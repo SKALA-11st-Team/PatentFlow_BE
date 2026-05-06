@@ -4,6 +4,7 @@ import java.util.List;
 
 public record MailingSendResponse(
         int updatedCount,
-        List<String> updatedPatentIds
+        List<String> updatedPatentIds,
+        List<String> skippedPatentIds
 ) {
 }

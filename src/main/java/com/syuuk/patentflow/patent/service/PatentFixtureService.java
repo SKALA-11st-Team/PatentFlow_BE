@@ -35,6 +35,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -57,6 +58,12 @@ public class PatentFixtureService {
     private final KiprisPatentLookupClient kiprisPatentLookupClient;
     private final GooglePatentsLookupClient googlePatentsLookupClient;
     private final PatentMetadataRepository patentMetadataRepository;
+
+    public record WorkflowBatchUpdateResult(
+            List<String> updatedPatentIds,
+            List<String> skippedPatentIds
+    ) {
+    }
 
     public PatentFixtureService(
             KiprisPatentLookupClient kiprisPatentLookupClient,
@@ -119,7 +126,12 @@ public class PatentFixtureService {
     public List<String> applyExecutiveApproval(List<String> patentIds, ExecutiveApprovalDecision decision) {
         OffsetDateTime decidedAt = OffsetDateTime.now(KST);
         return patentIds.stream()
-                .map(patentId -> updatePatent(patentId, patent -> withExecutiveApproval(patent, decision, decidedAt)))
+                .map(patentId -> updatePatent(patentId, patent -> {
+                    if (!canApplyExecutiveApproval(patent.reviewWorkflowStatus())) {
+                        throw new PatentFlowException(ErrorCode.INVALID_WORKFLOW_STATUS);
+                    }
+                    return withExecutiveApproval(patent, decision, decidedAt);
+                }))
                 .map(PatentDetailResponse::patentId)
                 .toList();
     }
@@ -231,7 +243,8 @@ public class PatentFixtureService {
                 .map(candidate -> new PatentContextSuggestionResponse(
                         candidate.patent().businessArea(),
                         confidenceText(candidate.score()),
-                        "%s 특허의 공식 metadata 키워드와 입력값을 비교했습니다.".formatted(candidate.patent().title()),
+                        "%s 특허의 공식 metadata 키워드와 입력값을 비교했습니다."
+                                .formatted(candidate.patent().title()),
                         candidate.patent().technologyArea()))
                 .orElse(null);
     }
@@ -241,13 +254,26 @@ public class PatentFixtureService {
      * @relatedUI UI-007
      * @description 실제 발송 연동 전, 사업부 검토 요청 메일 발송 상태를 fixture에 반영한다.
      */
-    public List<String> markMailingSent(List<String> patentIds) {
-        return patentIds.stream()
-                .map(patentId -> updatePatent(patentId, patent -> withReviewWorkflowStatus(
-                        patent,
-                        ReviewWorkflowStatus.WAITING_BUSINESS_RESPONSE)))
-                .map(PatentDetailResponse::patentId)
-                .toList();
+    public WorkflowBatchUpdateResult markMailingSent(List<String> patentIds) {
+        List<String> updatedPatentIds = new ArrayList<>();
+        List<String> skippedPatentIds = new ArrayList<>();
+
+        for (String patentId : new LinkedHashSet<>(patentIds)) {
+            PatentDetailResponse patent = findPatentOrNull(patentId);
+            if (patent == null || patent.reviewWorkflowStatus() != ReviewWorkflowStatus.MAIL_READY) {
+                skippedPatentIds.add(patentId);
+                continue;
+            }
+
+            PatentDetailResponse updatedPatent = updatePatent(
+                    patentId,
+                    currentPatent -> withReviewWorkflowStatus(
+                            currentPatent,
+                            ReviewWorkflowStatus.WAITING_BUSINESS_RESPONSE));
+            updatedPatentIds.add(updatedPatent.patentId());
+        }
+
+        return new WorkflowBatchUpdateResult(updatedPatentIds, skippedPatentIds);
     }
 
     /**
@@ -278,6 +304,13 @@ public class PatentFixtureService {
                 .filter(patent -> patent.patentId().equals(patentId))
                 .findFirst()
                 .orElseThrow(() -> new PatentFlowException(ErrorCode.PATENT_NOT_FOUND));
+    }
+
+    private PatentDetailResponse findPatentOrNull(String patentId) {
+        return patents.stream()
+                .filter(patent -> patent.patentId().equals(patentId))
+                .findFirst()
+                .orElse(null);
     }
 
     private PatentDetailResponse updatePatent(String patentId, PatentUpdater updater) {
@@ -509,8 +542,19 @@ public class PatentFixtureService {
         LocalDate expectedExpirationDate = entity.getExpectedExpirationDate();
         ReviewWorkflowStatus reviewWorkflowStatus = workflowStatus(sequence);
         Recommendation recommendation = recommendation(sequence);
-        BusinessOpinionDecision businessOpinionDecision = businessOpinionDecision(sequence);
+        BusinessOpinionDecision businessOpinionDecision = businessOpinionDecision(sequence, reviewWorkflowStatus);
         LegalActionResult legalActionResult = legalActionResult(reviewWorkflowStatus, recommendation);
+        OffsetDateTime businessOpinionSubmittedAt = businessOpinionDecision == null
+                ? null
+                : OffsetDateTime.of(
+                        2026,
+                        5,
+                        Math.min(28, 1 + sequence % 20),
+                        14,
+                        20,
+                        0,
+                        0,
+                        KST.getRules().getOffset(java.time.Instant.now()));
 
         return new PatentDetailResponse(
                 entity.getPatentId(),
@@ -540,7 +584,10 @@ public class PatentFixtureService {
                 summaryFromMetadata(title, technologyArea, productName),
                 aiEvaluationReport(recommendation),
                 new FinalDecisionRecordResponse(null, null, null, null),
-                new BusinessOpinionResponse(businessOpinionDecision, null, null));
+                new BusinessOpinionResponse(
+                        businessOpinionDecision,
+                        businessOpinionDecision == null ? null : defaultBusinessOpinionReason(businessOpinionDecision),
+                        businessOpinionSubmittedAt));
     }
 
     private PatentDetailResponse newPatentFromRequest(String patentId, PatentUpsertRequest request) {
@@ -731,7 +778,7 @@ public class PatentFixtureService {
                 new FinalDecisionRecordResponse(
                         patent.patentId() + "-DEC-01",
                         decision,
-                        null,
+                        defaultExecutiveApprovalReason(decision),
                         decidedAt),
                 patent.businessOpinion());
     }
@@ -740,7 +787,23 @@ public class PatentFixtureService {
         return switch (decision) {
             case APPROVED_ABANDON -> LegalActionResult.ABANDONED;
             case APPROVED_SELL -> LegalActionResult.SOLD;
-            case APPROVED_MAINTAIN, REJECTED, REQUEST_CHANGES -> null;
+            case APPROVED_MAINTAIN -> LegalActionResult.MAINTAINED;
+            case REJECTED, REQUEST_CHANGES -> null;
+        };
+    }
+
+    private boolean canApplyExecutiveApproval(ReviewWorkflowStatus status) {
+        return status == ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED
+                || status == ReviewWorkflowStatus.WAITING_EXECUTIVE_APPROVAL;
+    }
+
+    private String defaultExecutiveApprovalReason(ExecutiveApprovalDecision decision) {
+        return switch (decision) {
+            case APPROVED_MAINTAIN -> "사업부 의견과 AI 평가 근거를 검토해 유지 처리했습니다.";
+            case APPROVED_ABANDON -> "사업 활용성과 유지 필요성이 낮아 포기 처리했습니다.";
+            case APPROVED_SELL -> "외부 활용 가능성이 있어 매각 후보로 처리했습니다.";
+            case REJECTED -> "최종 검토 결과 요청을 반려했습니다.";
+            case REQUEST_CHANGES -> "추가 확인이 필요해 수정 요청으로 기록했습니다.";
         };
     }
 
@@ -813,7 +876,11 @@ public class PatentFixtureService {
         return recommendations[(sequence - 1) % recommendations.length];
     }
 
-    private BusinessOpinionDecision businessOpinionDecision(int sequence) {
+    private BusinessOpinionDecision businessOpinionDecision(int sequence, ReviewWorkflowStatus workflowStatus) {
+        if (workflowStatus != ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED
+                && workflowStatus != ReviewWorkflowStatus.LEGAL_ACTION_RECORDED) {
+            return null;
+        }
         if (sequence % 6 == 0) {
             return BusinessOpinionDecision.ABANDON;
         }
@@ -821,6 +888,12 @@ public class PatentFixtureService {
             return BusinessOpinionDecision.MAINTAIN;
         }
         return null;
+    }
+
+    private String defaultBusinessOpinionReason(BusinessOpinionDecision decision) {
+        return decision == BusinessOpinionDecision.MAINTAIN
+                ? "사업부 검토 결과 현재 제품 또는 향후 로드맵과 연결성이 확인되어 유지 의견을 제출했습니다."
+                : "현재 사업 적용 계획과 활용 근거가 부족해 포기 의견을 제출했습니다.";
     }
 
     private LegalActionResult legalActionResult(ReviewWorkflowStatus status, Recommendation recommendation) {

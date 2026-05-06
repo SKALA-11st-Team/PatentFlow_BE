@@ -28,7 +28,13 @@ public class MailingController {
      */
     @PostMapping("/send")
     public ApiResponse<MailingSendResponse> sendMailing(@Valid @RequestBody MailingSendRequest request) {
-        List<String> updatedPatentIds = patentFixtureService.markMailingSent(request.patentIds());
-        return ApiResponse.ok(new MailingSendResponse(updatedPatentIds.size(), updatedPatentIds));
+        PatentFixtureService.WorkflowBatchUpdateResult result =
+                patentFixtureService.markMailingSent(request.patentIds());
+        List<String> updatedPatentIds = result.updatedPatentIds();
+
+        return ApiResponse.ok(new MailingSendResponse(
+                updatedPatentIds.size(),
+                updatedPatentIds,
+                result.skippedPatentIds()));
     }
 }

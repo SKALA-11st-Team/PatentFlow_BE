@@ -7,6 +7,7 @@ import com.syuuk.patentflow.business.dto.BusinessChecklistSubmissionRequest;
 import com.syuuk.patentflow.business.dto.BusinessSubmissionChecklistScoreResponse;
 import com.syuuk.patentflow.business.dto.BusinessSubmissionVersionResponse;
 import com.syuuk.patentflow.patent.dto.BusinessOpinionDecision;
+import com.syuuk.patentflow.patent.dto.PatentDetailResponse;
 import com.syuuk.patentflow.patent.dto.Recommendation;
 import com.syuuk.patentflow.patent.service.PatentFixtureService;
 import java.time.OffsetDateTime;
@@ -80,8 +81,20 @@ public class BusinessFixtureService {
      * @description 특허별 사업부 제출 이력을 조회한다.
      */
     public List<BusinessSubmissionVersionResponse> getSubmissions(String patentId) {
-        patentFixtureService.ensurePatentExists(patentId);
-        return submissions.getOrDefault(patentId, List.of());
+        PatentDetailResponse patent = patentFixtureService.getPatentDetail(patentId);
+        List<BusinessSubmissionVersionResponse> patentSubmissions = submissions.get(patentId);
+        if (patentSubmissions != null) {
+            return patentSubmissions;
+        }
+
+        if (patent.businessOpinion().decision() == null || patent.businessOpinion().submittedAt() == null) {
+            return List.of();
+        }
+
+        List<BusinessSubmissionVersionResponse> seededSubmissions = new ArrayList<>();
+        seededSubmissions.add(toSeedVersion(patent));
+        submissions.put(patentId, seededSubmissions);
+        return seededSubmissions;
     }
 
     /**
@@ -91,7 +104,9 @@ public class BusinessFixtureService {
      */
     public BusinessChecklistSubmissionRequest submit(String patentId, BusinessChecklistSubmissionRequest request) {
         patentFixtureService.ensurePatentExists(patentId);
-        List<BusinessSubmissionVersionResponse> patentSubmissions = submissions.computeIfAbsent(patentId, key -> new ArrayList<>());
+        List<BusinessSubmissionVersionResponse> patentSubmissions = submissions.computeIfAbsent(
+                patentId,
+                key -> new ArrayList<>());
         int version = patentSubmissions.size() + 1;
         OffsetDateTime submittedAt = OffsetDateTime.now(KST);
         patentSubmissions.add(toVersion(patentId, request, version, submittedAt));
@@ -134,6 +149,36 @@ public class BusinessFixtureService {
                 checklistTotal,
                 checklistScores,
                 request.qualitativeScore());
+    }
+
+    private BusinessSubmissionVersionResponse toSeedVersion(PatentDetailResponse patent) {
+        BusinessOpinionDecision decision = patent.businessOpinion().decision();
+        int qualitativeScore = decision == BusinessOpinionDecision.MAINTAIN ? 3 : -3;
+        List<BusinessSubmissionChecklistScoreResponse> checklistScores = getChecklistItems().stream()
+                .map(item -> new BusinessSubmissionChecklistScoreResponse(
+                        item.id(),
+                        decision == BusinessOpinionDecision.MAINTAIN ? 3 : 2,
+                        "%s 기준으로 기존 제출 의견을 복원했습니다.".formatted(item.title())))
+                .toList();
+        int checklistTotal = checklistScores.stream()
+                .mapToInt(BusinessSubmissionChecklistScoreResponse::score)
+                .sum() + qualitativeScore;
+
+        return new BusinessSubmissionVersionResponse(
+                "%s-SUB-01".formatted(patent.patentId()),
+                1,
+                decision,
+                valueOrDefault(patent.businessOpinion().reason(), defaultReason(decision)),
+                patent.departmentName() + " 담당자",
+                patent.businessOpinion().submittedAt(),
+                patent.aiEvaluationReport().createdAt(),
+                patent.currentRecommendation(),
+                patent.aiEvaluationReport().totalScore() == null
+                        ? 0
+                        : patent.aiEvaluationReport().totalScore(),
+                checklistTotal,
+                checklistScores,
+                qualitativeScore);
     }
 
     private BusinessChecklistItemResponse checklistItem(

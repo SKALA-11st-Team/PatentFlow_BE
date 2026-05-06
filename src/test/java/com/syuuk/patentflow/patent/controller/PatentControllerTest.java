@@ -8,8 +8,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.syuuk.patentflow.patent.dto.EvaluationCategory;
 import com.jayway.jsonpath.JsonPath;
+import com.syuuk.patentflow.patent.dto.EvaluationCategory;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -32,8 +32,8 @@ class PatentControllerTest {
     @Test
     void getPatentsReturnsPagedEnvelope() throws Exception {
         mockMvc.perform(get("/api/v1/patents")
-                        .param("page", "1")
-                        .param("size", "2"))
+                .param("page", "1")
+                .param("size", "2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data", hasSize(2)))
                 .andExpect(jsonPath("$.page.page").value(1))
@@ -44,8 +44,8 @@ class PatentControllerTest {
     @Test
     void getPatentsCapsPageSizeAtTwenty() throws Exception {
         mockMvc.perform(get("/api/v1/patents")
-                        .param("page", "1")
-                        .param("size", "200"))
+                .param("page", "1")
+                .param("size", "200"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data", hasSize(20)))
                 .andExpect(jsonPath("$.page.size").value(20));
@@ -59,8 +59,10 @@ class PatentControllerTest {
                 .andExpect(jsonPath("$.data.title").value("상품 트렌드 예측을 반영한 강화학습 모델을 적용한 자산배분 시스템 및 방법"))
                 .andExpect(jsonPath("$.data.aiEvaluationReport.recommendation").value("MAINTAIN"))
                 .andExpect(jsonPath("$.data.finalDecisionRecord.decision").doesNotExist())
-                .andExpect(jsonPath("$.data.aiEvaluationReport.scores[0].category").value(EvaluationCategory.RIGHTS.name()))
-                .andExpect(jsonPath("$.data.aiEvaluationReport.scores[3].category").value(EvaluationCategory.LIFECYCLE_ECONOMICS.name()));
+                .andExpect(jsonPath("$.data.aiEvaluationReport.scores[0].category")
+                        .value(EvaluationCategory.RIGHTS.name()))
+                .andExpect(jsonPath("$.data.aiEvaluationReport.scores[3].category")
+                        .value(EvaluationCategory.LIFECYCLE_ECONOMICS.name()));
     }
 
     @Test
@@ -74,22 +76,36 @@ class PatentControllerTest {
     @Test
     void applyExecutiveApprovalUpdatesWorkflowAndDecision() throws Exception {
         mockMvc.perform(post("/api/v1/patents/executive-approvals/bulk-decision")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "patentIds": ["PAT-2026-0001"],
-                                  "decision": "APPROVED_ABANDON"
-                                }
-                                """))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                          "patentIds": ["PAT-2026-0005"],
+                          "decision": "APPROVED_ABANDON"
+                        }
+                        """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.decision").value("APPROVED_ABANDON"))
                 .andExpect(jsonPath("$.data.updatedCount").value(1));
 
-        mockMvc.perform(get("/api/v1/patents/PAT-2026-0001"))
+        mockMvc.perform(get("/api/v1/patents/PAT-2026-0005"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.reviewWorkflowStatus").value("APPROVAL_COMPLETED"))
                 .andExpect(jsonPath("$.data.executiveApprovalDecision").value("APPROVED_ABANDON"))
                 .andExpect(jsonPath("$.data.legalActionResult").value("ABANDONED"));
+    }
+
+    @Test
+    void applyExecutiveApprovalRejectsInvalidWorkflowStatus() throws Exception {
+        mockMvc.perform(post("/api/v1/patents/executive-approvals/bulk-decision")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                          "patentIds": ["PAT-2026-0001"],
+                          "decision": "APPROVED_MAINTAIN"
+                        }
+                        """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("INVALID_WORKFLOW_STATUS"));
     }
 
     @Test
@@ -102,8 +118,8 @@ class PatentControllerTest {
     @Test
     void lookupBibliographicInfoReturnsMetadataFromDocument() throws Exception {
         mockMvc.perform(get("/api/v1/patents/external-lookup")
-                        .param("managementNumber", "P202405001-KR0")
-                        .param("sourcePriority", "KIPRIS,GOOGLE_PATENTS"))
+                .param("managementNumber", "P202405001-KR0")
+                .param("sourcePriority", "KIPRIS,GOOGLE_PATENTS"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.managementNumber").value("P202405001-KR0"))
                 .andExpect(jsonPath("$.data.applicationNumber").value("10-2024-0115774"))
@@ -114,7 +130,7 @@ class PatentControllerTest {
     @Test
     void lookupBibliographicInfoReturnsNullWhenNotMatched() throws Exception {
         mockMvc.perform(get("/api/v1/patents/external-lookup")
-                        .param("managementNumber", "NO-MATCH"))
+                .param("managementNumber", "NO-MATCH"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").doesNotExist());
     }
@@ -122,17 +138,17 @@ class PatentControllerTest {
     @Test
     void suggestContextReturnsClosestBusinessAndTechnologyArea() throws Exception {
         mockMvc.perform(post("/api/v1/patents/context-suggestions")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "managementNumber": "TEMP-001",
-                                  "title": "블록체인 합의 과정 서명 검증 성능 향상",
-                                  "productName": "ChainZ",
-                                  "businessArea": "",
-                                  "technologyArea": "",
-                                  "applicationNumber": ""
-                                }
-                                """))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                          "managementNumber": "TEMP-001",
+                          "title": "블록체인 합의 과정 서명 검증 성능 향상",
+                          "productName": "ChainZ",
+                          "businessArea": "",
+                          "technologyArea": "",
+                          "applicationNumber": ""
+                        }
+                        """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.businessArea").value("Blockchain"))
                 .andExpect(jsonPath("$.data.technologyArea").value("Blockchain"))
@@ -152,33 +168,33 @@ class PatentControllerTest {
     @Test
     void submitBusinessChecklistCreatesSubmissionHistory() throws Exception {
         mockMvc.perform(post("/api/v1/patents/PAT-2026-0001/business-submissions")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "patentId": "PAT-2026-0001",
-                                  "evaluatorName": "R&D본부",
-                                  "evaluatedAt": "2026-05-06",
-                                  "responses": [
-                                    {
-                                      "itemId": "TECH_COMPLETENESS",
-                                      "score": 4,
-                                      "aiSuggestedScore": 3,
-                                      "memo": "제품 적용 가능성이 확인됩니다."
-                                    },
-                                    {
-                                      "itemId": "TECH_ORIGINALITY",
-                                      "score": 3,
-                                      "aiSuggestedScore": 3,
-                                      "memo": "기술 차별성이 일부 확인됩니다."
-                                    }
-                                  ],
-                                  "qualitativeScore": 2,
-                                  "qualitativeMemo": "사업부 정성 검토",
-                                  "finalOpinion": "MAINTAIN",
-                                  "finalReason": "현재 사업 적용 가능성이 있습니다.",
-                                  "additionalNeeds": "추가 시장 자료"
-                                }
-                                """))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                          "patentId": "PAT-2026-0001",
+                          "evaluatorName": "R&D본부",
+                          "evaluatedAt": "2026-05-06",
+                          "responses": [
+                            {
+                              "itemId": "TECH_COMPLETENESS",
+                              "score": 4,
+                              "aiSuggestedScore": 3,
+                              "memo": "제품 적용 가능성이 확인됩니다."
+                            },
+                            {
+                              "itemId": "TECH_ORIGINALITY",
+                              "score": 3,
+                              "aiSuggestedScore": 3,
+                              "memo": "기술 차별성이 일부 확인됩니다."
+                            }
+                          ],
+                          "qualitativeScore": 2,
+                          "qualitativeMemo": "사업부 정성 검토",
+                          "finalOpinion": "MAINTAIN",
+                          "finalReason": "현재 사업 적용 가능성이 있습니다.",
+                          "additionalNeeds": "추가 시장 자료"
+                        }
+                        """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.finalOpinion").value("MAINTAIN"))
                 .andExpect(jsonPath("$.data.responses", hasSize(2)));
@@ -198,21 +214,28 @@ class PatentControllerTest {
                 .andExpect(jsonPath("$.data.businessOpinion.decision").value("MAINTAIN"));
     }
 
-                @Test
-                void submitBusinessChecklistRejectsMismatchedPatentId() throws Exception {
-                                mockMvc.perform(post("/api/v1/patents/PAT-2026-0001/business-submissions")
-                                                                                                .contentType(MediaType.APPLICATION_JSON)
-                                                                                                .content("""
-                                                                                                                                {
-                                                                                                                                        "patentId": "PAT-2026-0002",
-                                                                                                                                        "responses": [],
-                                                                                                                                        "qualitativeScore": 0,
-                                                                                                                                        "finalOpinion": "MAINTAIN"
-                                                                                                                                }
-                                                                                                                                """))
-                                                                .andExpect(status().isBadRequest())
-                                                                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
-                }
+    @Test
+    void submitBusinessChecklistRejectsMismatchedPatentId() throws Exception {
+        mockMvc.perform(post("/api/v1/patents/PAT-2026-0001/business-submissions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                          "patentId": "PAT-2026-0002",
+                          "responses": [
+                            {
+                              "itemId": "TECH_COMPLETENESS",
+                              "score": 4,
+                              "aiSuggestedScore": 3,
+                              "memo": "제품 적용 가능성이 확인됩니다."
+                            }
+                          ],
+                          "qualitativeScore": 0,
+                          "finalOpinion": "MAINTAIN"
+                        }
+                        """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
 
     @Test
     void getBusinessSubmissionsForUnknownPatentReturnsNotFound() throws Exception {
@@ -222,19 +245,20 @@ class PatentControllerTest {
     }
 
     @Test
-    void sendMailingMovesPatentsToWaitingBusinessResponse() throws Exception {
+    void sendMailingMovesOnlyMailReadyPatentsToWaitingBusinessResponse() throws Exception {
         mockMvc.perform(post("/api/v1/mailings/send")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "patentIds": ["PAT-2026-0001"]
-                                }
-                                """))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                          "patentIds": ["PAT-2026-0001", "PAT-2026-0003"]
+                        }
+                        """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.updatedCount").value(1))
-                .andExpect(jsonPath("$.data.updatedPatentIds[0]").value("PAT-2026-0001"));
+                .andExpect(jsonPath("$.data.updatedPatentIds[0]").value("PAT-2026-0003"))
+                .andExpect(jsonPath("$.data.skippedPatentIds[0]").value("PAT-2026-0001"));
 
-        mockMvc.perform(get("/api/v1/patents/PAT-2026-0001"))
+        mockMvc.perform(get("/api/v1/patents/PAT-2026-0003"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.reviewWorkflowStatus").value("WAITING_BUSINESS_RESPONSE"));
     }
@@ -242,24 +266,24 @@ class PatentControllerTest {
     @Test
     void createAndUpdatePatentBasicInformation() throws Exception {
         String createResponse = mockMvc.perform(post("/api/v1/patents")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "managementNumber": "SKAX-NEW",
-                                  "title": "신규 테스트 특허",
-                                  "applicationDate": "2022-01-02",
-                                  "coApplicants": "없음",
-                                  "country": "KR",
-                                  "registrationDate": "2024-01-02",
-                                  "applicationNumber": "10-2022-0000004",
-                                  "registrationNumber": "10-2600000",
-                                  "expectedExpirationDate": "2042-01-02",
-                                  "source": "KIPRIS",
-                                  "businessArea": "AI",
-                                  "technologyArea": "문서처리",
-                                  "productName": "PatentFlow"
-                                }
-                                """))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                          "managementNumber": "SKAX-NEW",
+                          "title": "신규 테스트 특허",
+                          "applicationDate": "2022-01-02",
+                          "coApplicants": "없음",
+                          "country": "KR",
+                          "registrationDate": "2024-01-02",
+                          "applicationNumber": "10-2022-0000004",
+                          "registrationNumber": "10-2600000",
+                          "expectedExpirationDate": "2042-01-02",
+                          "source": "KIPRIS",
+                          "businessArea": "AI",
+                          "technologyArea": "문서처리",
+                          "productName": "PatentFlow"
+                        }
+                        """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.mode").value("CREATED"))
                 .andReturn()
@@ -268,24 +292,24 @@ class PatentControllerTest {
         String patentId = JsonPath.read(createResponse, "$.data.patentId");
 
         mockMvc.perform(put("/api/v1/patents/{patentId}", patentId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "managementNumber": "SKAX-NEW",
-                                  "title": "수정된 테스트 특허",
-                                  "applicationDate": "2022-01-02",
-                                  "coApplicants": "없음",
-                                  "country": "KR",
-                                  "registrationDate": "2024-01-02",
-                                  "applicationNumber": "10-2022-0000004",
-                                  "registrationNumber": "10-2600000",
-                                  "expectedExpirationDate": "2042-01-02",
-                                  "source": "KIPRIS",
-                                  "businessArea": "AI",
-                                  "technologyArea": "문서처리",
-                                  "productName": "PatentFlow"
-                                }
-                                """))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                          "managementNumber": "SKAX-NEW",
+                          "title": "수정된 테스트 특허",
+                          "applicationDate": "2022-01-02",
+                          "coApplicants": "없음",
+                          "country": "KR",
+                          "registrationDate": "2024-01-02",
+                          "applicationNumber": "10-2022-0000004",
+                          "registrationNumber": "10-2600000",
+                          "expectedExpirationDate": "2042-01-02",
+                          "source": "KIPRIS",
+                          "businessArea": "AI",
+                          "technologyArea": "문서처리",
+                          "productName": "PatentFlow"
+                        }
+                        """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.mode").value("UPDATED"));
 
