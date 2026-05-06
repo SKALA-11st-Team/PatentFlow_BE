@@ -1,0 +1,36 @@
+spring:
+  application:
+    name: PatentFlow
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/patentflow}
+    username: ${SPRING_DATASOURCE_USERNAME:patentflow}
+    password: ${SPRING_DATASOURCE_PASSWORD:patentflow}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+patentflow:
+  cors:
+    allowed-origins: ${PATENTFLOW_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
+  lookup:
+    kipris:
+      enabled: ${PATENTFLOW_KIPRIS_ENABLED:false}
+      base-url: ${PATENTFLOW_KIPRIS_BASE_URL:http://plus.kipris.or.kr/kipo-api/kipi/patUtiModInfoSearchSevice/getBibliographyDetailInfoSearch}
+      service-key: ${PATENTFLOW_KIPRIS_SERVICE_KEY:}
+    google-patents:
+      enabled: ${PATENTFLOW_GOOGLE_PATENTS_ENABLED:true}
+      base-url: ${PATENTFLOW_GOOGLE_PATENTS_BASE_URL:https://patents.google.com}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html

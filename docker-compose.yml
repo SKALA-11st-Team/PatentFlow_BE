@@ -1,0 +1,32 @@
+services:
+  patentflow-api:
+    build: .
+    container_name: patentflow-api
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      PATENTFLOW_CORS_ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      PATENTFLOW_KIPRIS_ENABLED: ${PATENTFLOW_KIPRIS_ENABLED:-false}
+      PATENTFLOW_KIPRIS_SERVICE_KEY: ${PATENTFLOW_KIPRIS_SERVICE_KEY:-}
+      PATENTFLOW_GOOGLE_PATENTS_ENABLED: ${PATENTFLOW_GOOGLE_PATENTS_ENABLED:-true}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/patentflow
+      SPRING_DATASOURCE_USERNAME: patentflow
+      SPRING_DATASOURCE_PASSWORD: patentflow
+    depends_on:
+      - postgres
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: patentflow-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: patentflow
+      POSTGRES_USER: patentflow
+      POSTGRES_PASSWORD: patentflow
+    volumes:
+      - patentflow-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  patentflow-postgres-data:
