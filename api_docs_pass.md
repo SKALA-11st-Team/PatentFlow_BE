@@ -11,7 +11,7 @@
 - BE가 비어 있는 상태에서는 DB보다 HTTP 계약을 먼저 맞춘다.
 - 초기 BE는 in-memory fixture 또는 JSON fixture 응답으로 시작해도 된다.
 - AI 평가 결과는 최종 판단이 아니다. 반드시 `AI 특허 평가 레포트`와 `최종 판단`을 분리한다.
-- 현재 평가축은 `RIGHTS`, `TECHNOLOGY`, `MARKET`, `LIFECYCLE_ECONOMICS`만 사용한다.
+- 현재 평가축은 `RIGHTS`, `TECHNOLOGY`, `MARKET`, `BUSINESS_ALIGNMENT`, `LIFECYCLE_ECONOMICS`를 사용한다.
 - `BUSINESS_RELEVANCE`, `STRATEGIC_VALUE`, `RIGHT_SCOPE`, `MATURITY`, `COST_EFFECTIVENESS` 등 과거 평가축은 사용하지 않는다.
 - 날짜는 `yyyy-mm-dd`, datetime은 ISO 8601 형식과 `+09:00` 타임존을 권장한다.
 
@@ -103,6 +103,7 @@ type EvaluationCategory =
   | "RIGHTS"
   | "TECHNOLOGY"
   | "MARKET"
+  | "BUSINESS_ALIGNMENT"
   | "LIFECYCLE_ECONOMICS";
 ```
 
@@ -247,6 +248,11 @@ Response:
           "category": "MARKET",
           "score": null,
           "evidenceSummary": "시장 규모 자료가 부족하여 추가 확인이 필요합니다."
+        },
+        {
+          "category": "BUSINESS_ALIGNMENT",
+          "score": 72,
+          "evidenceSummary": "관련사업 분야와 기술 영역은 연결되지만 실제 제품 적용 여부는 추가 확인이 필요합니다."
         },
         {
           "category": "LIFECYCLE_ECONOMICS",

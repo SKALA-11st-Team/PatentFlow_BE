@@ -62,6 +62,8 @@ class PatentControllerTest {
                 .andExpect(jsonPath("$.data.aiEvaluationReport.scores[0].category")
                         .value(EvaluationCategory.RIGHTS.name()))
                 .andExpect(jsonPath("$.data.aiEvaluationReport.scores[3].category")
+                        .value(EvaluationCategory.BUSINESS_ALIGNMENT.name()))
+                .andExpect(jsonPath("$.data.aiEvaluationReport.scores[4].category")
                         .value(EvaluationCategory.LIFECYCLE_ECONOMICS.name()));
     }
 

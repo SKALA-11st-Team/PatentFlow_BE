@@ -960,6 +960,8 @@ public class PatentFixtureService {
                                 "청구항 범위는 확인되나 일부 권리 범위 비교 자료가 부족합니다."),
                         new EvaluationScoreResponse(EvaluationCategory.TECHNOLOGY, 78, "명세서상 기술적 차별 요소가 확인됩니다."),
                         new EvaluationScoreResponse(EvaluationCategory.MARKET, null, "시장 규모 자료가 부족하여 추가 확인이 필요합니다."),
+                        new EvaluationScoreResponse(EvaluationCategory.BUSINESS_ALIGNMENT, 72,
+                                "관련사업 분야와 기술 영역은 연결되지만 실제 제품 적용 여부는 추가 확인이 필요합니다."),
                         new EvaluationScoreResponse(EvaluationCategory.LIFECYCLE_ECONOMICS, 68,
                                 "유지 비용 대비 활용 가능성 검토가 필요합니다.")),
                 List.of("시장 규모 자료", "제품 적용 여부"));

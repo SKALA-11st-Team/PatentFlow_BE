@@ -374,7 +374,7 @@ type ExecutiveApprovalDecision =
 
 type LegalActionResult = "MAINTAINED" | "ABANDONED" | "SOLD";
 
-type EvaluationCategory = "RIGHTS" | "TECHNOLOGY" | "MARKET" | "LIFECYCLE_ECONOMICS";
+type EvaluationCategory = "RIGHTS" | "TECHNOLOGY" | "MARKET" | "BUSINESS_ALIGNMENT" | "LIFECYCLE_ECONOMICS";
 ```
 
 ## 현재 BE 데이터 정책
@@ -391,4 +391,4 @@ type EvaluationCategory = "RIGHTS" | "TECHNOLOGY" | "MARKET" | "LIFECYCLE_ECONOM
 - 목록 API는 `page`가 1부터 시작합니다.
 - `N/A`는 source data가 없을 때만 사용하고, 사용자가 아직 작성하지 않은 값은 `작성 필요`, `대기 중`, `의견 대기` 계열 copy를 유지해 주세요.
 - AI 추천, 최종 판단, 사업부 의견은 화면과 상태 관리에서 섞지 말아 주세요.
-- 현재 평가 축은 `RIGHTS`, `TECHNOLOGY`, `MARKET`, `LIFECYCLE_ECONOMICS` 네 가지만 사용해 주세요.
+- 현재 평가 축은 `RIGHTS`, `TECHNOLOGY`, `MARKET`, `BUSINESS_ALIGNMENT`, `LIFECYCLE_ECONOMICS` 다섯 가지를 사용해 주세요.
