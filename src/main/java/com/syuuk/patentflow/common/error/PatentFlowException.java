@@ -9,6 +9,11 @@ public class PatentFlowException extends RuntimeException {
         this.errorCode = errorCode;
     }
 
+    public PatentFlowException(ErrorCode errorCode, String customMessage) {
+        super(customMessage);
+        this.errorCode = errorCode;
+    }
+
     public ErrorCode errorCode() {
         return errorCode;
     }

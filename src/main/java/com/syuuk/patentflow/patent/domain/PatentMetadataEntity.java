@@ -56,6 +56,9 @@ public class PatentMetadataEntity {
 
     private LocalDate expectedExpirationDate;
 
+    @Column(name = "fee_due_date")
+    private LocalDate feeDueDate;
+
     protected PatentMetadataEntity() {
     }
 
@@ -75,7 +78,8 @@ public class PatentMetadataEntity {
             LocalDate registrationDate,
             String applicationNumber,
             String registrationNumber,
-            LocalDate expectedExpirationDate
+            LocalDate expectedExpirationDate,
+            LocalDate feeDueDate
     ) {
         this.patentId = patentId;
         this.managementNumber = managementNumber;
@@ -93,6 +97,7 @@ public class PatentMetadataEntity {
         this.applicationNumber = applicationNumber;
         this.registrationNumber = registrationNumber;
         this.expectedExpirationDate = expectedExpirationDate;
+        this.feeDueDate = feeDueDate;
     }
 
     public String getPatentId() {
@@ -158,4 +163,17 @@ public class PatentMetadataEntity {
     public LocalDate getExpectedExpirationDate() {
         return expectedExpirationDate;
     }
+
+    public LocalDate getFeeDueDate() {
+        return feeDueDate;
+    }
+
+    public void setFeeDueDate(LocalDate feeDueDate) {
+        this.feeDueDate = feeDueDate;
+    }
+
+    public void setPatentStatus(String patentStatus) {
+        this.patentStatus = patentStatus;
+    }
+
 }

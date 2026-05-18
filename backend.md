@@ -14,7 +14,7 @@ FE/BE API 인터페이스 정합성 점검 후 주요 불일치 지점을 수정
   - `finalOpinion`: 필수
 - 메일 발송 API가 현재 `MAIL_READY` 상태인 특허만 `WAITING_BUSINESS_RESPONSE`로 변경하도록 제한했다.
 - 메일 발송 응답에 `skippedPatentIds`를 추가했다.
-- 관리자 최종 판단 API는 `BUSINESS_RESPONSE_RECEIVED`, `WAITING_EXECUTIVE_APPROVAL` 상태에서만 처리하도록 제한했다.
+- 관리자 최종 판단 API는 `BUSINESS_RESPONSE_RECEIVED` 상태에서만 처리하도록 제한했다.
 - `APPROVED_MAINTAIN` 최종 판단 시 `legalActionResult`를 `MAINTAINED`로 기록하도록 보정했다.
 - fixture의 사업부 의견 mock 데이터가 실제 workflow 상태와 맞도록 조정했다.
 - 컨트롤러 테스트에 실패/스킵 케이스를 추가하고 기존 테스트 indent를 정리했다.
@@ -84,7 +84,7 @@ FE/BE API 인터페이스 정합성 점검 후 주요 불일치 지점을 수정
 
 처리 규칙:
 
-- 허용 상태: `BUSINESS_RESPONSE_RECEIVED`, `WAITING_EXECUTIVE_APPROVAL`
+- 허용 상태: `BUSINESS_RESPONSE_RECEIVED`
 - 그 외 상태에서는 `409 CONFLICT`, `INVALID_WORKFLOW_STATUS`를 반환한다.
 - decision별 `legalActionResult` 매핑:
   - `APPROVED_MAINTAIN` -> `MAINTAINED`

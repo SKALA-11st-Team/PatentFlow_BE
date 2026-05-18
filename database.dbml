@@ -1,0 +1,160 @@
+// PatentFlow Database Schema — 2026-05-19
+//
+// Architecture
+//   FE(:5173) -> BE(:8080) -> PostgreSQL(:5432)   patent lifecycle, JPA
+//   FE(:5173) -> BE(:8080) -> MinIO(:9000)         file storage S3-compatible
+//   FE(:5173) -> BE(:8080) -> FastAPI(:8000) -> PostgreSQL(:5432)  AI RAG
+//
+// Tables managed by Spring Boot JPA (ddl-auto: update):
+//   patents, patent_review_history, quarter_settings,
+//   business_submissions, mailing_history, departments,
+//   users
+//
+// Table managed by FastAPI psycopg3 (manual DDL):
+//   industry_report_chunks  (pgvector extension required)
+
+Table patents {
+  patent_id varchar(32) [pk, note: "PAT-YYYY-NNNN"]
+  management_number varchar(64) [not null, unique, note: "Internal mgmt number e.g. P202405001-KR0"]
+  draft_title varchar(1000)
+  title varchar(1000)
+  business_area varchar(128) [note: "AI | Data | Blockchain | ESG | 통신 | 제조 | Cloud | 솔루션 | 금융/전략 | ..."]
+  technology_area varchar(256)
+  product_name varchar(512)
+  country varchar(16) [note: "KR | US | JP | CN | TW | UAE"]
+  joint_application varchar(16) [note: "Y or N"]
+  co_applicant_name varchar(512)
+  patent_status varchar(64) [note: "유지 | 소멸 | 포기 | SOLD — 특허 자체 상태. expected_expiration_date < today 이면 BE 기동 시 자동으로 소멸 처리"]
+  application_date date
+  registration_date date
+  application_number varchar(64)
+  registration_number varchar(64)
+  expected_expiration_date date [note: "법정 만료일 (연장 불가)"]
+  fee_due_date date [note: "연차료 납부 기한 (납부 완료 시 갱신). 분기 간 지속되는 최신값; patent_review_history.annual_fee_due_date는 분기별 스냅샷"]
+  department_id varchar(64) [note: "현재 담당 사업부 — FK to departments.department_id. 메일 발송 또는 분기 배정 시 설정"]
+}
+
+Table quarter_settings {
+  quarter_key varchar(12) [pk, note: "e.g. 2026-Q2"]
+  year int [not null]
+  quarter_number int [not null, note: "1~4"]
+  start_date date [note: "납부 기간 시작일 (관리자 설정)"]
+  end_date date [note: "납부 기간 종료일 (관리자 설정)"]
+  submission_deadline date [note: "사업부 의견 제출 마감일 (관리자 설정)"]
+  activated boolean [not null, note: "분기 시작 여부"]
+  activated_at timestamptz [note: "분기 활성화 시각"]
+  ended boolean [not null, default: false, note: "분기 종료 여부"]
+  ended_at timestamptz [note: "분기 종료 시각"]
+}
+
+Table patent_review_history {
+  id varchar(64) [pk, note: "{patent_id}|{quarter_key}"]
+  patent_id varchar(32) [not null]
+  quarter_key varchar(16) [not null]
+  review_workflow_status varchar(64) [note: "NOT_IN_REVIEW_QUARTER | REVIEW_QUARTER_STARTED | REPORT_GENERATED | MAIL_READY | WAITING_BUSINESS_RESPONSE | BUSINESS_RESPONSE_RECEIVED | WAITING_EXECUTIVE_APPROVAL | APPROVAL_COMPLETED | LEGAL_ACTION_RECORDED"]
+  business_opinion_decision varchar(64) [note: "MAINTAIN | ABANDON — business_submissions.decision 최신값 비정규화 스냅샷"]
+  business_opinion_reason varchar(2000) [note: "business_submissions.reason 최신값 비정규화 스냅샷"]
+  business_opinion_submitted_at timestamp [note: "business_submissions.submitted_at 최신값 비정규화 스냅샷"]
+  executive_approval_decision varchar(64) [note: "APPROVED_MAINTAIN | APPROVED_ABANDON | APPROVED_SELL | REJECTED | REQUEST_CHANGES"]
+  legal_action_result varchar(64) [note: "MAINTAINED | ABANDONED | SOLD"]
+  final_decision_id varchar(64)
+  final_decision_reason varchar(2000)
+  final_decision_decided_at timestamp
+  annual_fee_due_date date [note: "분기별 납부 기한 스냅샷; 납부 완료 시 연장된 값으로 갱신. 최신값은 patents.fee_due_date 참조"]
+  department_id varchar(64) [note: "담당 사업부 — FK to departments.department_id; 메일 발송 또는 분기 검토 시 설정. null/blank이면 FE에서 '-' 표시"]
+  department_name varchar(128) [note: "담당 사업부명 스냅샷 (departments.department_name 복사본)"]
+  created_at timestamp [note: "분기 활성화 시 생성"]
+
+  indexes {
+    (patent_id, quarter_key) [unique]
+  }
+}
+
+Table business_submissions {
+  submission_id varchar(64) [pk, note: "{patentId}-SUB-{NN}"]
+  patent_id varchar(32) [not null]
+  quarter_key varchar(12) [note: "FK to quarter_settings.quarter_key; 활성 분기 내 제출 시 설정"]
+  version int [note: "Incremented per re-submission within the same quarter"]
+  decision varchar(64) [note: "MAINTAIN | ABANDON"]
+  reason varchar(2000)
+  submitted_by varchar(128)
+  submitted_at timestamp
+  ai_report_created_at timestamp
+  ai_recommendation varchar(64) [note: "MAINTAIN | REVIEW_AGAIN | ABANDON | HOLD"]
+  ai_total_score int
+  checklist_total int
+  qualitative_score int
+  checklist_scores_json text [note: "JSON: [{itemId, score, memo}]"]
+}
+
+Table mailing_history {
+  mailing_id varchar(64) [pk, note: "MAIL-BATCH-{ts}-{emailHash}"]
+  body text [note: "HTML 메일 본문"]
+  cc_emails_json text [note: "JSON: [email string]"]
+  patent_count int [not null]
+  patents_json text [note: "JSON: [{patentId, managementNumber, title}]"]
+  recipient_email varchar(256)
+  recipient_name varchar(128)
+  department_id varchar(64) [note: "FK to departments.department_id — 발송 대상 사업부"]
+  sent_at timestamptz
+  sent_by varchar(128)
+  status varchar(32) [note: "SENT | FAILED | PENDING"]
+  subject varchar(500)
+}
+
+Table departments {
+  department_id varchar(64) [pk, note: "사업부 마스터. BE 기동 시 테이블이 비어있으면 기본 6개 사업부 자동 시드"]
+  department_name varchar(128)
+  updated_at date [note: "부서 생성/수정 일자"]
+}
+
+Table users {
+  id varchar(64) [pk, note: "USER-{UUID12}"]
+  username varchar(256) [not null, unique, note: "Email address used as login ID"]
+  password varchar(256) [not null, note: "BCrypt hash"]
+  role varchar(32) [not null, note: "ADMIN | BUSINESS"]
+  department_id varchar(64) [note: "Null for ADMIN; DEPT-* for BUSINESS — FK to departments.department_id"]
+  display_name varchar(128)
+  created_at timestamp
+}
+
+Table industry_report_chunks {
+  chunk_id text [pk]
+  text text [note: "Raw text of the chunk for RAG retrieval"]
+  metadata varchar(4000) [note: "JSONB in PostgreSQL: {source_name, industry, page, ...}"]
+  embedding_model text [note: "Embedding model identifier"]
+  embedding varchar(4000) [note: "pgvector float[] — stored as vector(N) in PostgreSQL"]
+  created_at timestamp
+  updated_at timestamp
+
+  indexes {
+    embedding [name: "industry_report_chunks_embedding_hnsw_idx", note: "HNSW index (vector_cosine_ops) — pgvector only"]
+    (metadata, embedding_model) [name: "industry_report_chunks_industry_idx"]
+  }
+}
+
+Table system_settings {
+  key varchar(128) [pk, note: "Dot-separated key e.g. mail.gmail.username | country.extension.KR"]
+  value text [note: "String value; numeric values stored as string"]
+  updated_at timestamptz [note: "Last update timestamp"]
+
+  note: '''
+  Key patterns in use:
+    mail.gmail.username       — Gmail sender address for review-request mailings
+    mail.gmail.app_password   — Gmail app password (stored in plaintext; production should use a secret manager)
+    country.extension.KR      — 납부일 연장 개월 수 (한국), default 12
+    country.extension.JP      — 납부일 연장 개월 수 (일본), default 12
+    country.extension.CN      — 납부일 연장 개월 수 (중국), default 12
+    country.extension.US      — 납부일 연장 개월 수 (미국), default 12
+    country.extension.TW      — 납부일 연장 개월 수 (대만), default 12
+  '''
+}
+
+Ref: patent_review_history.patent_id > patents.patent_id
+Ref: patent_review_history.quarter_key > quarter_settings.quarter_key
+Ref: patent_review_history.department_id > departments.department_id
+Ref: patents.department_id > departments.department_id
+Ref: users.department_id > departments.department_id
+Ref: business_submissions.patent_id > patents.patent_id
+Ref: business_submissions.quarter_key > quarter_settings.quarter_key
+Ref: mailing_history.department_id > departments.department_id
