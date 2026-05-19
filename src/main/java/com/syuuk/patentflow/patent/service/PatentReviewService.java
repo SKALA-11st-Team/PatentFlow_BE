@@ -36,7 +36,6 @@ import com.syuuk.patentflow.patent.dto.PatentUpsertRequest;
 import com.syuuk.patentflow.patent.dto.PatentUpsertResponse;
 import com.syuuk.patentflow.patent.dto.Recommendation;
 import com.syuuk.patentflow.patent.dto.ReviewWorkflowStatus;
-import com.syuuk.patentflow.common.service.SystemSettingsService;
 import com.syuuk.patentflow.mailing.domain.DepartmentEntity;
 import com.syuuk.patentflow.mailing.repository.DepartmentRepository;
 import com.syuuk.patentflow.patent.repository.PatentMetadataRepository;
@@ -76,7 +75,7 @@ public class PatentReviewService {
     private final PatentMetadataRepository patentMetadataRepository;
     private final PatentReviewHistoryRepository reviewHistoryRepository;
     private final AiReportAgentClient aiReportAgentClient;
-    private final SystemSettingsService systemSettingsService;
+    private final AnnualFeeScheduleService annualFeeScheduleService;
     private final DepartmentRepository mailingRecipientMappingRepository;
     private final ObjectMapper objectMapper;
     private Map<String, String> departmentNameCache;
@@ -94,7 +93,7 @@ public class PatentReviewService {
             PatentMetadataRepository patentMetadataRepository,
             PatentReviewHistoryRepository reviewHistoryRepository,
             AiReportAgentClient aiReportAgentClient,
-            SystemSettingsService systemSettingsService,
+            AnnualFeeScheduleService annualFeeScheduleService,
             DepartmentRepository mailingRecipientMappingRepository,
             ObjectMapper objectMapper
     ) {
@@ -103,7 +102,7 @@ public class PatentReviewService {
         this.patentMetadataRepository = patentMetadataRepository;
         this.reviewHistoryRepository = reviewHistoryRepository;
         this.aiReportAgentClient = aiReportAgentClient;
-        this.systemSettingsService = systemSettingsService;
+        this.annualFeeScheduleService = annualFeeScheduleService;
         this.mailingRecipientMappingRepository = mailingRecipientMappingRepository;
         this.objectMapper = objectMapper;
         seedDepartmentsIfNeeded();
@@ -367,6 +366,47 @@ public class PatentReviewService {
 
     public List<PatentListItemResponse> getAllPatents() {
         return patents.stream().map(this::toListItem).toList();
+    }
+
+    public List<String> createQuarterReviewTargets(String quarterKey, LocalDate startDate, LocalDate endDate) {
+        List<String> reviewStarted = new ArrayList<>();
+        patentMetadataRepository.findAll(Sort.by("patentId")).forEach(entity -> {
+            LocalDate dueDate = entity.getFeeDueDate() != null
+                    ? entity.getFeeDueDate()
+                    : annualFeeScheduleService.calculateNextDueDate(
+                            entity.getCountry(),
+                            entity.getApplicationDate(),
+                            entity.getRegistrationDate(),
+                            entity.getExpectedExpirationDate());
+            if (entity.getFeeDueDate() == null && dueDate != null) {
+                entity.setFeeDueDate(dueDate);
+                patentMetadataRepository.save(entity);
+            }
+            if (dueDate == null || dueDate.isBefore(startDate) || dueDate.isAfter(endDate)) {
+                return;
+            }
+
+            PatentReviewHistoryEntity history = reviewHistoryRepository
+                    .findByPatentIdAndQuarterKey(entity.getPatentId(), quarterKey)
+                    .orElseGet(() -> new PatentReviewHistoryEntity(entity.getPatentId(), quarterKey));
+            history.setReviewWorkflowStatus(ReviewWorkflowStatus.REVIEW_QUARTER_STARTED);
+            if (history.getAiRecommendation() == null) {
+                history.setAiRecommendation(Recommendation.HOLD);
+            }
+            history.setAnnualFeeDueDate(dueDate);
+            history.setDepartmentId(departmentId(entity.getBusinessArea()));
+            history.setDepartmentName(departmentName(entity.getBusinessArea()));
+            reviewHistoryRepository.save(history);
+            reviewStarted.add(entity.getPatentId());
+        });
+
+        if (!reviewStarted.isEmpty()) {
+            Set<String> idSet = new HashSet<>(reviewStarted);
+            patents.replaceAll(patent -> idSet.contains(patent.patentId())
+                    ? withReviewWorkflowStatus(patent, ReviewWorkflowStatus.REVIEW_QUARTER_STARTED)
+                    : patent);
+        }
+        return reviewStarted;
     }
 
     public void bulkUpdateWorkflowStatus(List<String> patentIds, ReviewWorkflowStatus newStatus, String quarterKey) {
@@ -690,7 +730,7 @@ public class PatentReviewService {
                         KST.getRules().getOffset(java.time.Instant.now()));
         LocalDate annualFeeDueDate = entity.getFeeDueDate() != null
                 ? entity.getFeeDueDate()
-                : annualFeeDueDate(
+                : annualFeeScheduleService.calculateNextDueDate(
                         entity.getCountry(),
                         entity.getApplicationDate(),
                         entity.getRegistrationDate(),
@@ -751,7 +791,7 @@ public class PatentReviewService {
 
         LocalDate baseFeeDate = entity.getFeeDueDate() != null
                 ? entity.getFeeDueDate()
-                : annualFeeDueDate(country, applicationDate, registrationDate, expectedExpirationDate);
+                : annualFeeScheduleService.calculateNextDueDate(country, applicationDate, registrationDate, expectedExpirationDate);
         
         if (ls == PatentLifecycleStatus.ACTIVE && expectedExpirationDate != null
                 && expectedExpirationDate.isBefore(LocalDate.now(KST))) {
@@ -794,7 +834,7 @@ public class PatentReviewService {
     }
 
     private PatentDetailResponse newPatentFromRequest(String patentId, PatentUpsertRequest request) {
-        LocalDate computedFeeDate = annualFeeDueDate(
+        LocalDate computedFeeDate = annualFeeScheduleService.calculateNextDueDate(
                 request.country(), request.applicationDate(), request.registrationDate(), request.expectedExpirationDate());
         return new PatentDetailResponse(
                 patentId,
@@ -827,7 +867,7 @@ public class PatentReviewService {
     }
 
     private PatentMetadataEntity metadataEntityFromRequest(String patentId, PatentUpsertRequest request) {
-        LocalDate computedFeeDate = annualFeeDueDate(
+        LocalDate computedFeeDate = annualFeeScheduleService.calculateNextDueDate(
                 request.country(), request.applicationDate(), request.registrationDate(), request.expectedExpirationDate());
         return new PatentMetadataEntity(
                 patentId,
@@ -1062,8 +1102,9 @@ public class PatentReviewService {
             FinalDecisionRequest request,
             OffsetDateTime decidedAt
     ) {
-        LocalDate newDueDate = request.legalActionResult() == LegalActionResult.MAINTAINED && patent.feeDueDate() != null
-                ? patent.feeDueDate().plusMonths(systemSettingsService.getCountryExtensionMonths(patent.country()))
+        LocalDate newDueDate = request.legalActionResult() == LegalActionResult.MAINTAINED
+                ? annualFeeScheduleService.advanceAfterMaintenance(
+                        patent.country(), patent.feeDueDate(), patent.expectedExpirationDate())
                 : patent.feeDueDate();
         return new PatentDetailResponse(
                 patent.patentId(),
@@ -1138,6 +1179,11 @@ public class PatentReviewService {
     ) {
         LegalActionResult legalActionResult = request.legalActionResult() != null
                 ? request.legalActionResult() : patent.legalActionResult();
+        LocalDate newDueDate = request.legalActionResult() == LegalActionResult.MAINTAINED
+                && patent.legalActionResult() != LegalActionResult.MAINTAINED
+                ? annualFeeScheduleService.advanceAfterMaintenance(
+                        patent.country(), patent.feeDueDate(), patent.expectedExpirationDate())
+                : patent.feeDueDate();
         String reason = request.reason() != null && !request.reason().isBlank()
                 ? request.reason()
                 : patent.finalDecisionRecord().reason();
@@ -1160,7 +1206,7 @@ public class PatentReviewService {
                 patent.departmentName(),
                 patent.lifecycleStatus(),
                 ReviewWorkflowStatus.LEGAL_ACTION_RECORDED,
-                patent.feeDueDate(),
+                newDueDate,
                 patent.reviewReason(),
                 patent.currentRecommendation(),
                 patent.businessOpinionDecision(),
@@ -1306,32 +1352,6 @@ public class PatentReviewService {
             return LegalActionResult.ABANDONED;
         }
         return LegalActionResult.MAINTAINED;
-    }
-
-    private LocalDate annualFeeDueDate(String country, LocalDate applicationDate,
-            LocalDate registrationDate, LocalDate expectedExpirationDate) {
-        int currentYear = LocalDate.now(KST).getYear();
-
-        // US: maintenance fees at 3.5 / 7.5 / 11.5 years from grant date
-        if ("US".equalsIgnoreCase(country) && registrationDate != null) {
-            LocalDate today = LocalDate.now(KST);
-            for (int[] ym : new int[][]{{3, 6}, {7, 6}, {11, 6}}) {
-                LocalDate feeDate = registrationDate.plusYears(ym[0]).plusMonths(ym[1]);
-                if (!feeDate.isBefore(today)) return feeDate;
-            }
-            return expectedExpirationDate != null ? expectedExpirationDate : today.plusYears(1);
-        }
-
-        // KR / JP / CN / TW / others: annual fee on application date anniversary, current year
-        LocalDate base = applicationDate != null ? applicationDate : registrationDate;
-        if (base == null) return LocalDate.of(currentYear, 12, 31);
-
-        try {
-            return LocalDate.of(currentYear, base.getMonth(), base.getDayOfMonth());
-        } catch (java.time.DateTimeException e) {
-            // Feb 29 in a non-leap year → Feb 28
-            return LocalDate.of(currentYear, base.getMonth(), 28);
-        }
     }
 
     private int sequenceFromPatentId(String patentId) {

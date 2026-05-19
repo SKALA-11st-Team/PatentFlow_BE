@@ -3,7 +3,6 @@ package com.syuuk.patentflow.settings.service;
 import com.syuuk.patentflow.common.error.ErrorCode;
 import com.syuuk.patentflow.common.error.PatentFlowException;
 import com.syuuk.patentflow.patent.dto.PatentListItemResponse;
-import com.syuuk.patentflow.patent.dto.ReviewWorkflowStatus;
 import com.syuuk.patentflow.patent.service.PatentReviewService;
 import com.syuuk.patentflow.settings.domain.QuarterSettingEntity;
 import com.syuuk.patentflow.settings.dto.QuarterActivateResponse;
@@ -13,7 +12,6 @@ import com.syuuk.patentflow.settings.repository.QuarterSettingRepository;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
-import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
@@ -76,22 +74,8 @@ public class SettingsService {
             throw new PatentFlowException(ErrorCode.INVALID_WORKFLOW_STATUS, "이미 활성화된 분기입니다.");
         }
 
-        List<PatentListItemResponse> allPatents = patentReviewService.getAllPatents();
-        List<String> reviewStarted = new ArrayList<>();
-
-        for (PatentListItemResponse patent : allPatents) {
-            if (patent.reviewWorkflowStatus() != ReviewWorkflowStatus.NOT_IN_REVIEW_QUARTER) {
-                continue;
-            }
-            LocalDate dueDate = patent.feeDueDate();
-            if (dueDate == null) continue;
-
-            if (!dueDate.isBefore(quarter.getStartDate()) && !dueDate.isAfter(quarter.getEndDate())) {
-                reviewStarted.add(patent.patentId());
-            }
-        }
-
-        patentReviewService.bulkUpdateWorkflowStatus(reviewStarted, ReviewWorkflowStatus.REVIEW_QUARTER_STARTED, quarterKey);
+        List<String> reviewStarted = patentReviewService.createQuarterReviewTargets(
+                quarterKey, quarter.getStartDate(), quarter.getEndDate());
 
         quarter.setActivated(true);
         quarter.setActivatedAt(OffsetDateTime.now(KST));
