@@ -62,7 +62,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 @Service
-public class PatentFixtureService {
+public class PatentReviewService {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private static final String PATENT_METADATA_PATH = "docs/skax_patents_list.md";
@@ -88,7 +88,7 @@ public class PatentFixtureService {
     ) {
     }
 
-    public PatentFixtureService(
+    public PatentReviewService(
             KiprisPatentLookupClient kiprisPatentLookupClient,
             GooglePatentsLookupClient googlePatentsLookupClient,
             PatentMetadataRepository patentMetadataRepository,
@@ -122,7 +122,7 @@ public class PatentFixtureService {
     /**
      * @relatedFR FR-001, FR-002
      * @relatedUI UI-002, UI-003
-     * @description FE 우선 연동을 위한 특허 목록 fixture 조회를 제공한다.
+     * @description FE 우선 연동을 위한 특허 목록 DB 기반 조회를 제공한다.
      */
     public PageResponse<PatentListItemResponse> getPatents(
             int page,
@@ -238,7 +238,7 @@ public class PatentFixtureService {
     /**
      * @relatedFR FR-003
      * @relatedUI UI-004
-     * @description 공식 metadata fixture에서 관리번호/출원번호/등록번호 기반 외부 검색 결과를 제공한다.
+     * @description 공식 metadata에서 관리번호/출원번호/등록번호 기반 외부 검색 결과를 제공한다.
      */
     public PatentBibliographicInfoResponse lookupBibliographicInfo(
             String managementNumber,
@@ -251,17 +251,17 @@ public class PatentFixtureService {
         }
 
         String keyword = lookupValue.trim().toLowerCase(Locale.ROOT);
-        PatentDetailResponse fixturePatent = patents.stream()
+        PatentDetailResponse knownPatent = patents.stream()
                 .filter(patent -> lowerEquals(patent.managementNumber(), keyword)
                         || lowerEquals(patent.applicationNumber(), keyword)
                         || lowerEquals(patent.registrationNumber(), keyword))
                 .findFirst()
                 .orElse(null);
         PatentLookupQuery query = new PatentLookupQuery(
-                fixturePatent == null ? lookupValue.trim() : fixturePatent.managementNumber(),
-                fixturePatent == null ? lookupValue.trim() : fixturePatent.applicationNumber(),
-                fixturePatent == null ? lookupValue.trim() : fixturePatent.registrationNumber(),
-                fixturePatent == null ? "KR" : fixturePatent.country());
+                knownPatent == null ? lookupValue.trim() : knownPatent.managementNumber(),
+                knownPatent == null ? lookupValue.trim() : knownPatent.applicationNumber(),
+                knownPatent == null ? lookupValue.trim() : knownPatent.registrationNumber(),
+                knownPatent == null ? "KR" : knownPatent.country());
 
         for (String source : lookupPriority(sourcePriority)) {
             PatentBibliographicInfoResponse externalResult = switch (source) {
@@ -270,17 +270,17 @@ public class PatentFixtureService {
                 default -> null;
             };
             if (externalResult != null) {
-                return mergeBibliographicInfo(externalResult, fixturePatent);
+                return mergeBibliographicInfo(externalResult, knownPatent);
             }
         }
 
-        return fixturePatent == null ? null : toBibliographicInfo(fixturePatent);
+        return knownPatent == null ? null : toBibliographicInfo(knownPatent);
     }
 
     /**
      * @relatedFR FR-003, FR-004
      * @relatedUI UI-004
-     * @description 특허명/제품/기술 키워드를 공식 metadata fixture와 비교해 회사 컨텍스트를 추천한다.
+     * @description 특허명/제품/기술 키워드를 공식 metadata와 비교해 회사 컨텍스트를 추천한다.
      */
     public PatentContextSuggestionResponse suggestContext(PatentContextSuggestionRequest request) {
         List<String> sourceTokens = tokenizeContextText(String.join(" ",
@@ -309,7 +309,7 @@ public class PatentFixtureService {
     /**
      * @relatedFR FR-014, FR-015, FR-016
      * @relatedUI UI-007
-     * @description 실제 발송 연동 전, 사업부 검토 요청 메일 발송 상태를 fixture에 반영한다.
+     * @description 실제 발송 연동 전, 사업부 검토 요청 메일 발송 상태를 검토 상태에 반영한다.
      */
     public WorkflowBatchUpdateResult markMailingSent(List<String> patentIds) {
         List<String> updatedPatentIds = new ArrayList<>();
@@ -336,7 +336,7 @@ public class PatentFixtureService {
     /**
      * @relatedFR FR-003, FR-004
      * @relatedUI UI-004
-     * @description 특허 기본 정보와 회사 컨텍스트를 fixture에 등록한다.
+     * @description 특허 기본 정보와 회사 컨텍스트를 DB에 등록한다.
      */
     public PatentUpsertResponse createPatent(PatentUpsertRequest request) {
         String patentId = "PAT-2026-%04d".formatted(patentSequence.getAndIncrement());
@@ -350,7 +350,7 @@ public class PatentFixtureService {
     /**
      * @relatedFR FR-003, FR-004
      * @relatedUI UI-004
-     * @description 특허 기본 정보와 회사 컨텍스트를 fixture에서 수정한다.
+     * @description 특허 기본 정보와 회사 컨텍스트를 DB에서 수정한다.
      */
     public PatentUpsertResponse updatePatent(String patentId, PatentUpsertRequest request) {
         updatePatent(patentId, patent -> withUpsertRequest(patent, request));
@@ -512,22 +512,22 @@ public class PatentFixtureService {
 
     private PatentBibliographicInfoResponse mergeBibliographicInfo(
             PatentBibliographicInfoResponse externalResult,
-            PatentDetailResponse fixturePatent
+            PatentDetailResponse knownPatent
     ) {
-        if (fixturePatent == null) {
+        if (knownPatent == null) {
             return externalResult;
         }
 
         return new PatentBibliographicInfoResponse(
-                valueOrDefault(fixturePatent.managementNumber(), externalResult.managementNumber()),
-                valueOrDefault(externalResult.title(), fixturePatent.title()),
-                valueOrDefault(externalResult.applicationDate(), fixturePatent.applicationDate()),
-                valueOrDefault(externalResult.coApplicants(), fixturePatent.coApplicants()),
-                valueOrDefault(externalResult.country(), fixturePatent.country()),
-                valueOrDefault(externalResult.registrationDate(), fixturePatent.registrationDate()),
-                valueOrDefault(externalResult.applicationNumber(), fixturePatent.applicationNumber()),
-                valueOrDefault(externalResult.registrationNumber(), fixturePatent.registrationNumber()),
-                valueOrDefault(externalResult.expectedExpirationDate(), fixturePatent.expectedExpirationDate()),
+                valueOrDefault(knownPatent.managementNumber(), externalResult.managementNumber()),
+                valueOrDefault(externalResult.title(), knownPatent.title()),
+                valueOrDefault(externalResult.applicationDate(), knownPatent.applicationDate()),
+                valueOrDefault(externalResult.coApplicants(), knownPatent.coApplicants()),
+                valueOrDefault(externalResult.country(), knownPatent.country()),
+                valueOrDefault(externalResult.registrationDate(), knownPatent.registrationDate()),
+                valueOrDefault(externalResult.applicationNumber(), knownPatent.applicationNumber()),
+                valueOrDefault(externalResult.registrationNumber(), knownPatent.registrationNumber()),
+                valueOrDefault(externalResult.expectedExpirationDate(), knownPatent.expectedExpirationDate()),
                 externalResult.source());
     }
 
@@ -632,7 +632,7 @@ public class PatentFixtureService {
                     .map(columns -> metadataEntityFromColumns(sequence.getAndIncrement(), columns))
                     .toList();
         } catch (java.io.IOException exception) {
-            throw new IllegalStateException("특허 metadata fixture 문서를 읽을 수 없습니다: " + PATENT_METADATA_PATH, exception);
+            throw new IllegalStateException("특허 metadata 문서를 읽을 수 없습니다: " + PATENT_METADATA_PATH, exception);
         }
     }
 

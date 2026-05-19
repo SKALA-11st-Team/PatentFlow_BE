@@ -17,7 +17,7 @@ import com.syuuk.patentflow.patent.dto.PatentListItemResponse;
 import com.syuuk.patentflow.patent.dto.PatentUpsertRequest;
 import com.syuuk.patentflow.patent.dto.PatentUpsertResponse;
 import com.syuuk.patentflow.patent.dto.ReviewWorkflowStatus;
-import com.syuuk.patentflow.patent.service.PatentFixtureService;
+import com.syuuk.patentflow.patent.service.PatentReviewService;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -34,10 +34,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/patents")
 public class PatentController {
 
-    private final PatentFixtureService patentFixtureService;
+    private final PatentReviewService patentReviewService;
 
-    public PatentController(PatentFixtureService patentFixtureService) {
-        this.patentFixtureService = patentFixtureService;
+    public PatentController(PatentReviewService patentReviewService) {
+        this.patentReviewService = patentReviewService;
     }
 
     /**
@@ -53,7 +53,7 @@ public class PatentController {
             @RequestParam(required = false) String departmentId,
             @RequestParam(required = false) ReviewWorkflowStatus reviewWorkflowStatus,
             @RequestParam(required = false) String sort) {
-        return patentFixtureService.getPatents(page, size, keyword, departmentId, reviewWorkflowStatus, sort);
+        return patentReviewService.getPatents(page, size, keyword, departmentId, reviewWorkflowStatus, sort);
     }
 
     /**
@@ -63,13 +63,13 @@ public class PatentController {
      */
     @PostMapping
     public ApiResponse<PatentUpsertResponse> createPatent(@Valid @RequestBody PatentUpsertRequest request) {
-        return ApiResponse.ok(patentFixtureService.createPatent(request));
+        return ApiResponse.ok(patentReviewService.createPatent(request));
     }
 
     /**
      * @relatedFR FR-003
      * @relatedUI UI-004
-     * @description 관리번호/출원번호/등록번호 기반 특허 외부 검색 mock API.
+     * @description 관리번호/출원번호/등록번호 기반 특허 외부 검색 API.
      */
     @GetMapping("/external-lookup")
     public ApiResponse<PatentBibliographicInfoResponse> lookupBibliographicInfo(
@@ -77,19 +77,19 @@ public class PatentController {
             @RequestParam(required = false) String registrationNumber,
             @RequestParam(required = false) String sourcePriority
     ) {
-        return ApiResponse.ok(patentFixtureService.lookupBibliographicInfo(managementNumber, registrationNumber, sourcePriority));
+        return ApiResponse.ok(patentReviewService.lookupBibliographicInfo(managementNumber, registrationNumber, sourcePriority));
     }
 
     /**
      * @relatedFR FR-003, FR-004
      * @relatedUI UI-004
-     * @description 특허명/관련제품 기반 회사 컨텍스트 추천 mock API.
+     * @description 특허명/관련제품 기반 회사 컨텍스트 추천 API.
      */
     @PostMapping("/context-suggestions")
     public ApiResponse<PatentContextSuggestionResponse> suggestContext(
             @RequestBody PatentContextSuggestionRequest request
     ) {
-        return ApiResponse.ok(patentFixtureService.suggestContext(request));
+        return ApiResponse.ok(patentReviewService.suggestContext(request));
     }
 
     /**
@@ -99,7 +99,7 @@ public class PatentController {
      */
     @GetMapping("/{patentId}")
     public ApiResponse<PatentDetailResponse> getPatentDetail(@PathVariable String patentId) {
-        return ApiResponse.ok(patentFixtureService.getPatentDetail(patentId));
+        return ApiResponse.ok(patentReviewService.getPatentDetail(patentId));
     }
 
     /**
@@ -112,7 +112,7 @@ public class PatentController {
             @PathVariable String patentId,
             @Valid @RequestBody PatentUpsertRequest request
     ) {
-        return ApiResponse.ok(patentFixtureService.updatePatent(patentId, request));
+        return ApiResponse.ok(patentReviewService.updatePatent(patentId, request));
     }
 
     /**
@@ -122,7 +122,7 @@ public class PatentController {
      */
     @GetMapping("/{patentId}/history")
     public ApiResponse<List<PatentHistoryResponse>> getPatentHistory(@PathVariable String patentId) {
-        return ApiResponse.ok(patentFixtureService.getPatentHistory(patentId));
+        return ApiResponse.ok(patentReviewService.getPatentHistory(patentId));
     }
 
     /**
@@ -135,7 +135,7 @@ public class PatentController {
             @PathVariable String patentId,
             @Valid @RequestBody FinalDecisionRequest request
     ) {
-        return ApiResponse.ok(patentFixtureService.recordFinalDecision(patentId, request));
+        return ApiResponse.ok(patentReviewService.recordFinalDecision(patentId, request));
     }
 
     /**
@@ -148,7 +148,7 @@ public class PatentController {
             @PathVariable String patentId,
             @RequestBody PatchFinalDecisionRequest request
     ) {
-        return ApiResponse.ok(patentFixtureService.patchFinalDecision(patentId, request));
+        return ApiResponse.ok(patentReviewService.patchFinalDecision(patentId, request));
     }
 
     /**
@@ -159,7 +159,7 @@ public class PatentController {
             @PathVariable String patentId,
             @Valid @RequestBody AssignDepartmentRequest request
     ) {
-        return ApiResponse.ok(patentFixtureService.assignDepartment(patentId, request.departmentId()));
+        return ApiResponse.ok(patentReviewService.assignDepartment(patentId, request.departmentId()));
     }
 
     /**
@@ -167,7 +167,7 @@ public class PatentController {
      */
     @PostMapping("/{patentId}/request-ai-report")
     public ApiResponse<PatentDetailResponse> requestAiReport(@PathVariable String patentId) {
-        return ApiResponse.ok(patentFixtureService.generateAiReport(patentId));
+        return ApiResponse.ok(patentReviewService.generateAiReport(patentId));
     }
 
     /**
@@ -175,7 +175,7 @@ public class PatentController {
      */
     @PostMapping("/batch/mark-mail-ready")
     public ApiResponse<List<String>> markMailReady(@Valid @RequestBody BatchPatentIdsRequest request) {
-        return ApiResponse.ok(patentFixtureService.markMailReady(request.patentIds()));
+        return ApiResponse.ok(patentReviewService.markMailReady(request.patentIds()));
     }
 
 }

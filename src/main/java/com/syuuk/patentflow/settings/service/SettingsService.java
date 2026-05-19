@@ -4,7 +4,7 @@ import com.syuuk.patentflow.common.error.ErrorCode;
 import com.syuuk.patentflow.common.error.PatentFlowException;
 import com.syuuk.patentflow.patent.dto.PatentListItemResponse;
 import com.syuuk.patentflow.patent.dto.ReviewWorkflowStatus;
-import com.syuuk.patentflow.patent.service.PatentFixtureService;
+import com.syuuk.patentflow.patent.service.PatentReviewService;
 import com.syuuk.patentflow.settings.domain.QuarterSettingEntity;
 import com.syuuk.patentflow.settings.dto.QuarterActivateResponse;
 import com.syuuk.patentflow.settings.dto.QuarterSettingRequest;
@@ -23,12 +23,12 @@ public class SettingsService {
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     private final QuarterSettingRepository quarterSettingRepository;
-    private final PatentFixtureService patentFixtureService;
+    private final PatentReviewService patentReviewService;
 
     public SettingsService(QuarterSettingRepository quarterSettingRepository,
-            PatentFixtureService patentFixtureService) {
+            PatentReviewService patentReviewService) {
         this.quarterSettingRepository = quarterSettingRepository;
-        this.patentFixtureService = patentFixtureService;
+        this.patentReviewService = patentReviewService;
         seedDefaultQuartersIfNeeded();
     }
 
@@ -76,7 +76,7 @@ public class SettingsService {
             throw new PatentFlowException(ErrorCode.INVALID_WORKFLOW_STATUS, "이미 활성화된 분기입니다.");
         }
 
-        List<PatentListItemResponse> allPatents = patentFixtureService.getAllPatents();
+        List<PatentListItemResponse> allPatents = patentReviewService.getAllPatents();
         List<String> reviewStarted = new ArrayList<>();
 
         for (PatentListItemResponse patent : allPatents) {
@@ -91,7 +91,7 @@ public class SettingsService {
             }
         }
 
-        patentFixtureService.bulkUpdateWorkflowStatus(reviewStarted, ReviewWorkflowStatus.REVIEW_QUARTER_STARTED, quarterKey);
+        patentReviewService.bulkUpdateWorkflowStatus(reviewStarted, ReviewWorkflowStatus.REVIEW_QUARTER_STARTED, quarterKey);
 
         quarter.setActivated(true);
         quarter.setActivatedAt(OffsetDateTime.now(KST));
@@ -109,7 +109,7 @@ public class SettingsService {
 
     private int countTargetPatents(QuarterSettingEntity quarter) {
         if (quarter.getStartDate() == null || quarter.getEndDate() == null) return 0;
-        return (int) patentFixtureService.getAllPatents().stream()
+        return (int) patentReviewService.getAllPatents().stream()
                 .filter(p -> p.feeDueDate() != null)
                 .filter(p -> !p.feeDueDate().isBefore(quarter.getStartDate())
                         && !p.feeDueDate().isAfter(quarter.getEndDate()))

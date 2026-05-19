@@ -13,7 +13,7 @@ import com.syuuk.patentflow.mailing.dto.MailingHistoryItemResponse;
 import com.syuuk.patentflow.mailing.dto.MailingSendRequest;
 import com.syuuk.patentflow.mailing.dto.MailingSendResponse;
 import com.syuuk.patentflow.mailing.repository.MailingHistoryRepository;
-import com.syuuk.patentflow.patent.service.PatentFixtureService;
+import com.syuuk.patentflow.patent.service.PatentReviewService;
 import com.syuuk.patentflow.user.domain.UserEntity;
 import com.syuuk.patentflow.user.repository.UserRepository;
 import jakarta.mail.MessagingException;
@@ -45,20 +45,20 @@ public class MailingService {
     private String envGmailAppPassword;
 
     private final MailingHistoryRepository mailingHistoryRepository;
-    private final PatentFixtureService patentFixtureService;
+    private final PatentReviewService patentReviewService;
     private final ObjectMapper objectMapper;
     private final UserRepository userRepository;
     private final SystemSettingsService systemSettingsService;
 
     public MailingService(
             MailingHistoryRepository mailingHistoryRepository,
-            PatentFixtureService patentFixtureService,
+            PatentReviewService patentReviewService,
             ObjectMapper objectMapper,
             UserRepository userRepository,
             SystemSettingsService systemSettingsService
     ) {
         this.mailingHistoryRepository = mailingHistoryRepository;
-        this.patentFixtureService = patentFixtureService;
+        this.patentReviewService = patentReviewService;
         this.objectMapper = objectMapper;
         this.userRepository = userRepository;
         this.systemSettingsService = systemSettingsService;
@@ -105,7 +105,7 @@ public class MailingService {
                 .map(BusinessReviewMailPatentSummary::patentId)
                 .distinct()
                 .toList();
-        PatentFixtureService.WorkflowBatchUpdateResult updateResult = patentFixtureService.markMailingSent(patentIds);
+        PatentReviewService.WorkflowBatchUpdateResult updateResult = patentReviewService.markMailingSent(patentIds);
         request.drafts().forEach(draft -> saveHistory(mailingBatchId, draft));
 
         return new MailingSendResponse(

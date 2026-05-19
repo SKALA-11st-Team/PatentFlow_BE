@@ -5,7 +5,7 @@ import com.syuuk.patentflow.common.error.PatentFlowException;
 import com.syuuk.patentflow.mailing.domain.DepartmentEntity;
 import com.syuuk.patentflow.mailing.dto.DepartmentRecipientMappingResponse;
 import com.syuuk.patentflow.mailing.repository.DepartmentRepository;
-import com.syuuk.patentflow.patent.service.PatentFixtureService;
+import com.syuuk.patentflow.patent.service.PatentReviewService;
 import com.syuuk.patentflow.user.dto.CreateDepartmentRequest;
 import com.syuuk.patentflow.user.repository.UserRepository;
 import java.time.LocalDate;
@@ -17,15 +17,15 @@ import org.springframework.stereotype.Service;
 public class AdminDepartmentService {
 
     private final DepartmentRepository mailingRecipientMappingRepository;
-    private final PatentFixtureService patentFixtureService;
+    private final PatentReviewService patentReviewService;
     private final UserRepository userRepository;
 
     public AdminDepartmentService(
             DepartmentRepository mailingRecipientMappingRepository,
-            PatentFixtureService patentFixtureService,
+            PatentReviewService patentReviewService,
             UserRepository userRepository) {
         this.mailingRecipientMappingRepository = mailingRecipientMappingRepository;
-        this.patentFixtureService = patentFixtureService;
+        this.patentReviewService = patentReviewService;
         this.userRepository = userRepository;
     }
 
@@ -51,7 +51,7 @@ public class AdminDepartmentService {
                 request.departmentName(),
                 LocalDate.now());
         mailingRecipientMappingRepository.save(entity);
-        patentFixtureService.refreshDepartmentCache();
+        patentReviewService.refreshDepartmentCache();
         return new DepartmentRecipientMappingResponse(
                 request.departmentId(),
                 request.departmentName(),
@@ -71,6 +71,6 @@ public class AdminDepartmentService {
                     "해당 사업부에 소속된 계정이 있어 삭제할 수 없습니다.");
         }
         mailingRecipientMappingRepository.deleteById(departmentId);
-        patentFixtureService.refreshDepartmentCache();
+        patentReviewService.refreshDepartmentCache();
     }
 }

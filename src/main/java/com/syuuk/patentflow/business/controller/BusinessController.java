@@ -16,7 +16,7 @@ import com.syuuk.patentflow.patent.dto.BusinessOpinionDecision;
 import com.syuuk.patentflow.patent.dto.PatentDetailResponse;
 import com.syuuk.patentflow.patent.dto.PatentListItemResponse;
 import com.syuuk.patentflow.patent.dto.ReviewWorkflowStatus;
-import com.syuuk.patentflow.patent.service.PatentFixtureService;
+import com.syuuk.patentflow.patent.service.PatentReviewService;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.security.core.Authentication;
@@ -31,16 +31,16 @@ import org.springframework.web.bind.annotation.RestController;
 public class BusinessController {
 
     private final BusinessFixtureService businessFixtureService;
-    private final PatentFixtureService patentFixtureService;
+    private final PatentReviewService patentReviewService;
     private final AuthService authService;
 
     public BusinessController(
             BusinessFixtureService businessFixtureService,
-            PatentFixtureService patentFixtureService,
+            PatentReviewService patentReviewService,
             AuthService authService
     ) {
         this.businessFixtureService = businessFixtureService;
-        this.patentFixtureService = patentFixtureService;
+        this.patentReviewService = patentReviewService;
         this.authService = authService;
     }
 
@@ -62,7 +62,7 @@ public class BusinessController {
     @GetMapping("/api/v1/business/dashboard/summary")
     public ApiResponse<BusinessDashboardSummaryResponse> getDashboardSummary(Authentication authentication) {
         String departmentId = getDepartmentId(authentication);
-        List<PatentListItemResponse> all = patentFixtureService.getAllPatents().stream()
+        List<PatentListItemResponse> all = patentReviewService.getAllPatents().stream()
                 .filter(p -> departmentId.equals(p.departmentId()))
                 .toList();
         int total = all.size();
@@ -90,7 +90,7 @@ public class BusinessController {
             Authentication authentication
     ) {
         String departmentId = getDepartmentId(authentication);
-        List<PatentListItemResponse> filtered = patentFixtureService.getAllPatents().stream()
+        List<PatentListItemResponse> filtered = patentReviewService.getAllPatents().stream()
                 .filter(p -> departmentId.equals(p.departmentId()))
                 .filter(p -> p.reviewWorkflowStatus() == ReviewWorkflowStatus.WAITING_BUSINESS_RESPONSE)
                 .toList();
@@ -111,7 +111,7 @@ public class BusinessController {
             Authentication authentication
     ) {
         String departmentId = getDepartmentId(authentication);
-        return patentFixtureService.getPatents(page, size, keyword, departmentId, reviewWorkflowStatus, null);
+        return patentReviewService.getPatents(page, size, keyword, departmentId, reviewWorkflowStatus, null);
     }
 
     /**
@@ -125,7 +125,7 @@ public class BusinessController {
             Authentication authentication
     ) {
         String departmentId = getDepartmentId(authentication);
-        PatentDetailResponse detail = patentFixtureService.getPatentDetail(patentId);
+        PatentDetailResponse detail = patentReviewService.getPatentDetail(patentId);
         if (!departmentId.equals(detail.departmentId())) {
             throw new PatentFlowException(ErrorCode.UNAUTHORIZED);
         }

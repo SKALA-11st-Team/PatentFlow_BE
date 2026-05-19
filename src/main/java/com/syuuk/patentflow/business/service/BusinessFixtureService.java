@@ -14,7 +14,7 @@ import com.syuuk.patentflow.patent.dto.BusinessOpinionDecision;
 import com.syuuk.patentflow.patent.dto.PatentDetailResponse;
 import com.syuuk.patentflow.patent.dto.Recommendation;
 import com.syuuk.patentflow.notification.service.NotificationService;
-import com.syuuk.patentflow.patent.service.PatentFixtureService;
+import com.syuuk.patentflow.patent.service.PatentReviewService;
 import com.syuuk.patentflow.settings.repository.QuarterSettingRepository;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -28,20 +28,20 @@ public class BusinessFixtureService {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
-    private final PatentFixtureService patentFixtureService;
+    private final PatentReviewService patentReviewService;
     private final BusinessSubmissionRepository businessSubmissionRepository;
     private final ObjectMapper objectMapper;
     private final NotificationService notificationService;
     private final QuarterSettingRepository quarterSettingRepository;
 
     public BusinessFixtureService(
-            PatentFixtureService patentFixtureService,
+            PatentReviewService patentReviewService,
             BusinessSubmissionRepository businessSubmissionRepository,
             ObjectMapper objectMapper,
             NotificationService notificationService,
             QuarterSettingRepository quarterSettingRepository
     ) {
-        this.patentFixtureService = patentFixtureService;
+        this.patentReviewService = patentReviewService;
         this.businessSubmissionRepository = businessSubmissionRepository;
         this.objectMapper = objectMapper;
         this.notificationService = notificationService;
@@ -100,7 +100,7 @@ public class BusinessFixtureService {
      */
     @Transactional
     public List<BusinessSubmissionVersionResponse> getSubmissions(String patentId) {
-        PatentDetailResponse patent = patentFixtureService.getPatentDetail(patentId);
+        PatentDetailResponse patent = patentReviewService.getPatentDetail(patentId);
         List<BusinessSubmissionVersionResponse> persistedSubmissions = businessSubmissionRepository
                 .findByPatentIdOrderByVersionAsc(patentId)
                 .stream()
@@ -128,7 +128,7 @@ public class BusinessFixtureService {
      */
     @Transactional
     public BusinessSubmissionVersionResponse submit(String patentId, BusinessChecklistSubmissionRequest request) {
-        patentFixtureService.ensurePatentExists(patentId);
+        patentReviewService.ensurePatentExists(patentId);
         String quarterKey = quarterSettingRepository.findAll().stream()
                 .filter(q -> q.isActivated() && !q.isEnded())
                 .findFirst()
@@ -138,12 +138,12 @@ public class BusinessFixtureService {
         OffsetDateTime submittedAt = OffsetDateTime.now(KST);
         BusinessSubmissionVersionResponse submission = toVersion(patentId, request, version, submittedAt);
         businessSubmissionRepository.save(toEntity(patentId, quarterKey, submission));
-        patentFixtureService.recordBusinessOpinion(
+        patentReviewService.recordBusinessOpinion(
                 patentId,
                 request.finalOpinion(),
                 valueOrDefault(request.finalReason(), defaultReason(request.finalOpinion())),
                 submittedAt);
-        PatentDetailResponse patent = patentFixtureService.getPatentDetail(patentId);
+        PatentDetailResponse patent = patentReviewService.getPatentDetail(patentId);
         String deptName = patent.departmentName() != null ? patent.departmentName() : "사업부";
         notificationService.addNotification(
                 "사업부 의견 수신",
@@ -222,8 +222,8 @@ public class BusinessFixtureService {
         int checklistTotal = checklistScores.stream()
                 .mapToInt(BusinessSubmissionChecklistScoreResponse::score)
                 .sum() + request.qualitativeScore();
-        Recommendation recommendation = patentFixtureService.getCurrentRecommendation(patentId);
-        Integer aiTotalScore = patentFixtureService.getAiTotalScore(patentId);
+        Recommendation recommendation = patentReviewService.getCurrentRecommendation(patentId);
+        Integer aiTotalScore = patentReviewService.getAiTotalScore(patentId);
 
         return new BusinessSubmissionVersionResponse(
                 "%s-SUB-%02d".formatted(patentId, version),
@@ -232,7 +232,7 @@ public class BusinessFixtureService {
                 valueOrDefault(request.finalReason(), defaultReason(request.finalOpinion())),
                 valueOrDefault(request.evaluatorName(), "사업부 담당자"),
                 submittedAt,
-                patentFixtureService.getAiReportCreatedAt(patentId),
+                patentReviewService.getAiReportCreatedAt(patentId),
                 recommendation,
                 aiTotalScore == null ? 0 : aiTotalScore,
                 checklistTotal,
