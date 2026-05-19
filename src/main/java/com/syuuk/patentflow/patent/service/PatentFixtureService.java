@@ -1,5 +1,7 @@
 package com.syuuk.patentflow.patent.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.syuuk.patentflow.common.error.ErrorCode;
 import com.syuuk.patentflow.common.error.PatentFlowException;
 import com.syuuk.patentflow.common.response.PageInfo;
@@ -76,6 +78,7 @@ public class PatentFixtureService {
     private final AiReportAgentClient aiReportAgentClient;
     private final SystemSettingsService systemSettingsService;
     private final DepartmentRepository mailingRecipientMappingRepository;
+    private final ObjectMapper objectMapper;
     private Map<String, String> departmentNameCache;
 
 
@@ -92,7 +95,8 @@ public class PatentFixtureService {
             PatentReviewHistoryRepository reviewHistoryRepository,
             AiReportAgentClient aiReportAgentClient,
             SystemSettingsService systemSettingsService,
-            DepartmentRepository mailingRecipientMappingRepository
+            DepartmentRepository mailingRecipientMappingRepository,
+            ObjectMapper objectMapper
     ) {
         this.kiprisPatentLookupClient = kiprisPatentLookupClient;
         this.googlePatentsLookupClient = googlePatentsLookupClient;
@@ -101,6 +105,7 @@ public class PatentFixtureService {
         this.aiReportAgentClient = aiReportAgentClient;
         this.systemSettingsService = systemSettingsService;
         this.mailingRecipientMappingRepository = mailingRecipientMappingRepository;
+        this.objectMapper = objectMapper;
         seedDepartmentsIfNeeded();
         this.departmentNameCache = mailingRecipientMappingRepository.findAll().stream()
                 .collect(Collectors.toMap(
@@ -693,6 +698,7 @@ public class PatentFixtureService {
         PatentReviewHistoryEntity history = new PatentReviewHistoryEntity(entity.getPatentId(), "DEMO-SEED");
         history.setReviewWorkflowStatus(reviewWorkflowStatus);
         history.setAiRecommendation(recommendation);
+        applyAiReportToHistory(history, aiEvaluationReport(recommendation));
         history.setBusinessOpinionDecision(businessOpinionDecision);
         history.setBusinessOpinionReason(businessOpinionDecision == null ? null : defaultBusinessOpinionReason(businessOpinionDecision));
         history.setBusinessOpinionSubmittedAt(businessOpinionSubmittedAt);
@@ -1456,6 +1462,7 @@ public class PatentFixtureService {
         Recommendation currentRecommendation = state.getAiRecommendation() != null
                 ? state.getAiRecommendation()
                 : patent.currentRecommendation();
+        AiEvaluationReportResponse aiReport = aiReportFromHistory(state, patent.aiEvaluationReport(), currentRecommendation);
         return new PatentDetailResponse(
                 patent.patentId(),
                 patent.managementNumber(),
@@ -1481,7 +1488,7 @@ public class PatentFixtureService {
                 state.getBusinessOpinionDecision() != null ? state.getBusinessOpinionDecision() : patent.businessOpinionDecision(),
                 state.getLegalActionResult() != null ? state.getLegalActionResult() : patent.legalActionResult(),
                 patent.summary(),
-                withAiRecommendation(patent.aiEvaluationReport(), currentRecommendation),
+                aiReport,
                 new FinalDecisionRecordResponse(
                         state.getFinalDecisionId(),
                         state.getFinalDecisionReason(),
@@ -1490,6 +1497,24 @@ public class PatentFixtureService {
                         state.getBusinessOpinionDecision(),
                         state.getBusinessOpinionReason(),
                         state.getBusinessOpinionSubmittedAt()));
+    }
+
+    private AiEvaluationReportResponse aiReportFromHistory(
+            PatentReviewHistoryEntity state,
+            AiEvaluationReportResponse fallback,
+            Recommendation recommendation
+    ) {
+        if (state.getAiReportId() == null) {
+            return withAiRecommendation(fallback, recommendation);
+        }
+        return new AiEvaluationReportResponse(
+                state.getAiReportId(),
+                state.getAiReportCreatedAt(),
+                recommendation,
+                state.getAiRecommendationReason(),
+                state.getAiTotalScore(),
+                readEvaluationScores(state.getAiScoresJson()),
+                readStringList(state.getAiMissingInformationJson()));
     }
 
     private AiEvaluationReportResponse withAiRecommendation(
@@ -1506,6 +1531,48 @@ public class PatentFixtureService {
                 report.missingInformation());
     }
 
+    private void applyAiReportToHistory(PatentReviewHistoryEntity state, AiEvaluationReportResponse report) {
+        state.setAiReportId(report.reportId());
+        state.setAiReportCreatedAt(report.createdAt());
+        state.setAiRecommendation(report.recommendation());
+        state.setAiRecommendationReason(report.recommendationReason());
+        state.setAiTotalScore(report.totalScore());
+        state.setAiScoresJson(writeJson(report.scores()));
+        state.setAiMissingInformationJson(writeJson(report.missingInformation()));
+    }
+
+    private List<EvaluationScoreResponse> readEvaluationScores(String value) {
+        if (value == null || value.isBlank()) {
+            return List.of();
+        }
+        try {
+            return objectMapper.readValue(value, new TypeReference<>() {
+            });
+        } catch (Exception exception) {
+            return List.of();
+        }
+    }
+
+    private List<String> readStringList(String value) {
+        if (value == null || value.isBlank()) {
+            return List.of();
+        }
+        try {
+            return objectMapper.readValue(value, new TypeReference<>() {
+            });
+        } catch (Exception exception) {
+            return List.of();
+        }
+    }
+
+    private String writeJson(Object value) {
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (Exception exception) {
+            throw new IllegalStateException("AI 평가 레포트 JSON을 저장할 수 없습니다.", exception);
+        }
+    }
+
     private void persistPatentState(PatentDetailResponse patent) {
         List<PatentReviewHistoryEntity> history =
                 reviewHistoryRepository.findByPatentIdOrderByCreatedAtDesc(patent.patentId());
@@ -1514,6 +1581,7 @@ public class PatentFixtureService {
                 : history.get(0);
         state.setReviewWorkflowStatus(patent.reviewWorkflowStatus());
         state.setAiRecommendation(patent.currentRecommendation());
+        applyAiReportToHistory(state, patent.aiEvaluationReport());
         state.setBusinessOpinionDecision(patent.businessOpinionDecision());
         state.setBusinessOpinionReason(patent.businessOpinion().reason());
         state.setBusinessOpinionSubmittedAt(patent.businessOpinion().submittedAt());

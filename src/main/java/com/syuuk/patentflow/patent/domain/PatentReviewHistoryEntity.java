@@ -38,6 +38,24 @@ public class PatentReviewHistoryEntity extends BaseEntity {
     @Column(name = "ai_recommendation", length = 64)
     private Recommendation aiRecommendation;
 
+    @Column(name = "ai_report_id", length = 128)
+    private String aiReportId;
+
+    @Column(name = "ai_report_created_at")
+    private OffsetDateTime aiReportCreatedAt;
+
+    @Column(name = "ai_recommendation_reason", length = 2000)
+    private String aiRecommendationReason;
+
+    @Column(name = "ai_total_score")
+    private Integer aiTotalScore;
+
+    @Column(name = "ai_scores_json", columnDefinition = "TEXT")
+    private String aiScoresJson;
+
+    @Column(name = "ai_missing_information_json", columnDefinition = "TEXT")
+    private String aiMissingInformationJson;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "business_opinion_decision", length = 64)
     private BusinessOpinionDecision businessOpinionDecision;
@@ -105,6 +123,54 @@ public class PatentReviewHistoryEntity extends BaseEntity {
 
     public void setAiRecommendation(Recommendation aiRecommendation) {
         this.aiRecommendation = aiRecommendation;
+    }
+
+    public String getAiReportId() {
+        return aiReportId;
+    }
+
+    public void setAiReportId(String aiReportId) {
+        this.aiReportId = aiReportId;
+    }
+
+    public OffsetDateTime getAiReportCreatedAt() {
+        return aiReportCreatedAt;
+    }
+
+    public void setAiReportCreatedAt(OffsetDateTime aiReportCreatedAt) {
+        this.aiReportCreatedAt = aiReportCreatedAt;
+    }
+
+    public String getAiRecommendationReason() {
+        return aiRecommendationReason;
+    }
+
+    public void setAiRecommendationReason(String aiRecommendationReason) {
+        this.aiRecommendationReason = aiRecommendationReason;
+    }
+
+    public Integer getAiTotalScore() {
+        return aiTotalScore;
+    }
+
+    public void setAiTotalScore(Integer aiTotalScore) {
+        this.aiTotalScore = aiTotalScore;
+    }
+
+    public String getAiScoresJson() {
+        return aiScoresJson;
+    }
+
+    public void setAiScoresJson(String aiScoresJson) {
+        this.aiScoresJson = aiScoresJson;
+    }
+
+    public String getAiMissingInformationJson() {
+        return aiMissingInformationJson;
+    }
+
+    public void setAiMissingInformationJson(String aiMissingInformationJson) {
+        this.aiMissingInformationJson = aiMissingInformationJson;
     }
 
     public BusinessOpinionDecision getBusinessOpinionDecision() {

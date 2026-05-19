@@ -53,6 +53,12 @@ Table patent_review_history {
   quarter_key varchar(16) [not null]
   review_workflow_status varchar(64) [note: "NOT_IN_REVIEW_QUARTER | REVIEW_QUARTER_STARTED | REPORT_GENERATED | MAIL_READY | WAITING_BUSINESS_RESPONSE | BUSINESS_RESPONSE_RECEIVED | LEGAL_ACTION_RECORDED"]
   ai_recommendation varchar(64) [note: "MAINTAIN | REVIEW_AGAIN | ABANDON | HOLD — 현재 AI 추천값 스냅샷"]
+  ai_report_id varchar(128)
+  ai_report_created_at timestamp
+  ai_recommendation_reason varchar(2000)
+  ai_total_score int
+  ai_scores_json text [note: "JSON: [{category, score, evidence}]"]
+  ai_missing_information_json text [note: "JSON: [missing information string]"]
   business_opinion_decision varchar(64) [note: "MAINTAIN | ABANDON — business_submissions.decision 최신값 비정규화 스냅샷"]
   business_opinion_reason varchar(2000) [note: "business_submissions.reason 최신값 비정규화 스냅샷"]
   business_opinion_submitted_at timestamp [note: "business_submissions.submitted_at 최신값 비정규화 스냅샷"]
