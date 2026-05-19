@@ -52,7 +52,7 @@ Table patent_review_history {
   patent_id varchar(32) [not null]
   quarter_key varchar(16) [not null]
   review_workflow_status varchar(64) [note: "NOT_IN_REVIEW_QUARTER | REVIEW_QUARTER_STARTED | REPORT_GENERATED | MAIL_READY | WAITING_BUSINESS_RESPONSE | BUSINESS_RESPONSE_RECEIVED | LEGAL_ACTION_RECORDED"]
-  ai_recommendation varchar(64) [note: "MAINTAIN | REVIEW_AGAIN | ABANDON | HOLD — 현재 AI 추천값 스냅샷"]
+  ai_recommendation varchar(64) [note: "MAINTAIN | REVIEW_AGAIN | ABANDON | HOLD — 해당 분기 검토 상태의 현재 AI 추천값"]
   ai_report_id varchar(128)
   ai_report_created_at timestamp
   ai_recommendation_reason varchar(2000)
@@ -90,9 +90,9 @@ Table business_submissions {
   reason varchar(2000)
   submitted_by varchar(128)
   submitted_at timestamp
-  ai_report_created_at timestamp
-  ai_recommendation varchar(64) [note: "MAINTAIN | REVIEW_AGAIN | ABANDON | HOLD"]
-  ai_total_score int
+  ai_report_created_at timestamp [note: "사업부 제출 당시 참조한 AI 레포트 생성 시각 스냅샷"]
+  ai_recommendation varchar(64) [note: "사업부 제출 당시 참조한 AI 추천값 스냅샷. 최신값 source는 patent_review_history.ai_recommendation"]
+  ai_total_score int [note: "사업부 제출 당시 참조한 AI 총점 스냅샷"]
   checklist_total int
   qualitative_score int
   checklist_scores_json text [note: "JSON: [{itemId, score, memo}]"]

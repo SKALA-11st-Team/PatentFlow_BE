@@ -81,6 +81,8 @@ The current implementation loads official demo patent metadata from `docs/skax_p
 
 - The workflow does not include a separate approval step. After `BUSINESS_RESPONSE_RECEIVED`, the administrator/legal user records the final decision and legal action result directly.
 - Do not add separate approval statuses or decision APIs/types unless the team explicitly reverses this decision.
+- `patent_review_history` is the source of truth for the current quarter review state, including workflow status, AI recommendation/report snapshot, patent summary snapshot, business opinion snapshot, and final legal decision.
+- `business_submissions` stores the business user's submitted checklist/opinion and keeps AI recommendation/report values only as submission-time snapshots. Do not read it as the current AI recommendation source.
 
 ## External Patent Lookup
 
