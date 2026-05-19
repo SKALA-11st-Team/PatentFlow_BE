@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.jayway.jsonpath.JsonPath;
 import com.syuuk.patentflow.user.domain.UserEntity;
 import com.syuuk.patentflow.user.repository.UserRepository;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -19,7 +20,9 @@ import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(properties = {
         "patentflow.lookup.kipris.enabled=false",
-        "patentflow.lookup.google-patents.enabled=false"
+        "patentflow.lookup.google-patents.enabled=false",
+        "patentflow.auth.max-login-failures=2",
+        "patentflow.auth.login-lock-seconds=300"
 })
 @AutoConfigureMockMvc
 class AuthControllerTest {
@@ -43,6 +46,38 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.data.username").value("admin"))
                 .andExpect(jsonPath("$.data.displayName").value("특허관리자"))
                 .andExpect(jsonPath("$.data.roles[0]").value("ROLE_ADMIN"));
+    }
+
+    @Test
+    void loginSetsHttpOnlyCookiesAndCookieAuthenticatesCurrentUser() throws Exception {
+        LoginCapture login = loginCapture("admin", "admin1234");
+
+        mockMvc.perform(get("/api/v1/auth/me")
+                .cookie(login.accessCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.username").value("admin"));
+    }
+
+    @Test
+    void refreshRotatesSessionCookieAndIssuesNewAccessCookie() throws Exception {
+        LoginCapture login = loginCapture("admin", "admin1234");
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                .cookie(login.refreshCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.accessToken").isNotEmpty())
+                .andExpect(result -> {
+                    Cookie accessCookie = result.getResponse().getCookie("patentflow_access");
+                    Cookie refreshCookie = result.getResponse().getCookie("patentflow_refresh");
+                    org.assertj.core.api.Assertions.assertThat(accessCookie).isNotNull();
+                    org.assertj.core.api.Assertions.assertThat(refreshCookie).isNotNull();
+                    org.assertj.core.api.Assertions.assertThat(accessCookie.isHttpOnly()).isTrue();
+                    org.assertj.core.api.Assertions.assertThat(refreshCookie.isHttpOnly()).isTrue();
+                });
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                .cookie(login.refreshCookie()))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -93,12 +128,63 @@ class AuthControllerTest {
                 .andExpect(status().isForbidden());
     }
 
+    @Test
+    void repeatedLoginFailuresLockAccountTemporarily() throws Exception {
+        ensureLockTestUser();
+
+        for (int i = 0; i < 2; i += 1) {
+            mockMvc.perform(post("/api/v1/auth/login")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                            {
+                              "username": "lock-user",
+                              "password": "wrong-password"
+                            }
+                            """))
+                    .andExpect(status().isUnauthorized());
+        }
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                          "username": "lock-user",
+                          "password": "lock1234"
+                        }
+                        """))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value("LOGIN_LOCKED"));
+    }
+
+    @Test
+    void businessUserCanAccessOnlyAssignedDepartmentPatentResources() throws Exception {
+        ensureBusinessUser();
+        String token = login("business-user", "business1234");
+
+        mockMvc.perform(get("/api/v1/business/patents/PAT-2026-0001")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.departmentId").value("DEPT-RND"));
+
+        mockMvc.perform(get("/api/v1/patents/PAT-2026-0001")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/v1/business/patents/PAT-2026-0002")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isUnauthorized());
+    }
+
     private String loginAsAdmin() throws Exception {
         return login("admin", "admin1234");
     }
 
     private String login(String username, String password) throws Exception {
-        String response = mockMvc.perform(post("/api/v1/auth/login")
+        return loginCapture(username, password).accessToken();
+    }
+
+    private LoginCapture loginCapture(String username, String password) throws Exception {
+        var result = mockMvc.perform(post("/api/v1/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {
@@ -111,10 +197,13 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.data.tokenType").value("Bearer"))
                 .andExpect(jsonPath("$.data.user.username").value(username))
                 .andReturn()
-                .getResponse()
-                .getContentAsString();
+                .getResponse();
 
-        return JsonPath.read(response, "$.data.accessToken");
+        String accessToken = JsonPath.read(result.getContentAsString(), "$.data.accessToken");
+        return new LoginCapture(
+                accessToken,
+                result.getCookie("patentflow_access"),
+                result.getCookie("patentflow_refresh"));
     }
 
     private void ensureBusinessUser() {
@@ -126,7 +215,22 @@ class AuthControllerTest {
                 "business-user",
                 passwordEncoder.encode("business1234"),
                 "BUSINESS",
-                null,
+                "DEPT-RND",
                 "사업부 테스트 사용자"));
     }
+
+    private void ensureLockTestUser() {
+        if (userRepository.existsByUsername("lock-user")) {
+            return;
+        }
+        userRepository.save(new UserEntity(
+                "USER-lock-test",
+                "lock-user",
+                passwordEncoder.encode("lock1234"),
+                "ADMIN",
+                null,
+                "잠금 테스트 사용자"));
+    }
+
+    private record LoginCapture(String accessToken, Cookie accessCookie, Cookie refreshCookie) {}
 }

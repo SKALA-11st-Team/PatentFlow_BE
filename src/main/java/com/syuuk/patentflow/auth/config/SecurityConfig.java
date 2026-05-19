@@ -46,13 +46,18 @@ public class SecurityConfig {
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/api/v1/auth/login").permitAll()
+                        .requestMatchers("/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .requestMatchers("/api/v1/admin/**", "/api/v1/legal/**", "/api/v1/settings/**",
                                 "/api/v1/mailings/**", "/api/v1/departments/**").hasRole("ADMIN")
                         .requestMatchers("/api/v1/business/**").hasRole("BUSINESS")
                         .requestMatchers(HttpMethod.POST, "/api/v1/patents/*/business-submissions").hasRole("BUSINESS")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/patents/*/business-submissions").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/patents/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/patents/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/patents/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/patents/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();

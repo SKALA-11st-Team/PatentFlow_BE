@@ -138,7 +138,11 @@ public class BusinessController {
      * @description 특허별 사업부 제출 이력 조회 API.
      */
     @GetMapping("/api/v1/patents/{patentId}/business-submissions")
-    public ApiResponse<List<BusinessSubmissionVersionResponse>> getBusinessSubmissions(@PathVariable String patentId) {
+    public ApiResponse<List<BusinessSubmissionVersionResponse>> getBusinessSubmissions(
+            @PathVariable String patentId,
+            Authentication authentication
+    ) {
+        assertCanAccessPatent(patentId, authentication);
         return ApiResponse.ok(businessFixtureService.getSubmissions(patentId));
     }
 
@@ -150,11 +154,13 @@ public class BusinessController {
     @PostMapping("/api/v1/patents/{patentId}/business-submissions")
     public ApiResponse<BusinessSubmissionVersionResponse> submitBusinessChecklist(
             @PathVariable String patentId,
-            @Valid @RequestBody BusinessChecklistSubmissionRequest request
+            @Valid @RequestBody BusinessChecklistSubmissionRequest request,
+            Authentication authentication
     ) {
         if (!patentId.equals(request.patentId())) {
             throw new PatentFlowException(ErrorCode.INVALID_REQUEST);
         }
+        assertBusinessDepartmentPatent(patentId, authentication);
         return ApiResponse.ok(businessFixtureService.submit(patentId, request));
     }
 
@@ -164,6 +170,30 @@ public class BusinessController {
             throw new PatentFlowException(ErrorCode.UNAUTHORIZED);
         }
         return user.departmentId();
+    }
+
+    private void assertCanAccessPatent(String patentId, Authentication authentication) {
+        if (authentication == null) {
+            patentReviewService.getPatentDetail(patentId);
+            return;
+        }
+        UserPrincipalResponse user = authService.currentUser(authentication);
+        if ("ADMIN".equals(user.role())) {
+            patentReviewService.getPatentDetail(patentId);
+            return;
+        }
+        assertBusinessDepartmentPatent(patentId, authentication);
+    }
+
+    private void assertBusinessDepartmentPatent(String patentId, Authentication authentication) {
+        if (authentication == null) {
+            return;
+        }
+        String departmentId = getDepartmentId(authentication);
+        PatentDetailResponse detail = patentReviewService.getPatentDetail(patentId);
+        if (!departmentId.equals(detail.departmentId())) {
+            throw new PatentFlowException(ErrorCode.UNAUTHORIZED);
+        }
     }
 
     private int countByStatus(List<PatentListItemResponse> patents, ReviewWorkflowStatus status) {

@@ -1,6 +1,7 @@
 package com.syuuk.patentflow.auth.security;
 
 import com.syuuk.patentflow.auth.dto.UserPrincipalResponse;
+import com.syuuk.patentflow.auth.service.AuthCookieService;
 import com.syuuk.patentflow.auth.service.AuthTokenRevocationService;
 import com.syuuk.patentflow.auth.service.JwtTokenProvider;
 import jakarta.servlet.FilterChain;
@@ -22,13 +23,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final String BEARER_PREFIX = "Bearer ";
 
+    private final AuthCookieService authCookieService;
     private final JwtTokenProvider jwtTokenProvider;
     private final AuthTokenRevocationService tokenRevocationService;
 
     public JwtAuthenticationFilter(
+            AuthCookieService authCookieService,
             JwtTokenProvider jwtTokenProvider,
             AuthTokenRevocationService tokenRevocationService
     ) {
+        this.authCookieService = authCookieService;
         this.jwtTokenProvider = jwtTokenProvider;
         this.tokenRevocationService = tokenRevocationService;
     }
@@ -42,12 +46,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String authorization = request.getHeader(HttpHeaders.AUTHORIZATION);
         if (authorization != null && authorization.startsWith(BEARER_PREFIX)) {
             authenticate(authorization.substring(BEARER_PREFIX.length()), request);
+        } else {
+            authenticate(authCookieService.getAccessToken(request), request);
         }
         filterChain.doFilter(request, response);
     }
 
     private void authenticate(String token, HttpServletRequest request) {
-        if (SecurityContextHolder.getContext().getAuthentication() != null
+        if (token == null
+                || SecurityContextHolder.getContext().getAuthentication() != null
                 || tokenRevocationService.isRevoked(token)
                 || !jwtTokenProvider.isValid(token)) {
             return;
@@ -62,7 +69,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 principal,
                 null,
                 authorities);
-        
+
         authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
         SecurityContextHolder.getContext().setAuthentication(authentication);
     }
