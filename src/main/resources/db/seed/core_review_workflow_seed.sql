@@ -107,10 +107,4 @@ SELECT
     CURRENT_TIMESTAMP,
     CURRENT_TIMESTAMP
 FROM patents p
-ON CONFLICT (patent_id, quarter_key) DO UPDATE SET
-    review_workflow_status = EXCLUDED.review_workflow_status,
-    ai_recommendation = EXCLUDED.ai_recommendation,
-    annual_fee_due_date = EXCLUDED.annual_fee_due_date,
-    department_id = EXCLUDED.department_id,
-    department_name = EXCLUDED.department_name,
-    updated_at = EXCLUDED.updated_at;
+ON CONFLICT (patent_id, quarter_key) DO NOTHING;

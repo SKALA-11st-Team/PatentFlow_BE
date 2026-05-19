@@ -12,6 +12,11 @@
   - 기본 부서, 관리자/사업부 사용자, 국가별 설정, 2026년 분기 설정을 seed한다.
   - `patents` 기준으로 2026-Q2 `patent_review_history`를 생성한다.
   - 2026-Q2 연차료 점검 대상은 `REVIEW_QUARTER_STARTED`, 나머지는 `NOT_IN_REVIEW_QUARTER`로 시작한다.
+- `LocalDemoSeedRunner`
+  - `local`, `demo` profile에서만 실행한다.
+  - Hibernate가 테이블을 생성/갱신한 뒤 SQL seed를 적용한다.
+  - 이미 특허 데이터가 있으면 특허 seed를 건너뛰고, 기본 부서/사용자/설정/분기/검토 이력이 부족한 경우에만 core seed를 실행한다.
+  - `patent_review_history`는 중복 row를 만들지 않고 기존 row도 덮어쓰지 않는다.
 
 ## 추가로 필요한 Seed
 

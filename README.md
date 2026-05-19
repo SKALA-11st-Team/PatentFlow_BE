@@ -89,6 +89,7 @@ The same SK AX patent metadata is also available as an idempotent SQL seed in `s
 
 - `src/main/resources/db/seed/skax_patents.sql` seeds 185 SK AX patent rows from `docs/skax_patent_list.csv`.
 - `src/main/resources/db/seed/core_review_workflow_seed.sql` seeds departments, users, country settings, 2026 quarters, and initial 2026-Q2 review history.
+- In `local` and `demo` profiles, the application runs an idempotent seed runner after Hibernate creates/updates tables. Existing patent data is not duplicated, and existing review-history rows are not overwritten.
 - `docs/db_seed_and_status_plan.md` lists the remaining seed data and DB-side status/date update functions needed before production-like operation.
 
 ## External Patent Lookup

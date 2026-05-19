@@ -57,6 +57,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.Sort;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -75,6 +76,7 @@ public class PatentReviewService {
     private final AnnualFeeScheduleService annualFeeScheduleService;
     private final DepartmentRepository mailingRecipientMappingRepository;
     private final ObjectMapper objectMapper;
+    private final Environment environment;
     private Map<String, String> departmentNameCache;
 
 
@@ -92,7 +94,8 @@ public class PatentReviewService {
             AiReportAgentClient aiReportAgentClient,
             AnnualFeeScheduleService annualFeeScheduleService,
             DepartmentRepository mailingRecipientMappingRepository,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            Environment environment
     ) {
         this.kiprisPatentLookupClient = kiprisPatentLookupClient;
         this.googlePatentsLookupClient = googlePatentsLookupClient;
@@ -102,15 +105,20 @@ public class PatentReviewService {
         this.annualFeeScheduleService = annualFeeScheduleService;
         this.mailingRecipientMappingRepository = mailingRecipientMappingRepository;
         this.objectMapper = objectMapper;
-        seedDepartmentsIfNeeded();
+        this.environment = environment;
+        if (!usesSqlSeedRunner()) {
+            seedDepartmentsIfNeeded();
+        }
         this.departmentNameCache = mailingRecipientMappingRepository.findAll().stream()
                 .collect(Collectors.toMap(
                         DepartmentEntity::getDepartmentId,
                         DepartmentEntity::getDepartmentName,
                         (a, b) -> a,
                         HashMap::new));
-        seedPatentMetadataIfNeeded();
-        seedReviewHistoryIfNeeded();
+        if (!usesSqlSeedRunner()) {
+            seedPatentMetadataIfNeeded();
+            seedReviewHistoryIfNeeded();
+        }
     }
 
     /**
@@ -638,6 +646,11 @@ public class PatentReviewService {
             }
             reviewHistoryRepository.save(reviewHistoryFromMetadataEntity(entity));
         });
+    }
+
+    private boolean usesSqlSeedRunner() {
+        return Arrays.stream(environment.getActiveProfiles())
+                .anyMatch(profile -> "local".equals(profile) || "demo".equals(profile));
     }
 
     private List<PatentDetailResponse> loadPatentsFromDatabase() {
