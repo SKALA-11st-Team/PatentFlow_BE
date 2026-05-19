@@ -47,7 +47,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -68,8 +67,6 @@ public class PatentReviewService {
     private static final Set<String> CONTEXT_STOP_WORDS = Set.of("관련", "기술", "시스템", "방법", "특허", "장치");
     private static final Pattern CONTEXT_TOKEN_SPLITTER = Pattern.compile("[^0-9a-z가-힣]+");
 
-    private final List<PatentDetailResponse> patents;
-    private final AtomicInteger patentSequence;
     private final KiprisPatentLookupClient kiprisPatentLookupClient;
     private final GooglePatentsLookupClient googlePatentsLookupClient;
     private final PatentMetadataRepository patentMetadataRepository;
@@ -114,8 +111,6 @@ public class PatentReviewService {
                         HashMap::new));
         seedPatentMetadataIfNeeded();
         seedReviewHistoryIfNeeded();
-        this.patents = new ArrayList<>(loadPatentsFromDatabase());
-        this.patentSequence = new AtomicInteger(this.patents.size() + 1);
     }
 
     /**
@@ -132,7 +127,7 @@ public class PatentReviewService {
             String sort) {
         int normalizedPage = Math.max(page, 1);
         int normalizedSize = Math.min(Math.max(size, 1), 20);
-        List<PatentListItemResponse> filtered = patents.stream()
+        List<PatentListItemResponse> filtered = loadPatentsFromDatabase().stream()
                 .map(this::toListItem)
                 .filter(item -> matchesKeyword(item, keyword))
                 .filter(item -> departmentId == null || departmentId.isBlank()
@@ -250,7 +245,7 @@ public class PatentReviewService {
         }
 
         String keyword = lookupValue.trim().toLowerCase(Locale.ROOT);
-        PatentDetailResponse knownPatent = patents.stream()
+        PatentDetailResponse knownPatent = loadPatentsFromDatabase().stream()
                 .filter(patent -> lowerEquals(patent.managementNumber(), keyword)
                         || lowerEquals(patent.applicationNumber(), keyword)
                         || lowerEquals(patent.registrationNumber(), keyword))
@@ -292,7 +287,7 @@ public class PatentReviewService {
             return null;
         }
 
-        return patents.stream()
+        return loadPatentsFromDatabase().stream()
                 .map(patent -> scoredSuggestion(sourceTokens, patent))
                 .max(Comparator.comparingInt(ScoredContextSuggestion::score))
                 .filter(candidate -> candidate.score() > 0)
@@ -338,11 +333,10 @@ public class PatentReviewService {
      * @description 특허 기본 정보와 회사 컨텍스트를 DB에 등록한다.
      */
     public PatentUpsertResponse createPatent(PatentUpsertRequest request) {
-        String patentId = "PAT-2026-%04d".formatted(patentSequence.getAndIncrement());
+        String patentId = nextPatentId();
         patentMetadataRepository.save(metadataEntityFromRequest(patentId, request));
         PatentDetailResponse created = newPatentFromRequest(patentId, request);
         persistPatentState(created);
-        patents.add(created);
         return new PatentUpsertResponse(patentId, "CREATED");
     }
 
@@ -357,6 +351,15 @@ public class PatentReviewService {
         return new PatentUpsertResponse(patentId, "UPDATED");
     }
 
+    private String nextPatentId() {
+        int nextSequence = patentMetadataRepository.findAll().stream()
+                .map(PatentMetadataEntity::getPatentId)
+                .mapToInt(this::sequenceFromPatentId)
+                .max()
+                .orElse(0) + 1;
+        return "PAT-2026-%04d".formatted(nextSequence);
+    }
+
     public PatentDetailResponse assignDepartment(String patentId, String departmentId) {
         String departmentName = resolvedDepartmentName(departmentId);
         PatentDetailResponse updated = updatePatent(patentId, patent -> withDepartment(patent, departmentId, departmentName));
@@ -365,7 +368,7 @@ public class PatentReviewService {
     }
 
     public List<PatentListItemResponse> getAllPatents() {
-        return patents.stream().map(this::toListItem).toList();
+        return loadPatentsFromDatabase().stream().map(this::toListItem).toList();
     }
 
     public List<String> createQuarterReviewTargets(String quarterKey, LocalDate startDate, LocalDate endDate) {
@@ -400,21 +403,11 @@ public class PatentReviewService {
             reviewStarted.add(entity.getPatentId());
         });
 
-        if (!reviewStarted.isEmpty()) {
-            Set<String> idSet = new HashSet<>(reviewStarted);
-            patents.replaceAll(patent -> idSet.contains(patent.patentId())
-                    ? withReviewWorkflowStatus(patent, ReviewWorkflowStatus.REVIEW_QUARTER_STARTED)
-                    : patent);
-        }
         return reviewStarted;
     }
 
     public void bulkUpdateWorkflowStatus(List<String> patentIds, ReviewWorkflowStatus newStatus, String quarterKey) {
         if (patentIds == null || patentIds.isEmpty()) return;
-        Set<String> idSet = new HashSet<>(patentIds);
-        patents.replaceAll(patent -> idSet.contains(patent.patentId())
-                ? withReviewWorkflowStatus(patent, newStatus)
-                : patent);
         for (String patentId : patentIds) {
             PatentReviewHistoryEntity history = reviewHistoryRepository
                     .findByPatentIdAndQuarterKey(patentId, quarterKey)
@@ -463,30 +456,24 @@ public class PatentReviewService {
     }
 
     private PatentDetailResponse findPatent(String patentId) {
-        return patents.stream()
+        return loadPatentsFromDatabase().stream()
                 .filter(patent -> patent.patentId().equals(patentId))
                 .findFirst()
                 .orElseThrow(() -> new PatentFlowException(ErrorCode.PATENT_NOT_FOUND));
     }
 
     private PatentDetailResponse findPatentOrNull(String patentId) {
-        return patents.stream()
+        return loadPatentsFromDatabase().stream()
                 .filter(patent -> patent.patentId().equals(patentId))
                 .findFirst()
                 .orElse(null);
     }
 
     private PatentDetailResponse updatePatent(String patentId, PatentUpdater updater) {
-        for (int index = 0; index < patents.size(); index++) {
-            PatentDetailResponse patent = patents.get(index);
-                if (patent.patentId().equals(patentId)) {
-                    PatentDetailResponse updated = updater.update(patent);
-                    patents.set(index, updated);
-                    persistPatentState(updated);
-                    return updated;
-                }
-            }
-        throw new PatentFlowException(ErrorCode.PATENT_NOT_FOUND);
+        PatentDetailResponse patent = findPatent(patentId);
+        PatentDetailResponse updated = updater.update(patent);
+        persistPatentState(updated);
+        return updated;
     }
 
     private PatentDetailResponse patent(
