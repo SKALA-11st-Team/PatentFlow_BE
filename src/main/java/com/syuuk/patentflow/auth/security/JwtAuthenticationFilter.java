@@ -1,6 +1,7 @@
 package com.syuuk.patentflow.auth.security;
 
 import com.syuuk.patentflow.auth.dto.UserPrincipalResponse;
+import com.syuuk.patentflow.auth.service.AuthTokenRevocationService;
 import com.syuuk.patentflow.auth.service.JwtTokenProvider;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -22,9 +23,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final AuthTokenRevocationService tokenRevocationService;
 
-    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider) {
+    public JwtAuthenticationFilter(
+            JwtTokenProvider jwtTokenProvider,
+            AuthTokenRevocationService tokenRevocationService
+    ) {
         this.jwtTokenProvider = jwtTokenProvider;
+        this.tokenRevocationService = tokenRevocationService;
     }
 
     @Override
@@ -41,7 +47,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private void authenticate(String token, HttpServletRequest request) {
-        if (SecurityContextHolder.getContext().getAuthentication() != null || !jwtTokenProvider.isValid(token)) {
+        if (SecurityContextHolder.getContext().getAuthentication() != null
+                || tokenRevocationService.isRevoked(token)
+                || !jwtTokenProvider.isValid(token)) {
             return;
         }
 

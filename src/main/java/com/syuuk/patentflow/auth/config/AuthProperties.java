@@ -1,5 +1,6 @@
 package com.syuuk.patentflow.auth.config;
 
+import jakarta.annotation.PostConstruct;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
@@ -24,5 +25,15 @@ public class AuthProperties {
 
     public void setAccessTokenExpirationSeconds(long accessTokenExpirationSeconds) {
         this.accessTokenExpirationSeconds = accessTokenExpirationSeconds;
+    }
+
+    @PostConstruct
+    void validate() {
+        if (jwtSecret == null || jwtSecret.length() < 32) {
+            throw new IllegalStateException("patentflow.auth.jwt-secret must be at least 32 characters.");
+        }
+        if (accessTokenExpirationSeconds <= 0) {
+            throw new IllegalStateException("patentflow.auth.access-token-expiration-seconds must be positive.");
+        }
     }
 }

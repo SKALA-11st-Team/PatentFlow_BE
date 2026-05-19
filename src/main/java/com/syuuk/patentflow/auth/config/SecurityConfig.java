@@ -49,6 +49,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/auth/login").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                        .requestMatchers("/api/v1/admin/**", "/api/v1/legal/**", "/api/v1/settings/**",
+                                "/api/v1/mailings/**", "/api/v1/departments/**").hasRole("ADMIN")
+                        .requestMatchers("/api/v1/business/**").hasRole("BUSINESS")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/patents/*/business-submissions").hasRole("BUSINESS")
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();

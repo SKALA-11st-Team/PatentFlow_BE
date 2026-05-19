@@ -22,15 +22,18 @@ import org.springframework.stereotype.Service;
 public class AuthService {
 
     private final AuthenticationManager authenticationManager;
+    private final AuthTokenRevocationService tokenRevocationService;
     private final JwtTokenProvider jwtTokenProvider;
     private final UserRepository userRepository;
 
     public AuthService(
             AuthenticationManager authenticationManager,
+            AuthTokenRevocationService tokenRevocationService,
             JwtTokenProvider jwtTokenProvider,
             UserRepository userRepository
     ) {
         this.authenticationManager = authenticationManager;
+        this.tokenRevocationService = tokenRevocationService;
         this.jwtTokenProvider = jwtTokenProvider;
         this.userRepository = userRepository;
     }
@@ -59,6 +62,21 @@ public class AuthService {
         user.setDisplayName(request.displayName());
         userRepository.save(user);
         return toPrincipalResponse(new UserDetailsImpl(user));
+    }
+
+    public void logout(String bearerToken) {
+        String token = extractBearerToken(bearerToken);
+        if (token == null || !jwtTokenProvider.isValid(token)) {
+            return;
+        }
+        tokenRevocationService.revoke(token, jwtTokenProvider.getExpiresAt(token));
+    }
+
+    private String extractBearerToken(String value) {
+        if (value == null || !value.startsWith("Bearer ")) {
+            return null;
+        }
+        return value.substring("Bearer ".length());
     }
 
     private UserPrincipalResponse toPrincipalResponse(UserDetails userDetails) {

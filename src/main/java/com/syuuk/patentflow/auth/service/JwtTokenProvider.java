@@ -13,6 +13,7 @@ import java.util.Base64;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.springframework.security.core.GrantedAuthority;
@@ -107,6 +108,7 @@ public class JwtTokenProvider {
                     Map.entry("role", principal.role()),
                     Map.entry("departmentId", valueOrEmpty(principal.departmentId())),
                     Map.entry("departmentName", valueOrEmpty(principal.departmentName())),
+                    Map.entry("jti", UUID.randomUUID().toString()),
                     Map.entry("iat", issuedAt.getEpochSecond()),
                     Map.entry("exp", expiresAt.getEpochSecond())));
             String signedContent = header + "." + payload;
