@@ -59,38 +59,23 @@ FE/BE API 인터페이스 정합성 점검 후 주요 불일치 지점을 수정
 - `finalOpinion`은 `MAINTAIN` 또는 `ABANDON`이어야 한다.
 - 정상 제출 후 특허 상세의 `businessOpinion`이 갱신되고 workflow는 `BUSINESS_RESPONSE_RECEIVED`로 진행된다.
 
-### POST `/api/v1/patents/executive-approvals/bulk-decision`
+### POST `/api/v1/patents/{patentId}/final-decision`
+
+최종 판단은 별도 승인 단계 없이 법무/관리자 사용자가 바로 기록한다.
 
 요청:
 
 ```json
 {
-  "patentIds": ["PAT-2026-0005"],
-  "decision": "APPROVED_ABANDON"
-}
-```
-
-응답:
-
-```json
-{
-  "data": {
-    "decision": "APPROVED_ABANDON",
-    "updatedCount": 1,
-    "updatedPatentIds": ["PAT-2026-0005"]
-  }
+  "legalActionResult": "MAINTAINED",
+  "reason": "사업부 의견과 AI 평가를 종합해 유지합니다."
 }
 ```
 
 처리 규칙:
 
-- 허용 상태: `BUSINESS_RESPONSE_RECEIVED`
-- 그 외 상태에서는 `409 CONFLICT`, `INVALID_WORKFLOW_STATUS`를 반환한다.
-- decision별 `legalActionResult` 매핑:
-  - `APPROVED_MAINTAIN` -> `MAINTAINED`
-  - `APPROVED_ABANDON` -> `ABANDONED`
-  - `APPROVED_SELL` -> `SOLD`
-  - `REJECTED`, `REQUEST_CHANGES` -> `null`
+- 허용 상태: `BUSINESS_RESPONSE_RECEIVED`, `LEGAL_ACTION_RECORDED`
+- 정상 저장 후 특허 상세의 `finalDecisionRecord`, `legalActionResult`가 갱신되고 workflow는 `LEGAL_ACTION_RECORDED`로 진행된다.
 
 ## FE 연동 기대값
 

@@ -16,7 +16,6 @@ import com.syuuk.patentflow.patent.dto.BusinessOpinionDecision;
 import com.syuuk.patentflow.patent.dto.BusinessOpinionResponse;
 import com.syuuk.patentflow.patent.dto.EvaluationCategory;
 import com.syuuk.patentflow.patent.dto.EvaluationScoreResponse;
-import com.syuuk.patentflow.patent.dto.ExecutiveApprovalDecision;
 import com.syuuk.patentflow.patent.dto.FinalDecisionRequest;
 import com.syuuk.patentflow.patent.dto.PatchFinalDecisionRequest;
 import com.syuuk.patentflow.patent.dto.FinalDecisionResponse;
@@ -157,19 +156,6 @@ public class PatentFixtureService {
 
     public void ensurePatentExists(String patentId) {
         findPatent(patentId);
-    }
-
-    public List<String> applyExecutiveApproval(List<String> patentIds, ExecutiveApprovalDecision decision) {
-        OffsetDateTime decidedAt = OffsetDateTime.now(KST);
-        return patentIds.stream()
-                .map(patentId -> updatePatent(patentId, patent -> {
-                    if (!canApplyExecutiveApproval(patent.reviewWorkflowStatus())) {
-                        throw new PatentFlowException(ErrorCode.INVALID_WORKFLOW_STATUS);
-                    }
-                    return withExecutiveApproval(patent, decision, decidedAt);
-                }))
-                .map(PatentDetailResponse::patentId)
-                .toList();
     }
 
     public Recommendation getCurrentRecommendation(String patentId) {
@@ -495,11 +481,10 @@ public class PatentFixtureService {
                 "연차료 납부 검토 시점 도래",
                 recommendation,
                 businessOpinionDecision,
-                null,
                 legalActionResult,
                 summary(),
                 aiEvaluationReport(recommendation),
-                new FinalDecisionRecordResponse(null, null, null, null),
+                new FinalDecisionRecordResponse(null, null, null),
                 new BusinessOpinionResponse(businessOpinionDecision, null, null));
     }
 
@@ -735,11 +720,10 @@ public class PatentFixtureService {
                 "연차료 납부 검토 시점 도래",
                 recommendation,
                 businessOpinionDecision,
-                null,
                 legalActionResult,
                 summaryFromMetadata(title, technologyArea, productName),
                 aiEvaluationReport(recommendation),
-                new FinalDecisionRecordResponse(null, null, null, null),
+                new FinalDecisionRecordResponse(null, null, null),
                 new BusinessOpinionResponse(
                         businessOpinionDecision,
                         businessOpinionDecision == null ? null : defaultBusinessOpinionReason(businessOpinionDecision),
@@ -774,10 +758,9 @@ public class PatentFixtureService {
                 Recommendation.HOLD,
                 null,
                 null,
-                null,
                 new PatentSummaryResponse("작성 필요", "작성 필요", List.of(), "작성 필요", List.of()),
                 aiEvaluationReport(Recommendation.HOLD),
-                new FinalDecisionRecordResponse(null, null, null, null),
+                new FinalDecisionRecordResponse(null, null, null),
                 new BusinessOpinionResponse(null, null, null));
     }
 
@@ -828,7 +811,6 @@ public class PatentFixtureService {
                 patent.reviewReason(),
                 patent.currentRecommendation(),
                 patent.businessOpinionDecision(),
-                patent.executiveApprovalDecision(),
                 patent.legalActionResult(),
                 patent.summary(),
                 patent.aiEvaluationReport(),
@@ -860,7 +842,6 @@ public class PatentFixtureService {
                 patent.reviewReason(),
                 patent.currentRecommendation(),
                 patent.businessOpinionDecision(),
-                patent.executiveApprovalDecision(),
                 patent.legalActionResult(),
                 patent.summary(),
                 patent.aiEvaluationReport(),
@@ -892,7 +873,6 @@ public class PatentFixtureService {
                 patent.reviewReason(),
                 patent.currentRecommendation(),
                 patent.businessOpinionDecision(),
-                patent.executiveApprovalDecision(),
                 patent.legalActionResult(),
                 patent.summary(),
                 patent.aiEvaluationReport(),
@@ -910,7 +890,6 @@ public class PatentFixtureService {
                 patent.departmentId(), patent.departmentName(), patent.lifecycleStatus(),
                 newStatus, patent.feeDueDate(), patent.reviewReason(),
                 patent.currentRecommendation(), patent.businessOpinionDecision(),
-                patent.executiveApprovalDecision(),
                 patent.legalActionResult(),
                 patent.summary(), patent.aiEvaluationReport(),
                 patent.finalDecisionRecord(), patent.businessOpinion());
@@ -927,7 +906,6 @@ public class PatentFixtureService {
                 ReviewWorkflowStatus.MAIL_READY, patent.feeDueDate(),
                 patent.reviewReason(), report.recommendation(),
                 patent.businessOpinionDecision(),
-                patent.executiveApprovalDecision(),
                 patent.legalActionResult(), patent.summary(), report,
                 patent.finalDecisionRecord(), patent.businessOpinion());
     }
@@ -995,52 +973,11 @@ public class PatentFixtureService {
                 patent.reviewReason(),
                 patent.currentRecommendation(),
                 decision,
-                patent.executiveApprovalDecision(),
                 patent.legalActionResult(),
                 patent.summary(),
                 patent.aiEvaluationReport(),
                 patent.finalDecisionRecord(),
                 new BusinessOpinionResponse(decision, reason, submittedAt));
-    }
-
-    private PatentDetailResponse withExecutiveApproval(
-            PatentDetailResponse patent,
-            ExecutiveApprovalDecision decision,
-            OffsetDateTime decidedAt
-    ) {
-        return new PatentDetailResponse(
-                patent.patentId(),
-                patent.managementNumber(),
-                patent.applicationNumber(),
-                patent.registrationNumber(),
-                patent.title(),
-                patent.draftTitle(),
-                patent.businessArea(),
-                patent.technologyArea(),
-                patent.productName(),
-                patent.country(),
-                patent.coApplicants(),
-                patent.applicationDate(),
-                patent.registrationDate(),
-                patent.expectedExpirationDate(),
-                patent.departmentId(),
-                patent.departmentName(),
-                patent.lifecycleStatus(),
-                ReviewWorkflowStatus.APPROVAL_COMPLETED,
-                patent.feeDueDate(),
-                patent.reviewReason(),
-                patent.currentRecommendation(),
-                patent.businessOpinionDecision(),
-                decision,
-                legalActionResult(decision),
-                patent.summary(),
-                patent.aiEvaluationReport(),
-                new FinalDecisionRecordResponse(
-                        patent.patentId() + "-DEC-01",
-                        decision,
-                        defaultExecutiveApprovalReason(decision),
-                        decidedAt),
-                patent.businessOpinion());
     }
 
     private PatentDetailResponse withFinalDecision(
@@ -1051,9 +988,6 @@ public class PatentFixtureService {
         LocalDate newDueDate = request.legalActionResult() == LegalActionResult.MAINTAINED && patent.feeDueDate() != null
                 ? patent.feeDueDate().plusMonths(systemSettingsService.getCountryExtensionMonths(patent.country()))
                 : patent.feeDueDate();
-        ExecutiveApprovalDecision decision = request.decision() != null
-                ? request.decision()
-                : executiveDecisionFromLegalAction(request.legalActionResult());
         return new PatentDetailResponse(
                 patent.patentId(),
                 patent.managementNumber(),
@@ -1077,7 +1011,6 @@ public class PatentFixtureService {
                 patent.reviewReason(),
                 patent.currentRecommendation(),
                 patent.businessOpinionDecision(),
-                decision,
                 request.legalActionResult(),
                 patent.summary(),
                 patent.aiEvaluationReport(),
@@ -1085,7 +1018,6 @@ public class PatentFixtureService {
                         patent.finalDecisionRecord().decisionId() == null
                                 ? patent.patentId() + "-DEC-01"
                                 : patent.finalDecisionRecord().decisionId(),
-                        decision,
                         request.reason(),
                         decidedAt),
                 patent.businessOpinion());
@@ -1116,10 +1048,9 @@ public class PatentFixtureService {
                 patent.currentRecommendation(),
                 patent.businessOpinionDecision(),
                 null,
-                null,
                 patent.summary(),
                 patent.aiEvaluationReport(),
-                new FinalDecisionRecordResponse(null, null, null, null),
+                new FinalDecisionRecordResponse(null, null, null),
                 patent.businessOpinion());
     }
 
@@ -1156,7 +1087,6 @@ public class PatentFixtureService {
                 patent.reviewReason(),
                 patent.currentRecommendation(),
                 patent.businessOpinionDecision(),
-                patent.executiveApprovalDecision(),
                 legalActionResult,
                 patent.summary(),
                 patent.aiEvaluationReport(),
@@ -1164,7 +1094,6 @@ public class PatentFixtureService {
                         patent.finalDecisionRecord().decisionId() == null
                                 ? patent.patentId() + "-DEC-01"
                                 : patent.finalDecisionRecord().decisionId(),
-                        patent.finalDecisionRecord().decision(),
                         reason,
                         decidedAt),
                 patent.businessOpinion());
@@ -1172,40 +1101,7 @@ public class PatentFixtureService {
 
     private boolean canRecordFinalDecision(ReviewWorkflowStatus status) {
         return status == ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED
-                || status == ReviewWorkflowStatus.APPROVAL_COMPLETED
                 || status == ReviewWorkflowStatus.LEGAL_ACTION_RECORDED;
-    }
-
-    private boolean canApplyExecutiveApproval(ReviewWorkflowStatus status) {
-        return status == ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED
-                || status == ReviewWorkflowStatus.WAITING_EXECUTIVE_APPROVAL;
-    }
-
-    private LegalActionResult legalActionResult(ExecutiveApprovalDecision decision) {
-        return switch (decision) {
-            case APPROVED_ABANDON -> LegalActionResult.ABANDONED;
-            case APPROVED_SELL -> LegalActionResult.SOLD;
-            case APPROVED_MAINTAIN -> LegalActionResult.MAINTAINED;
-            case REJECTED, REQUEST_CHANGES -> null;
-        };
-    }
-
-    private ExecutiveApprovalDecision executiveDecisionFromLegalAction(LegalActionResult legalActionResult) {
-        return switch (legalActionResult) {
-            case ABANDONED -> ExecutiveApprovalDecision.APPROVED_ABANDON;
-            case SOLD -> ExecutiveApprovalDecision.APPROVED_SELL;
-            case MAINTAINED -> ExecutiveApprovalDecision.APPROVED_MAINTAIN;
-        };
-    }
-
-    private String defaultExecutiveApprovalReason(ExecutiveApprovalDecision decision) {
-        return switch (decision) {
-            case APPROVED_MAINTAIN -> "사업부 의견과 AI 평가 근거를 검토해 유지 처리했습니다.";
-            case APPROVED_ABANDON -> "사업부 의견과 AI 평가 근거를 검토해 포기 처리했습니다.";
-            case APPROVED_SELL -> "사업부 의견과 AI 평가 근거를 검토해 매각 처리했습니다.";
-            case REJECTED -> "최종 승인 요청이 반려되었습니다.";
-            case REQUEST_CHANGES -> "최종 승인 전 추가 검토가 요청되었습니다.";
-        };
     }
 
     private PatentSummaryResponse summary() {
@@ -1422,7 +1318,6 @@ public class PatentFixtureService {
                 detail.reviewReason(),
                 detail.currentRecommendation(),
                 detail.businessOpinionDecision(),
-                detail.executiveApprovalDecision(),
                 detail.legalActionResult());
     }
 
@@ -1522,13 +1417,11 @@ public class PatentFixtureService {
                 patent.reviewReason(),
                 patent.currentRecommendation(),
                 enumOrDefault(BusinessOpinionDecision.class, state.getBusinessOpinionDecision(), patent.businessOpinionDecision()),
-                patent.finalDecisionRecord().decision(),
                 enumOrDefault(LegalActionResult.class, state.getLegalActionResult(), patent.legalActionResult()),
                 patent.summary(),
                 patent.aiEvaluationReport(),
                 new FinalDecisionRecordResponse(
                         state.getFinalDecisionId(),
-                        patent.finalDecisionRecord().decision(),
                         state.getFinalDecisionReason(),
                         state.getFinalDecisionDecidedAt()),
                 new BusinessOpinionResponse(

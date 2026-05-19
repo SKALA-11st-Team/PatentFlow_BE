@@ -75,47 +75,11 @@ class PatentControllerTest {
     }
 
     @Test
-    void applyExecutiveApprovalUpdatesWorkflowAndDecision() throws Exception {
-        mockMvc.perform(post("/api/v1/patents/executive-approvals/bulk-decision")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        {
-                          "patentIds": ["PAT-2026-0005"],
-                          "decision": "APPROVED_ABANDON"
-                        }
-                        """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.decision").value("APPROVED_ABANDON"))
-                .andExpect(jsonPath("$.data.updatedCount").value(1));
-
-        mockMvc.perform(get("/api/v1/patents/PAT-2026-0005"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.reviewWorkflowStatus").value("APPROVAL_COMPLETED"))
-                .andExpect(jsonPath("$.data.executiveApprovalDecision").value("APPROVED_ABANDON"))
-                .andExpect(jsonPath("$.data.legalActionResult").value("ABANDONED"));
-    }
-
-    @Test
-    void applyExecutiveApprovalRejectsInvalidWorkflowStatus() throws Exception {
-        mockMvc.perform(post("/api/v1/patents/executive-approvals/bulk-decision")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        {
-                          "patentIds": ["PAT-2026-0001"],
-                          "decision": "APPROVED_MAINTAIN"
-                        }
-                        """))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("INVALID_WORKFLOW_STATUS"));
-    }
-
-    @Test
     void recordFinalDecisionPersistsDecisionAndLegalAction() throws Exception {
         mockMvc.perform(post("/api/v1/patents/PAT-2026-0005/final-decision")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {
-                          "decision": "APPROVED_MAINTAIN",
                           "legalActionResult": "MAINTAINED",
                           "reason": "사업부 의견과 AI 평가를 종합해 유지합니다."
                         }
@@ -124,12 +88,11 @@ class PatentControllerTest {
                 .andExpect(jsonPath("$.data.patentId").value("PAT-2026-0005"))
                 .andExpect(jsonPath("$.data.reviewWorkflowStatus").value("LEGAL_ACTION_RECORDED"))
                 .andExpect(jsonPath("$.data.legalActionResult").value("MAINTAINED"))
-                .andExpect(jsonPath("$.data.finalDecisionRecord.decision").value("APPROVED_MAINTAIN"));
+                .andExpect(jsonPath("$.data.finalDecisionRecord.reason").value("사업부 의견과 AI 평가를 종합해 유지합니다."));
 
         mockMvc.perform(get("/api/v1/patents/PAT-2026-0005"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.reviewWorkflowStatus").value("LEGAL_ACTION_RECORDED"))
-                .andExpect(jsonPath("$.data.executiveApprovalDecision").value("APPROVED_MAINTAIN"))
                 .andExpect(jsonPath("$.data.legalActionResult").value("MAINTAINED"))
                 .andExpect(jsonPath("$.data.finalDecisionRecord.reason").value("사업부 의견과 AI 평가를 종합해 유지합니다."));
     }

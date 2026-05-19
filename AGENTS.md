@@ -37,12 +37,13 @@ Review target identification
   - 시장성
   - 사업 연계성
   - 라이프사이클 경제성
+- The system does not include a separate approval step. After business response, the administrator/legal user records the final decision and legal action result directly.
 - Business opinion categories are `유지` and `포기`.
 - AI report recommendation labels are:
   - 유지 권고
   - 포기 검토
   - 추가 정보 필요
-- Workflow status labels should describe process state, such as `사업부 응답 대기`, `결재 대기`, and `처리 완료`.
+- Workflow status labels should describe process state, such as `사업부 응답 대기`, `사업부 응답 완료`, and `처리 완료`.
 - Use `정보 부족 있음`, `추가 확인 필요`, and `N/A` only for missing, insufficient, or not-applicable source data.
 - For not-yet-written user input, use state/action copy such as `작성 필요`, `대기 중`, or `의견 대기` instead of `N/A`.
 - Checklist totals and detail scores must use the same source. Do not mix AI 0-100 evaluation scores with business checklist 1-4 item scores in one total.
@@ -131,22 +132,12 @@ const REVIEW_WORKFLOW_STATUSES = [
   "MAIL_READY",
   "WAITING_BUSINESS_RESPONSE",
   "BUSINESS_RESPONSE_RECEIVED",
-  "WAITING_EXECUTIVE_APPROVAL",
-  "APPROVAL_COMPLETED",
   "LEGAL_ACTION_RECORDED",
 ] as const;
 
 const RECOMMENDATIONS = ["MAINTAIN", "REVIEW_AGAIN", "ABANDON", "SALES_CANDIDATE", "HOLD"] as const;
 
 const BUSINESS_OPINION_DECISIONS = ["MAINTAIN", "ABANDON"] as const;
-
-const EXECUTIVE_APPROVAL_DECISIONS = [
-  "APPROVED_MAINTAIN",
-  "APPROVED_ABANDON",
-  "APPROVED_SELL",
-  "REJECTED",
-  "REQUEST_CHANGES",
-] as const;
 
 const LEGAL_ACTION_RESULTS = ["MAINTAINED", "ABANDONED", "SOLD"] as const;
 
@@ -167,8 +158,6 @@ Current display labels include:
 | ReviewWorkflowStatus | `MAIL_READY` | 메일 발송 대기 |
 | ReviewWorkflowStatus | `WAITING_BUSINESS_RESPONSE` | 사업부 응답 대기 |
 | ReviewWorkflowStatus | `BUSINESS_RESPONSE_RECEIVED` | 사업부 응답 완료 |
-| ReviewWorkflowStatus | `WAITING_EXECUTIVE_APPROVAL` | 결재 대기 |
-| ReviewWorkflowStatus | `APPROVAL_COMPLETED` | 결재 완료 |
 | ReviewWorkflowStatus | `LEGAL_ACTION_RECORDED` | 처리 완료 |
 | Recommendation | `MAINTAIN` | 유지 권고 |
 | Recommendation | `REVIEW_AGAIN` | 추가 정보 필요 |
@@ -177,11 +166,6 @@ Current display labels include:
 | Recommendation | `HOLD` | 추가 정보 필요 |
 | BusinessOpinionDecision | `MAINTAIN` | 유지 |
 | BusinessOpinionDecision | `ABANDON` | 포기 |
-| ExecutiveApprovalDecision | `APPROVED_MAINTAIN` | 유지 승인 |
-| ExecutiveApprovalDecision | `APPROVED_ABANDON` | 포기 승인 |
-| ExecutiveApprovalDecision | `APPROVED_SELL` | 매각 승인 |
-| ExecutiveApprovalDecision | `REJECTED` | 반려 |
-| ExecutiveApprovalDecision | `REQUEST_CHANGES` | 수정 요청 |
 | LegalActionResult | `MAINTAINED` | 유지 처리 |
 | LegalActionResult | `ABANDONED` | 포기 처리 |
 | LegalActionResult | `SOLD` | 매각 처리 |
@@ -199,8 +183,6 @@ const REVIEW_WORKFLOW_PROGRESS_STATUSES = [
   "MAIL_READY",
   "WAITING_BUSINESS_RESPONSE",
   "BUSINESS_RESPONSE_RECEIVED",
-  "WAITING_EXECUTIVE_APPROVAL",
-  "APPROVAL_COMPLETED",
   "LEGAL_ACTION_RECORDED",
 ] as const;
 ```

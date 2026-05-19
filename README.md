@@ -77,6 +77,11 @@ http://localhost:8080/swagger-ui.html
 
 The current implementation loads official demo patent metadata from `docs/skax_patents_list.md` and adds mock evaluation/workflow data around it.
 
+## Domain Decisions
+
+- The workflow does not include a separate approval step. After `BUSINESS_RESPONSE_RECEIVED`, the administrator/legal user records the final decision and legal action result directly.
+- Do not add separate approval statuses or decision APIs/types unless the team explicitly reverses this decision.
+
 ## External Patent Lookup
 
 `GET /api/v1/patents/external-lookup` tries sources in `sourcePriority` order.

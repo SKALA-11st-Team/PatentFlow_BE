@@ -25,7 +25,6 @@ public record PatentDetailResponse(
         String reviewReason,
         Recommendation currentRecommendation,
         BusinessOpinionDecision businessOpinionDecision,
-        ExecutiveApprovalDecision executiveApprovalDecision,
         LegalActionResult legalActionResult,
         PatentSummaryResponse summary,
         AiEvaluationReportResponse aiEvaluationReport,

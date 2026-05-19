@@ -25,7 +25,6 @@ public record PatentListItemResponse(
         String reviewReason,
         Recommendation currentRecommendation,
         BusinessOpinionDecision businessOpinionDecision,
-        ExecutiveApprovalDecision executiveApprovalDecision,
         LegalActionResult legalActionResult
 ) {
 }

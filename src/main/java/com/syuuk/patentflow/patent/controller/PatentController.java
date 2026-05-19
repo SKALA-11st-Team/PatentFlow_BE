@@ -4,8 +4,6 @@ import com.syuuk.patentflow.common.response.ApiResponse;
 import com.syuuk.patentflow.common.response.PageResponse;
 import com.syuuk.patentflow.patent.dto.AssignDepartmentRequest;
 import com.syuuk.patentflow.patent.dto.BatchPatentIdsRequest;
-import com.syuuk.patentflow.patent.dto.ExecutiveApprovalBulkDecisionRequest;
-import com.syuuk.patentflow.patent.dto.ExecutiveApprovalBulkDecisionResponse;
 import com.syuuk.patentflow.patent.dto.FinalDecisionRequest;
 import com.syuuk.patentflow.patent.dto.FinalDecisionResponse;
 import com.syuuk.patentflow.patent.dto.PatchFinalDecisionRequest;
@@ -180,20 +178,4 @@ public class PatentController {
         return ApiResponse.ok(patentFixtureService.markMailReady(request.patentIds()));
     }
 
-    /**
-     * @relatedFR FR-011, FR-012
-     * @relatedUI UI-005
-     * @description 특허 최종 의사결정을 일괄 반영하는 API.
-     */
-    @PostMapping("/executive-approvals/bulk-decision")
-    public ApiResponse<ExecutiveApprovalBulkDecisionResponse> applyExecutiveApproval(
-            @Valid @RequestBody ExecutiveApprovalBulkDecisionRequest request
-    ) {
-        List<String> updatedPatentIds = patentFixtureService.applyExecutiveApproval(request.patentIds(), request.decision());
-        return ApiResponse.ok(new ExecutiveApprovalBulkDecisionResponse(
-                request.decision(),
-                updatedPatentIds.size(),
-                updatedPatentIds,
-                List.of()));
-    }
 }

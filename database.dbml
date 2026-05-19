@@ -51,11 +51,10 @@ Table patent_review_history {
   id varchar(64) [pk, note: "{patent_id}|{quarter_key}"]
   patent_id varchar(32) [not null]
   quarter_key varchar(16) [not null]
-  review_workflow_status varchar(64) [note: "NOT_IN_REVIEW_QUARTER | REVIEW_QUARTER_STARTED | REPORT_GENERATED | MAIL_READY | WAITING_BUSINESS_RESPONSE | BUSINESS_RESPONSE_RECEIVED | WAITING_EXECUTIVE_APPROVAL | APPROVAL_COMPLETED | LEGAL_ACTION_RECORDED"]
+  review_workflow_status varchar(64) [note: "NOT_IN_REVIEW_QUARTER | REVIEW_QUARTER_STARTED | REPORT_GENERATED | MAIL_READY | WAITING_BUSINESS_RESPONSE | BUSINESS_RESPONSE_RECEIVED | LEGAL_ACTION_RECORDED"]
   business_opinion_decision varchar(64) [note: "MAINTAIN | ABANDON — business_submissions.decision 최신값 비정규화 스냅샷"]
   business_opinion_reason varchar(2000) [note: "business_submissions.reason 최신값 비정규화 스냅샷"]
   business_opinion_submitted_at timestamp [note: "business_submissions.submitted_at 최신값 비정규화 스냅샷"]
-  executive_approval_decision varchar(64) [note: "APPROVED_MAINTAIN | APPROVED_ABANDON | APPROVED_SELL | REJECTED | REQUEST_CHANGES"]
   legal_action_result varchar(64) [note: "MAINTAINED | ABANDONED | SOLD"]
   final_decision_id varchar(64)
   final_decision_reason varchar(2000)
