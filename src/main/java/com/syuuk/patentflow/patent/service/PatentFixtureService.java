@@ -374,7 +374,7 @@ public class PatentFixtureService {
             PatentReviewHistoryEntity history = reviewHistoryRepository
                     .findByPatentIdAndQuarterKey(patentId, quarterKey)
                     .orElseGet(() -> new PatentReviewHistoryEntity(patentId, quarterKey));
-            history.setReviewWorkflowStatus(newStatus.name());
+            history.setReviewWorkflowStatus(newStatus);
             reviewHistoryRepository.save(history);
         }
     }
@@ -657,7 +657,7 @@ public class PatentFixtureService {
                 columns.get(6),
                 columns.get(7),
                 columns.get(8),
-                columns.get(9),
+                lifecycleStatus(columns.get(9)),
                 parseDate(columns.get(10)),
                 parseDate(columns.get(11)),
                 columns.get(12),
@@ -691,11 +691,11 @@ public class PatentFixtureService {
                         entity.getRegistrationDate(),
                         entity.getExpectedExpirationDate());
         PatentReviewHistoryEntity history = new PatentReviewHistoryEntity(entity.getPatentId(), "DEMO-SEED");
-        history.setReviewWorkflowStatus(reviewWorkflowStatus.name());
-        history.setBusinessOpinionDecision(nameOrNull(businessOpinionDecision));
+        history.setReviewWorkflowStatus(reviewWorkflowStatus);
+        history.setBusinessOpinionDecision(businessOpinionDecision);
         history.setBusinessOpinionReason(businessOpinionDecision == null ? null : defaultBusinessOpinionReason(businessOpinionDecision));
         history.setBusinessOpinionSubmittedAt(businessOpinionSubmittedAt);
-        history.setLegalActionResult(nameOrNull(legalActionResult));
+        history.setLegalActionResult(legalActionResult);
         history.setFinalDecisionId(legalActionResult == null ? null : entity.getPatentId() + "-DEC-01");
         history.setFinalDecisionReason(legalActionResult == null ? null : defaultFinalDecisionReason(legalActionResult));
         history.setFinalDecisionDecidedAt(legalActionResult == null ? null : businessOpinionSubmittedAt);
@@ -716,7 +716,7 @@ public class PatentFixtureService {
         String country = entity.getCountry();
         String jointApplication = entity.getJointApplication();
         String coApplicantName = entity.getCoApplicantName();
-        String status = entity.getPatentStatus();
+        PatentLifecycleStatus ls = entity.getPatentStatus();
         LocalDate applicationDate = entity.getApplicationDate();
         LocalDate registrationDate = entity.getRegistrationDate();
         String applicationNumber = entity.getApplicationNumber();
@@ -741,11 +741,11 @@ public class PatentFixtureService {
         LocalDate baseFeeDate = entity.getFeeDueDate() != null
                 ? entity.getFeeDueDate()
                 : annualFeeDueDate(country, applicationDate, registrationDate, expectedExpirationDate);
-        PatentLifecycleStatus ls = lifecycleStatus(status);
+        
         if (ls == PatentLifecycleStatus.ACTIVE && expectedExpirationDate != null
                 && expectedExpirationDate.isBefore(LocalDate.now(KST))) {
             ls = PatentLifecycleStatus.EXPIRED;
-            entity.setPatentStatus("소멸");
+            entity.setPatentStatus(PatentLifecycleStatus.EXPIRED);
             patentMetadataRepository.save(entity);
         }
         PatentDetailResponse basePatent = new PatentDetailResponse(
@@ -829,7 +829,7 @@ public class PatentFixtureService {
                 valueOrDefault(request.country(), "KR"),
                 "N",
                 "없음".equals(request.coApplicants()) ? "" : request.coApplicants(),
-                "유지",
+                PatentLifecycleStatus.ACTIVE,
                 request.applicationDate(),
                 request.registrationDate(),
                 request.applicationNumber(),
@@ -990,7 +990,6 @@ public class PatentFixtureService {
             case "권리성" -> EvaluationCategory.RIGHTS;
             case "기술성" -> EvaluationCategory.TECHNOLOGY;
             case "시장성" -> EvaluationCategory.MARKET;
-            case "라이프사이클 경제성" -> EvaluationCategory.LIFECYCLE_ECONOMICS;
             default -> EvaluationCategory.BUSINESS_ALIGNMENT;
         };
     }
@@ -1471,12 +1470,12 @@ public class PatentFixtureService {
                 state.getDepartmentId() != null ? state.getDepartmentId() : "",
                 resolvedDepartmentName(state.getDepartmentId()),
                 patent.lifecycleStatus(),
-                enumOrDefault(ReviewWorkflowStatus.class, state.getReviewWorkflowStatus(), patent.reviewWorkflowStatus()),
+                state.getReviewWorkflowStatus() != null ? state.getReviewWorkflowStatus() : patent.reviewWorkflowStatus(),
                 state.getAnnualFeeDueDate() != null ? state.getAnnualFeeDueDate() : patent.feeDueDate(),
                 patent.reviewReason(),
                 patent.currentRecommendation(),
-                enumOrDefault(BusinessOpinionDecision.class, state.getBusinessOpinionDecision(), patent.businessOpinionDecision()),
-                enumOrDefault(LegalActionResult.class, state.getLegalActionResult(), patent.legalActionResult()),
+                state.getBusinessOpinionDecision() != null ? state.getBusinessOpinionDecision() : patent.businessOpinionDecision(),
+                state.getLegalActionResult() != null ? state.getLegalActionResult() : patent.legalActionResult(),
                 patent.summary(),
                 patent.aiEvaluationReport(),
                 new FinalDecisionRecordResponse(
@@ -1484,7 +1483,7 @@ public class PatentFixtureService {
                         state.getFinalDecisionReason(),
                         state.getFinalDecisionDecidedAt()),
                 new BusinessOpinionResponse(
-                        enumOrDefault(BusinessOpinionDecision.class, state.getBusinessOpinionDecision(), null),
+                        state.getBusinessOpinionDecision(),
                         state.getBusinessOpinionReason(),
                         state.getBusinessOpinionSubmittedAt()));
     }
@@ -1495,11 +1494,11 @@ public class PatentFixtureService {
         PatentReviewHistoryEntity state = history.isEmpty()
                 ? new PatentReviewHistoryEntity(patent.patentId(), "UNQUARTERED")
                 : history.get(0);
-        state.setReviewWorkflowStatus(patent.reviewWorkflowStatus().name());
-        state.setBusinessOpinionDecision(nameOrNull(patent.businessOpinionDecision()));
+        state.setReviewWorkflowStatus(patent.reviewWorkflowStatus());
+        state.setBusinessOpinionDecision(patent.businessOpinionDecision());
         state.setBusinessOpinionReason(patent.businessOpinion().reason());
         state.setBusinessOpinionSubmittedAt(patent.businessOpinion().submittedAt());
-        state.setLegalActionResult(nameOrNull(patent.legalActionResult()));
+        state.setLegalActionResult(patent.legalActionResult());
         state.setFinalDecisionId(patent.finalDecisionRecord().decisionId());
         state.setFinalDecisionReason(patent.finalDecisionRecord().reason());
         state.setFinalDecisionDecidedAt(patent.finalDecisionRecord().decidedAt());
@@ -1516,15 +1515,15 @@ public class PatentFixtureService {
     private PatentReviewHistoryItemResponse toHistoryItem(PatentReviewHistoryEntity entity) {
         return new PatentReviewHistoryItemResponse(
                 entity.getQuarterKey(),
-                entity.getReviewWorkflowStatus(),
-                entity.getBusinessOpinionDecision(),
+                nameOrNull(entity.getReviewWorkflowStatus()),
+                nameOrNull(entity.getBusinessOpinionDecision()),
                 entity.getBusinessOpinionReason(),
                 entity.getBusinessOpinionSubmittedAt(),
-                entity.getLegalActionResult(),
+                nameOrNull(entity.getLegalActionResult()),
                 entity.getFinalDecisionId(),
                 entity.getFinalDecisionReason(),
                 entity.getFinalDecisionDecidedAt(),
-                entity.getCreatedAt(),
+                entity.getCreatedAt() != null ? entity.getCreatedAt().atZone(KST).toOffsetDateTime() : null,
                 entity.getDepartmentId(),
                 entity.getDepartmentName());
     }

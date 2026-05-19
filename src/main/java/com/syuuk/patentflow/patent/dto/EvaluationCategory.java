@@ -4,6 +4,5 @@ public enum EvaluationCategory {
     RIGHTS,
     TECHNOLOGY,
     MARKET,
-    BUSINESS_ALIGNMENT,
-    LIFECYCLE_ECONOMICS
+    BUSINESS_ALIGNMENT
 }
