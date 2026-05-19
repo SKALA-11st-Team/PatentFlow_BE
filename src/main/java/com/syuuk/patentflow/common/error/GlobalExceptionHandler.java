@@ -2,6 +2,8 @@ package com.syuuk.patentflow.common.error;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -11,9 +13,12 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
     @ExceptionHandler(PatentFlowException.class)
     public ResponseEntity<ErrorResponse> handlePatentFlowException(PatentFlowException exception) {
         ErrorCode errorCode = exception.errorCode();
+        log.warn("PatentFlowException occurred: {} - {}", errorCode.name(), exception.getMessage());
         return ResponseEntity.status(errorCode.status()).body(ErrorResponse.of(errorCode));
     }
 
@@ -22,16 +27,19 @@ public class GlobalExceptionHandler {
         Map<String, Object> details = new HashMap<>();
         exception.getBindingResult().getFieldErrors()
                 .forEach(error -> details.put(error.getField(), error.getDefaultMessage()));
+        log.warn("Validation failed: {}", details);
         return ResponseEntity.badRequest().body(ErrorResponse.of(ErrorCode.INVALID_REQUEST, details));
     }
 
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ErrorResponse> handleAuthenticationException(AuthenticationException exception) {
+        log.warn("Authentication failed: {}", exception.getMessage());
         return ResponseEntity.status(ErrorCode.UNAUTHORIZED.status()).body(ErrorResponse.of(ErrorCode.UNAUTHORIZED));
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleException(Exception exception) {
+        log.error("Unhandled exception occurred: ", exception);
         return ResponseEntity.internalServerError().body(ErrorResponse.of(ErrorCode.INTERNAL_ERROR));
     }
 }
