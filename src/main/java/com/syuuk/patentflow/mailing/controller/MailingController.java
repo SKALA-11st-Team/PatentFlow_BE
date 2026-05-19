@@ -1,24 +1,35 @@
 package com.syuuk.patentflow.mailing.controller;
 
 import com.syuuk.patentflow.common.response.ApiResponse;
+import com.syuuk.patentflow.mailing.dto.DepartmentRecipientMappingResponse;
+import com.syuuk.patentflow.mailing.dto.MailingHistoryItemResponse;
 import com.syuuk.patentflow.mailing.dto.MailingSendRequest;
 import com.syuuk.patentflow.mailing.dto.MailingSendResponse;
-import com.syuuk.patentflow.patent.service.PatentFixtureService;
+import com.syuuk.patentflow.mailing.service.MailingService;
 import jakarta.validation.Valid;
 import java.util.List;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/mailings")
 public class MailingController {
 
-    private final PatentFixtureService patentFixtureService;
+    private final MailingService mailingService;
 
-    public MailingController(PatentFixtureService patentFixtureService) {
-        this.patentFixtureService = patentFixtureService;
+    public MailingController(MailingService mailingService) {
+        this.mailingService = mailingService;
+    }
+
+    @GetMapping("/department-recipient-mappings")
+    public ApiResponse<List<DepartmentRecipientMappingResponse>> getRecipientMappings(
+            @RequestParam(required = false) String departmentId
+    ) {
+        return ApiResponse.ok(mailingService.getRecipientMappings(departmentId));
     }
 
     /**
@@ -28,13 +39,16 @@ public class MailingController {
      */
     @PostMapping("/send")
     public ApiResponse<MailingSendResponse> sendMailing(@Valid @RequestBody MailingSendRequest request) {
-        PatentFixtureService.WorkflowBatchUpdateResult result =
-                patentFixtureService.markMailingSent(request.patentIds());
-        List<String> updatedPatentIds = result.updatedPatentIds();
-
-        return ApiResponse.ok(new MailingSendResponse(
-                updatedPatentIds.size(),
-                updatedPatentIds,
-                result.skippedPatentIds()));
+        return ApiResponse.ok(mailingService.send(request));
     }
+
+    @GetMapping("/history")
+    public ApiResponse<List<MailingHistoryItemResponse>> getMailingHistory(
+            @RequestParam(required = false) String patentId,
+            @RequestParam(required = false) String recipientEmail
+    ) {
+        return ApiResponse.ok(mailingService.getHistory(patentId, recipientEmail));
+    }
+
+
 }
