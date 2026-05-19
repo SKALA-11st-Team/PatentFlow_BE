@@ -16,13 +16,17 @@
   - `local`, `demo` profile에서만 실행한다.
   - Hibernate가 테이블을 생성/갱신한 뒤 SQL seed를 적용한다.
   - 이미 특허 데이터가 있으면 특허 seed를 건너뛰고, 기본 부서/사용자/설정/분기/검토 이력이 부족한 경우에만 core seed를 실행한다.
-  - `patent_review_history`는 중복 row를 만들지 않고 기존 row도 덮어쓰지 않는다.
+- `src/main/resources/db/seed/demo_workflow_seed.sql`
+  - `local`, `demo` profile에서만 실행한다.
+  - 발표 화면에서 workflow가 비어 보이지 않도록 상태별 검토 이력, 메일 발송 이력, 사업부 제출 이력, AI 평가/요약 snapshot을 seed한다.
+  - FE 기본 사업부 로그인과 맞추기 위해 `business / business1234` 데모 계정을 생성한다.
+  - demo row가 이미 있으면 재시작 시 다시 적용하지 않는다.
 
 ## 추가로 필요한 Seed
 
-1. `business_submissions`, `mailing_history`
-   - 데모/통합 테스트에서 사업부 제출 이력과 메일링 이력을 보여주려면 선택 seed가 필요하다.
-   - 운영 초기 데이터에는 보통 넣지 않고, 데모 프로필 또는 테스트 프로필로 분리하는 편이 안전하다.
+1. 운영/스테이징용 사용자 seed 정책
+   - 현재 데모 계정과 발표용 이력은 `local/demo`에만 묶었다.
+   - 운영성 환경에서는 관리자 초대, 사업부 사용자 생성, 비밀번호 발급 정책을 별도로 정해야 한다.
 
 2. AI 평가 기준 seed
    - 평가 지표 외부화를 진행하면 `evaluation_criteria`, `evaluation_weights` 같은 설정 테이블 seed가 필요하다.
