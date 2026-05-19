@@ -45,8 +45,11 @@ public class AuthService {
     }
 
     public UserPrincipalResponse currentUser(Authentication authentication) {
-        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-        return toPrincipalResponse(userDetails);
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof UserPrincipalResponse userPrincipal) {
+            return userPrincipal;
+        }
+        return toPrincipalResponse((UserDetails) principal);
     }
 
     public UserPrincipalResponse updateProfile(Authentication authentication, UpdateProfileRequest request) {
@@ -55,7 +58,7 @@ public class AuthService {
                 .orElseThrow(() -> new PatentFlowException(ErrorCode.USER_NOT_FOUND));
         user.setDisplayName(request.displayName());
         userRepository.save(user);
-        return currentUser(authentication);
+        return toPrincipalResponse(new UserDetailsImpl(user));
     }
 
     private UserPrincipalResponse toPrincipalResponse(UserDetails userDetails) {

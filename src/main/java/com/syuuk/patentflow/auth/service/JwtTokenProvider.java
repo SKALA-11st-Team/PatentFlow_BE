@@ -3,6 +3,9 @@ package com.syuuk.patentflow.auth.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.syuuk.patentflow.auth.config.AuthProperties;
+import com.syuuk.patentflow.auth.dto.UserPrincipalResponse;
+import com.syuuk.patentflow.user.domain.UserEntity;
+import com.syuuk.patentflow.user.security.UserDetailsImpl;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
@@ -37,8 +40,9 @@ public class JwtTokenProvider {
         List<String> roles = userDetails.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
                 .toList();
+        UserPrincipalResponse principal = toPrincipalResponse(userDetails, roles);
 
-        return createToken(userDetails.getUsername(), roles, issuedAt, expiresAt);
+        return createToken(principal, issuedAt, expiresAt);
     }
 
     public Instant getExpiresAt(String token) {
@@ -55,6 +59,22 @@ public class JwtTokenProvider {
             return collection.stream().map(String::valueOf).toList();
         }
         return List.of();
+    }
+
+    public UserPrincipalResponse getUserPrincipal(String token) {
+        Map<String, Object> claims = claims(token);
+        String username = stringClaim(claims, "sub", "");
+        List<String> roles = getRoles(token);
+        return new UserPrincipalResponse(
+                username,
+                stringClaim(claims, "displayName", username),
+                roles,
+                stringClaim(claims, "userId", username),
+                stringClaim(claims, "name", stringClaim(claims, "displayName", username)),
+                stringClaim(claims, "email", username),
+                stringClaim(claims, "role", roles.stream().anyMatch("ROLE_ADMIN"::equals) ? "ADMIN" : "BUSINESS"),
+                stringClaim(claims, "departmentId", null),
+                stringClaim(claims, "departmentName", null));
     }
 
     public boolean isValid(String token) {
@@ -74,19 +94,55 @@ public class JwtTokenProvider {
         }
     }
 
-    private String createToken(String username, List<String> roles, Instant issuedAt, Instant expiresAt) {
+    private String createToken(UserPrincipalResponse principal, Instant issuedAt, Instant expiresAt) {
         try {
             String header = encodeJson(Map.of("alg", "HS256", "typ", "JWT"));
-            String payload = encodeJson(Map.of(
-                    "sub", username,
-                    "roles", roles,
-                    "iat", issuedAt.getEpochSecond(),
-                    "exp", expiresAt.getEpochSecond()));
+            String payload = encodeJson(Map.ofEntries(
+                    Map.entry("sub", principal.username()),
+                    Map.entry("roles", principal.roles()),
+                    Map.entry("userId", principal.userId()),
+                    Map.entry("displayName", principal.displayName()),
+                    Map.entry("name", principal.name()),
+                    Map.entry("email", principal.email()),
+                    Map.entry("role", principal.role()),
+                    Map.entry("departmentId", valueOrEmpty(principal.departmentId())),
+                    Map.entry("departmentName", valueOrEmpty(principal.departmentName())),
+                    Map.entry("iat", issuedAt.getEpochSecond()),
+                    Map.entry("exp", expiresAt.getEpochSecond())));
             String signedContent = header + "." + payload;
             return signedContent + "." + sign(signedContent);
         } catch (Exception exception) {
             throw new IllegalStateException("JWT 토큰을 생성할 수 없습니다.", exception);
         }
+    }
+
+    private UserPrincipalResponse toPrincipalResponse(UserDetails userDetails, List<String> roles) {
+        if (userDetails instanceof UserDetailsImpl impl) {
+            UserEntity user = impl.getUser();
+            return new UserPrincipalResponse(
+                    user.getUsername(),
+                    user.getDisplayName(),
+                    roles,
+                    user.getId(),
+                    user.getDisplayName(),
+                    user.getUsername(),
+                    user.getRole(),
+                    user.getDepartmentId(),
+                    user.getDepartmentName());
+        }
+        return new UserPrincipalResponse(userDetails.getUsername(), userDetails.getUsername(), roles);
+    }
+
+    private String stringClaim(Map<String, Object> claims, String key, String defaultValue) {
+        Object value = claims.get(key);
+        if (value == null || String.valueOf(value).isBlank()) {
+            return defaultValue;
+        }
+        return String.valueOf(value);
+    }
+
+    private String valueOrEmpty(String value) {
+        return value == null ? "" : value;
     }
 
     private Map<String, Object> claims(String token) {
