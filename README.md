@@ -76,6 +76,7 @@ http://localhost:8080/swagger-ui.html
 - `GET /api/v1/patents/{patentId}/history` - FR-013
 
 The current implementation loads official demo patent metadata from `docs/skax_patents_list.md` and adds mock evaluation/workflow data around it.
+The same SK AX patent metadata is also available as an idempotent SQL seed in `src/main/resources/db/seed/skax_patents.sql`.
 
 ## Domain Decisions
 
@@ -83,6 +84,11 @@ The current implementation loads official demo patent metadata from `docs/skax_p
 - Do not add separate approval statuses or decision APIs/types unless the team explicitly reverses this decision.
 - `patent_review_history` is the source of truth for the current quarter review state, including workflow status, AI recommendation/report snapshot, patent summary snapshot, business opinion snapshot, and final legal decision.
 - `business_submissions` stores the business user's submitted checklist/opinion and keeps AI recommendation/report values only as submission-time snapshots. Do not read it as the current AI recommendation source.
+
+## DB Seed
+
+- `src/main/resources/db/seed/skax_patents.sql` seeds 185 SK AX patent rows from `docs/skax_patent_list.csv`.
+- `docs/db_seed_and_status_plan.md` lists the remaining seed data and DB-side status/date update functions needed before production-like operation.
 
 ## External Patent Lookup
 
