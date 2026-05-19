@@ -5,11 +5,32 @@ spring:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/patentflow}
     username: ${SPRING_DATASOURCE_USERNAME:patentflow}
     password: ${SPRING_DATASOURCE_PASSWORD:patentflow}
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${GMAIL_USERNAME:}
+    password: ${GMAIL_APP_PASSWORD:}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+      mail.smtp.starttls.required: true
   jpa:
     hibernate:
       ddl-auto: update
     open-in-view: false
-
+  servlet:
+    multipart:
+      max-file-size: 50MB    # 파일 하나당 최대 크기
+      max-request-size: 50MB # 전체 요청의 최대 크기
+  cloud:
+    aws:
+      region:
+        static: ${AWS_REGION:ap-northeast-2}
+      credentials:
+        access-key: ${S3_ACCESS_KEY:admin}
+        secret-key: ${S3_SECRET_KEY:password123}
+      s3:
+        endpoint: ${S3_ENDPOINT:http://localhost:9000}
 server:
   port: 8080
 
@@ -18,8 +39,14 @@ management:
     web:
       exposure:
         include: health,info
+  health:
+    mail:
+      enabled: false
 
 patentflow:
+  auth:
+    jwt-secret: ${PATENTFLOW_JWT_SECRET:dev-patentflow-jwt-secret-change-me-please-32bytes}
+    access-token-expiration-seconds: ${PATENTFLOW_JWT_EXPIRATION_SECONDS:3600}
   cors:
     allowed-origins: ${PATENTFLOW_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
   lookup:
@@ -34,3 +61,20 @@ patentflow:
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
+
+agent:
+    url: ${PATENTFLOW_AGENT_URL:http://patentflow-agent:8000}
+
+cloud:
+    aws:
+      region:
+        static: ap-northeast-2 # AWS 리전 설정 (예: 서울 리전)
+      credentials:
+        access-key: ${S3_ACCESS_KEY:admin}
+        secret-key: ${S3_SECRET_KEY:password123}
+      s3:
+        endpoint: ${S3_ENDPOINT:http://localhost:9000}
+
+s3:
+  bucket:
+    name: ${S3_BUCKET_NAME:patentflow-bucket}

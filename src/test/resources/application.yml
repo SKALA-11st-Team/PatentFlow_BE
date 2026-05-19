@@ -8,8 +8,20 @@ spring:
     hibernate:
       ddl-auto: create-drop
     open-in-view: false
+  cloud:
+    aws:
+      region:
+        static: ap-northeast-2
+      credentials:
+        access-key: test
+        secret-key: test
+      s3:
+        endpoint: http://localhost:9000
 
 patentflow:
+  auth:
+    jwt-secret: test-patentflow-jwt-secret-change-me-please-32bytes
+    access-token-expiration-seconds: 3600
   cors:
     allowed-origins: http://localhost:5173,http://127.0.0.1:5173
   lookup:
@@ -20,3 +32,17 @@ patentflow:
     google-patents:
       enabled: false
       base-url: https://patents.google.com
+
+cloud:
+  aws:
+    region:
+      static: ap-northeast-2
+    credentials:
+      access-key: test
+      secret-key: test
+    s3:
+      endpoint: http://localhost:9000
+
+s3:
+  bucket:
+    name: patentflow-test-bucket
