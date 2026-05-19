@@ -7,6 +7,7 @@ import java.util.List;
 
 public record BusinessReviewMailSendDraft(
         @NotBlank String body,
+        List<String> ccEmails,
         @NotEmpty List<@Valid BusinessReviewMailPatentSummary> patents,
         @NotBlank String recipientEmail,
         @NotBlank String recipientName,

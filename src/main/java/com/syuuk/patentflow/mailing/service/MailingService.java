@@ -37,6 +37,9 @@ public class MailingService {
 
     private static final Logger log = LoggerFactory.getLogger(MailingService.class);
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+    private static final String STATUS_SENT = "SENT";
+    private static final String STATUS_FAILED = "FAILED";
+    private static final String STATUS_RECORDED = "RECORDED";
 
     @Value("${spring.mail.username:}")
     private String envGmailUsername;
@@ -91,22 +94,31 @@ public class MailingService {
     public MailingSendResponse send(MailingSendRequest request) {
         String username = resolve(systemSettingsService.getGmailUsername(), envGmailUsername);
         String password = resolve(systemSettingsService.getGmailAppPassword(), envGmailAppPassword);
+        boolean smtpConfigured = username != null && !username.isBlank() && password != null && !password.isBlank();
+        String mailingBatchId = "MAIL-BATCH-" + System.currentTimeMillis();
 
-        if (username != null && !username.isBlank() && password != null && !password.isBlank()) {
-            request.drafts().forEach(draft -> sendEmail(username, password, draft));
+        if (smtpConfigured) {
+            request.drafts().forEach(draft -> {
+                try {
+                    sendEmail(username, password, draft);
+                    saveHistory(mailingBatchId, draft, STATUS_SENT);
+                } catch (PatentFlowException exception) {
+                    saveHistory(mailingBatchId, draft, STATUS_FAILED);
+                    throw exception;
+                }
+            });
         } else {
             log.info("Gmail credentials are not configured; recording mailing workflow without SMTP delivery.");
+            request.drafts().forEach(draft -> saveHistory(mailingBatchId, draft, STATUS_RECORDED));
         }
 
         // 발송 성공 후 상태 변경 및 이력 저장
-        String mailingBatchId = "MAIL-BATCH-" + System.currentTimeMillis();
         List<String> patentIds = request.drafts().stream()
                 .flatMap(draft -> draft.patents().stream())
                 .map(BusinessReviewMailPatentSummary::patentId)
                 .distinct()
                 .toList();
         PatentReviewService.WorkflowBatchUpdateResult updateResult = patentReviewService.markMailingSent(patentIds);
-        request.drafts().forEach(draft -> saveHistory(mailingBatchId, draft));
 
         return new MailingSendResponse(
                 mailingBatchId,
@@ -122,6 +134,10 @@ public class MailingService {
             MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
             helper.setFrom(username);
             helper.setTo(draft.recipientEmail());
+            List<String> ccEmails = normalizedCcEmails(draft);
+            if (!ccEmails.isEmpty()) {
+                helper.setCc(ccEmails.toArray(String[]::new));
+            }
             helper.setSubject(draft.subject());
             helper.setText(draft.body(), false);
             sender.send(message);
@@ -159,7 +175,7 @@ public class MailingService {
                 .toList();
     }
 
-    private void saveHistory(String mailingBatchId, BusinessReviewMailSendDraft draft) {
+    private void saveHistory(String mailingBatchId, BusinessReviewMailSendDraft draft, String status) {
         String mailingId = mailingBatchId + "-" + Math.abs(draft.recipientEmail().hashCode());
         String departmentId = userRepository.findByUsername(draft.recipientEmail())
                 .map(u -> u.getDepartmentId())
@@ -167,7 +183,7 @@ public class MailingService {
         mailingHistoryRepository.save(new MailingHistoryEntity(
                 mailingId,
                 draft.body(),
-                writeJson(List.<String>of()),
+                writeJson(normalizedCcEmails(draft)),
                 draft.patents().size(),
                 writeJson(draft.patents()),
                 draft.recipientEmail(),
@@ -175,8 +191,19 @@ public class MailingService {
                 departmentId,
                 OffsetDateTime.now(KST),
                 "PatentFlow",
-                "SENT",
+                status,
                 draft.subject()));
+    }
+
+    private List<String> normalizedCcEmails(BusinessReviewMailSendDraft draft) {
+        if (draft.ccEmails() == null) {
+            return List.of();
+        }
+        return draft.ccEmails().stream()
+                .filter(email -> email != null && !email.isBlank())
+                .map(String::trim)
+                .distinct()
+                .toList();
     }
 
     private MailingHistoryItemResponse toHistoryResponse(MailingHistoryEntity entity) {
