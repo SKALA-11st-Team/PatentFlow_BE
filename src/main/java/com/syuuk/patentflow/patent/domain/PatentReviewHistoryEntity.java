@@ -3,6 +3,7 @@ package com.syuuk.patentflow.patent.domain;
 import com.syuuk.patentflow.common.domain.BaseEntity;
 import com.syuuk.patentflow.patent.dto.BusinessOpinionDecision;
 import com.syuuk.patentflow.patent.dto.LegalActionResult;
+import com.syuuk.patentflow.patent.dto.Recommendation;
 import com.syuuk.patentflow.patent.dto.ReviewWorkflowStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -32,6 +33,10 @@ public class PatentReviewHistoryEntity extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "review_workflow_status", length = 64)
     private ReviewWorkflowStatus reviewWorkflowStatus;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ai_recommendation", length = 64)
+    private Recommendation aiRecommendation;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "business_opinion_decision", length = 64)
@@ -92,6 +97,14 @@ public class PatentReviewHistoryEntity extends BaseEntity {
 
     public void setReviewWorkflowStatus(ReviewWorkflowStatus reviewWorkflowStatus) {
         this.reviewWorkflowStatus = reviewWorkflowStatus;
+    }
+
+    public Recommendation getAiRecommendation() {
+        return aiRecommendation;
+    }
+
+    public void setAiRecommendation(Recommendation aiRecommendation) {
+        this.aiRecommendation = aiRecommendation;
     }
 
     public BusinessOpinionDecision getBusinessOpinionDecision() {

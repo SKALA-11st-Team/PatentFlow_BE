@@ -692,6 +692,7 @@ public class PatentFixtureService {
                         entity.getExpectedExpirationDate());
         PatentReviewHistoryEntity history = new PatentReviewHistoryEntity(entity.getPatentId(), "DEMO-SEED");
         history.setReviewWorkflowStatus(reviewWorkflowStatus);
+        history.setAiRecommendation(recommendation);
         history.setBusinessOpinionDecision(businessOpinionDecision);
         history.setBusinessOpinionReason(businessOpinionDecision == null ? null : defaultBusinessOpinionReason(businessOpinionDecision));
         history.setBusinessOpinionSubmittedAt(businessOpinionSubmittedAt);
@@ -1452,6 +1453,9 @@ public class PatentFixtureService {
     }
 
     private PatentDetailResponse applyHistoryState(PatentDetailResponse patent, PatentReviewHistoryEntity state) {
+        Recommendation currentRecommendation = state.getAiRecommendation() != null
+                ? state.getAiRecommendation()
+                : patent.currentRecommendation();
         return new PatentDetailResponse(
                 patent.patentId(),
                 patent.managementNumber(),
@@ -1473,11 +1477,11 @@ public class PatentFixtureService {
                 state.getReviewWorkflowStatus() != null ? state.getReviewWorkflowStatus() : patent.reviewWorkflowStatus(),
                 state.getAnnualFeeDueDate() != null ? state.getAnnualFeeDueDate() : patent.feeDueDate(),
                 patent.reviewReason(),
-                patent.currentRecommendation(),
+                currentRecommendation,
                 state.getBusinessOpinionDecision() != null ? state.getBusinessOpinionDecision() : patent.businessOpinionDecision(),
                 state.getLegalActionResult() != null ? state.getLegalActionResult() : patent.legalActionResult(),
                 patent.summary(),
-                patent.aiEvaluationReport(),
+                withAiRecommendation(patent.aiEvaluationReport(), currentRecommendation),
                 new FinalDecisionRecordResponse(
                         state.getFinalDecisionId(),
                         state.getFinalDecisionReason(),
@@ -1488,6 +1492,20 @@ public class PatentFixtureService {
                         state.getBusinessOpinionSubmittedAt()));
     }
 
+    private AiEvaluationReportResponse withAiRecommendation(
+            AiEvaluationReportResponse report,
+            Recommendation recommendation
+    ) {
+        return new AiEvaluationReportResponse(
+                report.reportId(),
+                report.createdAt(),
+                recommendation,
+                report.recommendationReason(),
+                report.totalScore(),
+                report.scores(),
+                report.missingInformation());
+    }
+
     private void persistPatentState(PatentDetailResponse patent) {
         List<PatentReviewHistoryEntity> history =
                 reviewHistoryRepository.findByPatentIdOrderByCreatedAtDesc(patent.patentId());
@@ -1495,6 +1513,7 @@ public class PatentFixtureService {
                 ? new PatentReviewHistoryEntity(patent.patentId(), "UNQUARTERED")
                 : history.get(0);
         state.setReviewWorkflowStatus(patent.reviewWorkflowStatus());
+        state.setAiRecommendation(patent.currentRecommendation());
         state.setBusinessOpinionDecision(patent.businessOpinionDecision());
         state.setBusinessOpinionReason(patent.businessOpinion().reason());
         state.setBusinessOpinionSubmittedAt(patent.businessOpinion().submittedAt());
