@@ -184,7 +184,7 @@ public class PatentFixtureService {
         }
         AgentEvaluateResponse agentResponse = aiReportAgentClient.evaluate(patentId);
         AiEvaluationReportResponse report = mapAgentResponse(agentResponse, patentId);
-        return updatePatent(patentId, p -> withAiReport(p, report));
+        return updatePatent(patentId, p -> withAiReport(p, report, agentResponse.summary()));
     }
 
     public List<String> markMailReady(List<String> patentIds) {
@@ -957,7 +957,11 @@ public class PatentFixtureService {
                 patent.finalDecisionRecord(), patent.businessOpinion());
     }
 
-    private PatentDetailResponse withAiReport(PatentDetailResponse patent, AiEvaluationReportResponse report) {
+    private PatentDetailResponse withAiReport(
+            PatentDetailResponse patent,
+            AiEvaluationReportResponse report,
+            String agentSummary
+    ) {
         return new PatentDetailResponse(
                 patent.patentId(), patent.managementNumber(), patent.applicationNumber(),
                 patent.registrationNumber(), patent.title(), patent.draftTitle(),
@@ -968,8 +972,20 @@ public class PatentFixtureService {
                 ReviewWorkflowStatus.MAIL_READY, patent.feeDueDate(),
                 patent.reviewReason(), report.recommendation(),
                 patent.businessOpinionDecision(),
-                patent.legalActionResult(), patent.summary(), report,
+                patent.legalActionResult(), withAgentSummary(patent.summary(), agentSummary), report,
                 patent.finalDecisionRecord(), patent.businessOpinion());
+    }
+
+    private PatentSummaryResponse withAgentSummary(PatentSummaryResponse summary, String agentSummary) {
+        if (agentSummary == null || agentSummary.isBlank()) {
+            return summary;
+        }
+        return new PatentSummaryResponse(
+                agentSummary,
+                summary.problemSolved(),
+                summary.coreTechnicalPoints(),
+                summary.claimsSummary(),
+                summary.missingFields());
     }
 
     private AiEvaluationReportResponse mapAgentResponse(AgentEvaluateResponse agent, String patentId) {
