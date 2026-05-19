@@ -21,7 +21,7 @@ public record PatentListItemResponse(
         String departmentName,
         PatentLifecycleStatus lifecycleStatus,
         ReviewWorkflowStatus reviewWorkflowStatus,
-        LocalDate annualFeeDueDate,
+        LocalDate feeDueDate,
         String reviewReason,
         Recommendation currentRecommendation,
         BusinessOpinionDecision businessOpinionDecision,

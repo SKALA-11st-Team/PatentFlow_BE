@@ -2,14 +2,20 @@ package com.syuuk.patentflow.patent.controller;
 
 import com.syuuk.patentflow.common.response.ApiResponse;
 import com.syuuk.patentflow.common.response.PageResponse;
+import com.syuuk.patentflow.patent.dto.AssignDepartmentRequest;
+import com.syuuk.patentflow.patent.dto.BatchPatentIdsRequest;
 import com.syuuk.patentflow.patent.dto.ExecutiveApprovalBulkDecisionRequest;
 import com.syuuk.patentflow.patent.dto.ExecutiveApprovalBulkDecisionResponse;
+import com.syuuk.patentflow.patent.dto.FinalDecisionRequest;
+import com.syuuk.patentflow.patent.dto.FinalDecisionResponse;
+import com.syuuk.patentflow.patent.dto.PatchFinalDecisionRequest;
 import com.syuuk.patentflow.patent.dto.PatentBibliographicInfoResponse;
 import com.syuuk.patentflow.patent.dto.PatentContextSuggestionRequest;
 import com.syuuk.patentflow.patent.dto.PatentContextSuggestionResponse;
 import com.syuuk.patentflow.patent.dto.PatentDetailResponse;
 import com.syuuk.patentflow.patent.dto.PatentHistoryResponse;
 import com.syuuk.patentflow.patent.dto.PatentListItemResponse;
+
 import com.syuuk.patentflow.patent.dto.PatentUpsertRequest;
 import com.syuuk.patentflow.patent.dto.PatentUpsertResponse;
 import com.syuuk.patentflow.patent.dto.ReviewWorkflowStatus;
@@ -17,6 +23,7 @@ import com.syuuk.patentflow.patent.service.PatentFixtureService;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -68,10 +75,11 @@ public class PatentController {
      */
     @GetMapping("/external-lookup")
     public ApiResponse<PatentBibliographicInfoResponse> lookupBibliographicInfo(
-            @RequestParam String managementNumber,
+            @RequestParam(required = false) String managementNumber,
+            @RequestParam(required = false) String registrationNumber,
             @RequestParam(required = false) String sourcePriority
     ) {
-        return ApiResponse.ok(patentFixtureService.lookupBibliographicInfo(managementNumber, sourcePriority));
+        return ApiResponse.ok(patentFixtureService.lookupBibliographicInfo(managementNumber, registrationNumber, sourcePriority));
     }
 
     /**
@@ -122,6 +130,59 @@ public class PatentController {
     /**
      * @relatedFR FR-011, FR-012
      * @relatedUI UI-005
+     * @description 특허 최종 판단을 기록하는 API.
+     */
+    @PostMapping("/{patentId}/final-decision")
+    public ApiResponse<FinalDecisionResponse> recordFinalDecision(
+            @PathVariable String patentId,
+            @Valid @RequestBody FinalDecisionRequest request
+    ) {
+        return ApiResponse.ok(patentFixtureService.recordFinalDecision(patentId, request));
+    }
+
+    /**
+     * @relatedFR LEGAL-23
+     * @relatedUI UI-005
+     * @description 특허 최종 판단을 수정하거나 취소하는 API.
+     */
+    @PatchMapping("/{patentId}/final-decision")
+    public ApiResponse<FinalDecisionResponse> patchFinalDecision(
+            @PathVariable String patentId,
+            @RequestBody PatchFinalDecisionRequest request
+    ) {
+        return ApiResponse.ok(patentFixtureService.patchFinalDecision(patentId, request));
+    }
+
+    /**
+     * @description 이번 분기 납부 대상 특허에 담당 사업부를 배정한다.
+     */
+    @PatchMapping("/{patentId}/department")
+    public ApiResponse<PatentDetailResponse> assignDepartment(
+            @PathVariable String patentId,
+            @Valid @RequestBody AssignDepartmentRequest request
+    ) {
+        return ApiResponse.ok(patentFixtureService.assignDepartment(patentId, request.departmentId()));
+    }
+
+    /**
+     * @description AI 평가 레포트 생성 요청 — FastAPI agent 호출 후 상태를 REPORT_GENERATED로 전환.
+     */
+    @PostMapping("/{patentId}/request-ai-report")
+    public ApiResponse<PatentDetailResponse> requestAiReport(@PathVariable String patentId) {
+        return ApiResponse.ok(patentFixtureService.generateAiReport(patentId));
+    }
+
+    /**
+     * @description 복수 특허를 MAIL_READY 상태로 일괄 전환하는 API.
+     */
+    @PostMapping("/batch/mark-mail-ready")
+    public ApiResponse<List<String>> markMailReady(@Valid @RequestBody BatchPatentIdsRequest request) {
+        return ApiResponse.ok(patentFixtureService.markMailReady(request.patentIds()));
+    }
+
+    /**
+     * @relatedFR FR-011, FR-012
+     * @relatedUI UI-005
      * @description 특허 최종 의사결정을 일괄 반영하는 API.
      */
     @PostMapping("/executive-approvals/bulk-decision")
@@ -132,7 +193,7 @@ public class PatentController {
         return ApiResponse.ok(new ExecutiveApprovalBulkDecisionResponse(
                 request.decision(),
                 updatedPatentIds.size(),
-                updatedPatentIds));
+                updatedPatentIds,
+                List.of()));
     }
-
 }

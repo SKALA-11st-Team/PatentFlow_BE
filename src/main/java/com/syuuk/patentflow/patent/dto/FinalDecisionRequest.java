@@ -1,0 +1,11 @@
+package com.syuuk.patentflow.patent.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
+public record FinalDecisionRequest(
+        ExecutiveApprovalDecision decision,
+        @NotNull LegalActionResult legalActionResult,
+        @NotBlank String reason
+) {
+}

@@ -1,22 +1,27 @@
 package com.syuuk.patentflow.business.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.syuuk.patentflow.business.domain.BusinessSubmissionEntity;
 import com.syuuk.patentflow.business.dto.BusinessChecklistItemResponse;
 import com.syuuk.patentflow.business.dto.BusinessChecklistResponseDto;
 import com.syuuk.patentflow.business.dto.BusinessChecklistScoreOptionResponse;
 import com.syuuk.patentflow.business.dto.BusinessChecklistSubmissionRequest;
 import com.syuuk.patentflow.business.dto.BusinessSubmissionChecklistScoreResponse;
 import com.syuuk.patentflow.business.dto.BusinessSubmissionVersionResponse;
+import com.syuuk.patentflow.business.repository.BusinessSubmissionRepository;
 import com.syuuk.patentflow.patent.dto.BusinessOpinionDecision;
 import com.syuuk.patentflow.patent.dto.PatentDetailResponse;
 import com.syuuk.patentflow.patent.dto.Recommendation;
+import com.syuuk.patentflow.notification.service.NotificationService;
 import com.syuuk.patentflow.patent.service.PatentFixtureService;
+import com.syuuk.patentflow.settings.repository.QuarterSettingRepository;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class BusinessFixtureService {
@@ -24,10 +29,23 @@ public class BusinessFixtureService {
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     private final PatentFixtureService patentFixtureService;
-    private final Map<String, List<BusinessSubmissionVersionResponse>> submissions = new LinkedHashMap<>();
+    private final BusinessSubmissionRepository businessSubmissionRepository;
+    private final ObjectMapper objectMapper;
+    private final NotificationService notificationService;
+    private final QuarterSettingRepository quarterSettingRepository;
 
-    public BusinessFixtureService(PatentFixtureService patentFixtureService) {
+    public BusinessFixtureService(
+            PatentFixtureService patentFixtureService,
+            BusinessSubmissionRepository businessSubmissionRepository,
+            ObjectMapper objectMapper,
+            NotificationService notificationService,
+            QuarterSettingRepository quarterSettingRepository
+    ) {
         this.patentFixtureService = patentFixtureService;
+        this.businessSubmissionRepository = businessSubmissionRepository;
+        this.objectMapper = objectMapper;
+        this.notificationService = notificationService;
+        this.quarterSettingRepository = quarterSettingRepository;
     }
 
     /**
@@ -80,11 +98,16 @@ public class BusinessFixtureService {
      * @relatedUI UI-009
      * @description 특허별 사업부 제출 이력을 조회한다.
      */
+    @Transactional
     public List<BusinessSubmissionVersionResponse> getSubmissions(String patentId) {
         PatentDetailResponse patent = patentFixtureService.getPatentDetail(patentId);
-        List<BusinessSubmissionVersionResponse> patentSubmissions = submissions.get(patentId);
-        if (patentSubmissions != null) {
-            return patentSubmissions;
+        List<BusinessSubmissionVersionResponse> persistedSubmissions = businessSubmissionRepository
+                .findByPatentIdOrderByVersionAsc(patentId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+        if (!persistedSubmissions.isEmpty()) {
+            return persistedSubmissions;
         }
 
         if (patent.businessOpinion().decision() == null || patent.businessOpinion().submittedAt() == null) {
@@ -92,30 +115,96 @@ public class BusinessFixtureService {
         }
 
         List<BusinessSubmissionVersionResponse> seededSubmissions = new ArrayList<>();
-        seededSubmissions.add(toSeedVersion(patent));
-        submissions.put(patentId, seededSubmissions);
+        BusinessSubmissionVersionResponse seededSubmission = toSeedVersion(patent);
+        businessSubmissionRepository.save(toEntity(patentId, null, seededSubmission));
+        seededSubmissions.add(seededSubmission);
         return seededSubmissions;
     }
 
     /**
      * @relatedFR FR-009
      * @relatedUI UI-005, UI-006
-     * @description 사업부 의견/체크리스트 제출을 저장하고 FE 입력 payload를 그대로 반환한다.
+     * @description 사업부 의견/체크리스트 제출을 저장하고 제출 이력 응답을 반환한다.
      */
-    public BusinessChecklistSubmissionRequest submit(String patentId, BusinessChecklistSubmissionRequest request) {
+    @Transactional
+    public BusinessSubmissionVersionResponse submit(String patentId, BusinessChecklistSubmissionRequest request) {
         patentFixtureService.ensurePatentExists(patentId);
-        List<BusinessSubmissionVersionResponse> patentSubmissions = submissions.computeIfAbsent(
-                patentId,
-                key -> new ArrayList<>());
-        int version = patentSubmissions.size() + 1;
+        String quarterKey = quarterSettingRepository.findAll().stream()
+                .filter(q -> q.isActivated() && !q.isEnded())
+                .findFirst()
+                .map(q -> q.getQuarterKey())
+                .orElse(null);
+        int version = (int) businessSubmissionRepository.countByPatentId(patentId) + 1;
         OffsetDateTime submittedAt = OffsetDateTime.now(KST);
-        patentSubmissions.add(toVersion(patentId, request, version, submittedAt));
+        BusinessSubmissionVersionResponse submission = toVersion(patentId, request, version, submittedAt);
+        businessSubmissionRepository.save(toEntity(patentId, quarterKey, submission));
         patentFixtureService.recordBusinessOpinion(
                 patentId,
                 request.finalOpinion(),
                 valueOrDefault(request.finalReason(), defaultReason(request.finalOpinion())),
                 submittedAt);
-        return request;
+        PatentDetailResponse patent = patentFixtureService.getPatentDetail(patentId);
+        String deptName = patent.departmentName() != null ? patent.departmentName() : "사업부";
+        notificationService.addNotification(
+                "사업부 의견 수신",
+                deptName + "에서 " + patent.title() + " 특허에 대한 의견을 제출했습니다.",
+                "ADMIN",
+                "/admin/patents/" + patentId);
+        return submission;
+    }
+
+    private BusinessSubmissionVersionResponse toResponse(BusinessSubmissionEntity entity) {
+        return new BusinessSubmissionVersionResponse(
+                entity.getSubmissionId(),
+                entity.getVersion(),
+                BusinessOpinionDecision.valueOf(entity.getDecision()),
+                entity.getReason(),
+                entity.getSubmittedBy(),
+                entity.getSubmittedAt(),
+                entity.getAiReportCreatedAt(),
+                Recommendation.valueOf(entity.getAiRecommendation()),
+                entity.getAiTotalScore(),
+                entity.getChecklistTotal(),
+                readChecklistScores(entity.getChecklistScoresJson()),
+                entity.getQualitativeScore());
+    }
+
+    private BusinessSubmissionEntity toEntity(String patentId, String quarterKey, BusinessSubmissionVersionResponse submission) {
+        return new BusinessSubmissionEntity(
+                submission.submissionId(),
+                patentId,
+                quarterKey,
+                submission.version(),
+                submission.decision().name(),
+                submission.reason(),
+                submission.submittedBy(),
+                submission.submittedAt(),
+                submission.aiReportCreatedAt(),
+                submission.aiRecommendation().name(),
+                submission.aiTotalScore(),
+                submission.checklistTotal(),
+                submission.qualitativeScore(),
+                writeChecklistScores(submission.checklistScores()));
+    }
+
+    private List<BusinessSubmissionChecklistScoreResponse> readChecklistScores(String value) {
+        if (value == null || value.isBlank()) {
+            return List.of();
+        }
+        try {
+            return objectMapper.readValue(value, new TypeReference<>() {
+            });
+        } catch (Exception exception) {
+            throw new IllegalStateException("사업부 체크리스트 점수 JSON을 읽을 수 없습니다.", exception);
+        }
+    }
+
+    private String writeChecklistScores(List<BusinessSubmissionChecklistScoreResponse> scores) {
+        try {
+            return objectMapper.writeValueAsString(scores);
+        } catch (Exception exception) {
+            throw new IllegalStateException("사업부 체크리스트 점수 JSON을 저장할 수 없습니다.", exception);
+        }
     }
 
     private BusinessSubmissionVersionResponse toVersion(
