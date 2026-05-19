@@ -8,32 +8,19 @@
   - 건수: 185건
   - `fee_due_date`: 2026-05-19 기준 다음 연차료 점검일로 계산
   - `patent_status`: CSV 상태를 기준으로 매핑하되, 예상 소멸일이 기준일 이전이면 `EXPIRED`
+- `src/main/resources/db/seed/core_review_workflow_seed.sql`
+  - 기본 부서, 관리자/사업부 사용자, 국가별 설정, 2026년 분기 설정을 seed한다.
+  - `patents` 기준으로 2026-Q2 `patent_review_history`를 생성한다.
+  - 2026-Q2 연차료 점검 대상은 `REVIEW_QUARTER_STARTED`, 나머지는 `NOT_IN_REVIEW_QUARTER`로 시작한다.
 
 ## 추가로 필요한 Seed
 
-1. `departments`
-   - 현재 Java 서비스가 기본 부서를 자동 생성하지만, 운영 DB 재현성을 위해 SQL seed가 필요하다.
-   - 최소 값: `DEPT-RND`, `DEPT-PLATFORM`, `DEPT-ESG`, `DEPT-ICT`, `DEPT-MFG`, `DEPT-BIZ`
-
-2. `users`
-   - 관리자와 사업부 계정이 있어야 FE 로그인, 보호 라우트, 메일 수신자 매핑을 바로 검증할 수 있다.
-   - 비밀번호는 운영 seed에 평문을 두지 말고 bcrypt 해시 또는 별도 초기화 스크립트로 분리한다.
-
-3. `system_settings`
-   - 국가별 연차료 검토 기준, 메일 발송 계정, 기능 플래그를 DB에서 관리하려면 기본 설정 seed가 필요하다.
-   - 최소 값: `country.extension.KR`, `country.extension.US`, `country.extension.JP`, `country.extension.CN`, `country.extension.TW`
-
-4. `quarter_settings`
-   - 현재 분기 검토 대상 생성 기준이 필요하다.
-   - 최소 값: 현재 연도/분기, 시작일, 종료일, 사업부 제출 마감일, 활성 여부
-
-5. `patent_review_history`
-   - `patents`는 보유 특허 원장이고, 실제 검토 상태는 `patent_review_history`가 source of truth다.
-   - 분기별 검토 대상 특허에 대해 `quarter_key`, `review_workflow_status`, `annual_fee_due_date`, 담당 부서 snapshot을 생성해야 한다.
-
-6. `business_submissions`, `mailing_history`
+1. `business_submissions`, `mailing_history`
    - 데모/통합 테스트에서 사업부 제출 이력과 메일링 이력을 보여주려면 선택 seed가 필요하다.
    - 운영 초기 데이터에는 보통 넣지 않고, 데모 프로필 또는 테스트 프로필로 분리하는 편이 안전하다.
+
+2. AI 평가 기준 seed
+   - 평가 지표 외부화를 진행하면 `evaluation_criteria`, `evaluation_weights` 같은 설정 테이블 seed가 필요하다.
 
 ## 필요한 DB 함수/트리거 후보
 
