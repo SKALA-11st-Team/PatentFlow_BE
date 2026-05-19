@@ -59,6 +59,11 @@ Table patent_review_history {
   ai_total_score int
   ai_scores_json text [note: "JSON: [{category, score, evidence}]"]
   ai_missing_information_json text [note: "JSON: [missing information string]"]
+  summary_text varchar(2000)
+  summary_problem_solved varchar(2000)
+  summary_core_technical_points_json text [note: "JSON: [core technical point string]"]
+  summary_claims varchar(2000)
+  summary_missing_fields_json text [note: "JSON: [missing field string]"]
   business_opinion_decision varchar(64) [note: "MAINTAIN | ABANDON — business_submissions.decision 최신값 비정규화 스냅샷"]
   business_opinion_reason varchar(2000) [note: "business_submissions.reason 최신값 비정규화 스냅샷"]
   business_opinion_submitted_at timestamp [note: "business_submissions.submitted_at 최신값 비정규화 스냅샷"]

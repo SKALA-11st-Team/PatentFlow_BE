@@ -699,6 +699,10 @@ public class PatentFixtureService {
         history.setReviewWorkflowStatus(reviewWorkflowStatus);
         history.setAiRecommendation(recommendation);
         applyAiReportToHistory(history, aiEvaluationReport(recommendation));
+        applySummaryToHistory(history, summaryFromMetadata(
+                valueOrDefault(entity.getTitle(), entity.getDraftTitle()),
+                entity.getTechnologyArea(),
+                entity.getProductName()));
         history.setBusinessOpinionDecision(businessOpinionDecision);
         history.setBusinessOpinionReason(businessOpinionDecision == null ? null : defaultBusinessOpinionReason(businessOpinionDecision));
         history.setBusinessOpinionSubmittedAt(businessOpinionSubmittedAt);
@@ -1463,6 +1467,7 @@ public class PatentFixtureService {
                 ? state.getAiRecommendation()
                 : patent.currentRecommendation();
         AiEvaluationReportResponse aiReport = aiReportFromHistory(state, patent.aiEvaluationReport(), currentRecommendation);
+        PatentSummaryResponse summary = summaryFromHistory(state, patent.summary());
         return new PatentDetailResponse(
                 patent.patentId(),
                 patent.managementNumber(),
@@ -1487,7 +1492,7 @@ public class PatentFixtureService {
                 currentRecommendation,
                 state.getBusinessOpinionDecision() != null ? state.getBusinessOpinionDecision() : patent.businessOpinionDecision(),
                 state.getLegalActionResult() != null ? state.getLegalActionResult() : patent.legalActionResult(),
-                patent.summary(),
+                summary,
                 aiReport,
                 new FinalDecisionRecordResponse(
                         state.getFinalDecisionId(),
@@ -1541,6 +1546,26 @@ public class PatentFixtureService {
         state.setAiMissingInformationJson(writeJson(report.missingInformation()));
     }
 
+    private PatentSummaryResponse summaryFromHistory(PatentReviewHistoryEntity state, PatentSummaryResponse fallback) {
+        if (state.getSummaryText() == null) {
+            return fallback;
+        }
+        return new PatentSummaryResponse(
+                state.getSummaryText(),
+                state.getSummaryProblemSolved(),
+                readStringList(state.getSummaryCoreTechnicalPointsJson()),
+                state.getSummaryClaims(),
+                readStringList(state.getSummaryMissingFieldsJson()));
+    }
+
+    private void applySummaryToHistory(PatentReviewHistoryEntity state, PatentSummaryResponse summary) {
+        state.setSummaryText(summary.summaryText());
+        state.setSummaryProblemSolved(summary.problemSolved());
+        state.setSummaryCoreTechnicalPointsJson(writeJson(summary.coreTechnicalPoints()));
+        state.setSummaryClaims(summary.claimsSummary());
+        state.setSummaryMissingFieldsJson(writeJson(summary.missingFields()));
+    }
+
     private List<EvaluationScoreResponse> readEvaluationScores(String value) {
         if (value == null || value.isBlank()) {
             return List.of();
@@ -1582,6 +1607,7 @@ public class PatentFixtureService {
         state.setReviewWorkflowStatus(patent.reviewWorkflowStatus());
         state.setAiRecommendation(patent.currentRecommendation());
         applyAiReportToHistory(state, patent.aiEvaluationReport());
+        applySummaryToHistory(state, patent.summary());
         state.setBusinessOpinionDecision(patent.businessOpinionDecision());
         state.setBusinessOpinionReason(patent.businessOpinion().reason());
         state.setBusinessOpinionSubmittedAt(patent.businessOpinion().submittedAt());

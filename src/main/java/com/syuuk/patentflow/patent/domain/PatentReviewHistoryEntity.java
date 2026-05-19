@@ -56,6 +56,21 @@ public class PatentReviewHistoryEntity extends BaseEntity {
     @Column(name = "ai_missing_information_json", columnDefinition = "TEXT")
     private String aiMissingInformationJson;
 
+    @Column(name = "summary_text", length = 2000)
+    private String summaryText;
+
+    @Column(name = "summary_problem_solved", length = 2000)
+    private String summaryProblemSolved;
+
+    @Column(name = "summary_core_technical_points_json", columnDefinition = "TEXT")
+    private String summaryCoreTechnicalPointsJson;
+
+    @Column(name = "summary_claims", length = 2000)
+    private String summaryClaims;
+
+    @Column(name = "summary_missing_fields_json", columnDefinition = "TEXT")
+    private String summaryMissingFieldsJson;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "business_opinion_decision", length = 64)
     private BusinessOpinionDecision businessOpinionDecision;
@@ -171,6 +186,46 @@ public class PatentReviewHistoryEntity extends BaseEntity {
 
     public void setAiMissingInformationJson(String aiMissingInformationJson) {
         this.aiMissingInformationJson = aiMissingInformationJson;
+    }
+
+    public String getSummaryText() {
+        return summaryText;
+    }
+
+    public void setSummaryText(String summaryText) {
+        this.summaryText = summaryText;
+    }
+
+    public String getSummaryProblemSolved() {
+        return summaryProblemSolved;
+    }
+
+    public void setSummaryProblemSolved(String summaryProblemSolved) {
+        this.summaryProblemSolved = summaryProblemSolved;
+    }
+
+    public String getSummaryCoreTechnicalPointsJson() {
+        return summaryCoreTechnicalPointsJson;
+    }
+
+    public void setSummaryCoreTechnicalPointsJson(String summaryCoreTechnicalPointsJson) {
+        this.summaryCoreTechnicalPointsJson = summaryCoreTechnicalPointsJson;
+    }
+
+    public String getSummaryClaims() {
+        return summaryClaims;
+    }
+
+    public void setSummaryClaims(String summaryClaims) {
+        this.summaryClaims = summaryClaims;
+    }
+
+    public String getSummaryMissingFieldsJson() {
+        return summaryMissingFieldsJson;
+    }
+
+    public void setSummaryMissingFieldsJson(String summaryMissingFieldsJson) {
+        this.summaryMissingFieldsJson = summaryMissingFieldsJson;
     }
 
     public BusinessOpinionDecision getBusinessOpinionDecision() {
