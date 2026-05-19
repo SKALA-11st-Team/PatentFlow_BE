@@ -109,6 +109,7 @@ public class PatentFixtureService {
                         (a, b) -> a,
                         HashMap::new));
         seedPatentMetadataIfNeeded();
+        seedReviewHistoryIfNeeded();
         this.patents = new ArrayList<>(loadPatentsFromDatabase());
         this.patentSequence = new AtomicInteger(this.patents.size() + 1);
     }
@@ -335,7 +336,9 @@ public class PatentFixtureService {
     public PatentUpsertResponse createPatent(PatentUpsertRequest request) {
         String patentId = "PAT-2026-%04d".formatted(patentSequence.getAndIncrement());
         patentMetadataRepository.save(metadataEntityFromRequest(patentId, request));
-        patents.add(newPatentFromRequest(patentId, request));
+        PatentDetailResponse created = newPatentFromRequest(patentId, request);
+        persistPatentState(created);
+        patents.add(created);
         return new PatentUpsertResponse(patentId, "CREATED");
     }
 
@@ -596,6 +599,15 @@ public class PatentFixtureService {
         patentMetadataRepository.saveAll(loadPatentMetadataFromDocument());
     }
 
+    private void seedReviewHistoryIfNeeded() {
+        patentMetadataRepository.findAll(Sort.by("patentId")).forEach(entity -> {
+            if (!reviewHistoryRepository.findByPatentIdOrderByCreatedAtDesc(entity.getPatentId()).isEmpty()) {
+                return;
+            }
+            reviewHistoryRepository.save(reviewHistoryFromMetadataEntity(entity));
+        });
+    }
+
     private List<PatentDetailResponse> loadPatentsFromDatabase() {
         return patentMetadataRepository.findAll(Sort.by("patentId")).stream()
                 .map(this::patentFromMetadataEntity)
@@ -652,6 +664,45 @@ public class PatentFixtureService {
                 columns.get(13),
                 parseDate(columns.get(14)),
                 null);
+    }
+
+    private PatentReviewHistoryEntity reviewHistoryFromMetadataEntity(PatentMetadataEntity entity) {
+        int sequence = sequenceFromPatentId(entity.getPatentId());
+        ReviewWorkflowStatus reviewWorkflowStatus = workflowStatus(sequence);
+        Recommendation recommendation = recommendation(sequence);
+        BusinessOpinionDecision businessOpinionDecision = businessOpinionDecision(sequence, reviewWorkflowStatus);
+        LegalActionResult legalActionResult = legalActionResult(reviewWorkflowStatus, recommendation);
+        OffsetDateTime businessOpinionSubmittedAt = businessOpinionDecision == null
+                ? null
+                : OffsetDateTime.of(
+                        2026,
+                        5,
+                        Math.min(28, 1 + sequence % 20),
+                        14,
+                        20,
+                        0,
+                        0,
+                        KST.getRules().getOffset(java.time.Instant.now()));
+        LocalDate annualFeeDueDate = entity.getFeeDueDate() != null
+                ? entity.getFeeDueDate()
+                : annualFeeDueDate(
+                        entity.getCountry(),
+                        entity.getApplicationDate(),
+                        entity.getRegistrationDate(),
+                        entity.getExpectedExpirationDate());
+        PatentReviewHistoryEntity history = new PatentReviewHistoryEntity(entity.getPatentId(), "DEMO-SEED");
+        history.setReviewWorkflowStatus(reviewWorkflowStatus.name());
+        history.setBusinessOpinionDecision(nameOrNull(businessOpinionDecision));
+        history.setBusinessOpinionReason(businessOpinionDecision == null ? null : defaultBusinessOpinionReason(businessOpinionDecision));
+        history.setBusinessOpinionSubmittedAt(businessOpinionSubmittedAt);
+        history.setLegalActionResult(nameOrNull(legalActionResult));
+        history.setFinalDecisionId(legalActionResult == null ? null : entity.getPatentId() + "-DEC-01");
+        history.setFinalDecisionReason(legalActionResult == null ? null : defaultFinalDecisionReason(legalActionResult));
+        history.setFinalDecisionDecidedAt(legalActionResult == null ? null : businessOpinionSubmittedAt);
+        history.setAnnualFeeDueDate(annualFeeDueDate);
+        history.setDepartmentId(departmentId(entity.getBusinessArea()));
+        history.setDepartmentName(departmentName(entity.getBusinessArea()));
+        return history;
     }
 
     private PatentDetailResponse patentFromMetadataEntity(PatentMetadataEntity entity) {
@@ -1211,6 +1262,14 @@ public class PatentFixtureService {
         return decision == BusinessOpinionDecision.MAINTAIN
                 ? "사업부 검토 결과 현재 제품 또는 향후 로드맵과 연결성이 확인되어 유지 의견을 제출했습니다."
                 : "현재 사업 적용 계획과 활용 근거가 부족해 포기 의견을 제출했습니다.";
+    }
+
+    private String defaultFinalDecisionReason(LegalActionResult result) {
+        return switch (result) {
+            case MAINTAINED -> "사업부 의견과 AI 평가 근거를 검토해 유지 처리했습니다.";
+            case ABANDONED -> "사업부 의견과 AI 평가 근거를 검토해 포기 처리했습니다.";
+            case SOLD -> "사업부 의견과 AI 평가 근거를 검토해 매각 처리했습니다.";
+        };
     }
 
     private LegalActionResult legalActionResult(ReviewWorkflowStatus status, Recommendation recommendation) {
