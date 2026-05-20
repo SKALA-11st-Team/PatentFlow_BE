@@ -102,8 +102,8 @@ WITH demo_reviews (
 )
 UPDATE patent_review_history h
 SET
-    review_workflow_status = d.workflow_status::review_workflow_status,
-    ai_recommendation = d.ai_recommendation::recommendation,
+    review_workflow_status = d.workflow_status,
+    ai_recommendation = d.ai_recommendation,
     ai_report_id = 'EVAL-DEMO-' || d.patent_id,
     ai_report_created_at = TIMESTAMP WITH TIME ZONE '2026-05-14 09:00:00+09',
     ai_recommendation_reason = d.ai_reason,
@@ -120,10 +120,10 @@ SET
     summary_core_technical_points_json = d.summary_points,
     summary_claims = d.summary_claims,
     summary_missing_fields_json = '["현업 적용 범위","최근 매출 기여도"]',
-    business_opinion_decision = d.business_decision::business_opinion_decision,
+    business_opinion_decision = d.business_decision,
     business_opinion_reason = d.business_reason,
     business_opinion_submitted_at = d.business_submitted_at,
-    legal_action_result = d.legal_result::legal_action_result,
+    legal_action_result = d.legal_result,
     final_decision_id = CASE WHEN d.legal_result IS NULL THEN NULL ELSE d.patent_id || '-DEMO-DEC-01' END,
     final_decision_reason = d.final_reason,
     final_decision_decided_at = d.final_decided_at,
