@@ -131,6 +131,14 @@ class AuthControllerTest {
     }
 
     @Test
+    void adminCanReadChecklistItemsForBusinessSubmissionDisplay() throws Exception {
+        mockMvc.perform(get("/api/v1/business/checklist-items")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + loginAsAdmin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray());
+    }
+
+    @Test
     void repeatedLoginFailuresLockAccountTemporarily() throws Exception {
         ensureLockTestUser();
 

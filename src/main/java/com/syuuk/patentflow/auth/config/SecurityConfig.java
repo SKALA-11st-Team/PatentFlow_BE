@@ -49,6 +49,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/business/checklist-items").authenticated()
                         .requestMatchers("/api/v1/admin/**", "/api/v1/legal/**", "/api/v1/settings/**",
                                 "/api/v1/mailings/**", "/api/v1/departments/**").hasRole("ADMIN")
                         .requestMatchers("/api/v1/business/**").hasRole("BUSINESS")
