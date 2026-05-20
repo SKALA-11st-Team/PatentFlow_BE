@@ -73,6 +73,7 @@ public class PatentReviewService {
     private final PatentMetadataRepository patentMetadataRepository;
     private final PatentReviewHistoryRepository reviewHistoryRepository;
     private final AiReportAgentClient aiReportAgentClient;
+    private final AiReportStorageService aiReportStorageService;
     private final AnnualFeeScheduleService annualFeeScheduleService;
     private final DepartmentRepository mailingRecipientMappingRepository;
     private final ObjectMapper objectMapper;
@@ -92,6 +93,7 @@ public class PatentReviewService {
             PatentMetadataRepository patentMetadataRepository,
             PatentReviewHistoryRepository reviewHistoryRepository,
             AiReportAgentClient aiReportAgentClient,
+            AiReportStorageService aiReportStorageService,
             AnnualFeeScheduleService annualFeeScheduleService,
             DepartmentRepository mailingRecipientMappingRepository,
             ObjectMapper objectMapper,
@@ -102,6 +104,7 @@ public class PatentReviewService {
         this.patentMetadataRepository = patentMetadataRepository;
         this.reviewHistoryRepository = reviewHistoryRepository;
         this.aiReportAgentClient = aiReportAgentClient;
+        this.aiReportStorageService = aiReportStorageService;
         this.annualFeeScheduleService = annualFeeScheduleService;
         this.mailingRecipientMappingRepository = mailingRecipientMappingRepository;
         this.objectMapper = objectMapper;
@@ -1036,9 +1039,44 @@ public class PatentReviewService {
                         .toList();
         Integer totalScore = scores.stream().filter(s -> s.score() != null)
                 .mapToInt(EvaluationScoreResponse::score).sum();
+        String rawMarkdown = normalizeMarkdown(agent.rawMarkdown(), agent.summary(), scores, agent.recommendation());
+        String markdownFilePath = aiReportStorageService.storeMarkdown(patentId, reportId, rawMarkdown);
         return new AiEvaluationReportResponse(reportId, agent.generatedAt(),
                 toRecommendation(agent.recommendation()), agent.summary(),
-                totalScore == 0 ? null : totalScore, scores, List.of());
+                totalScore == 0 ? null : totalScore, scores, List.of(), rawMarkdown, markdownFilePath);
+    }
+
+    private String normalizeMarkdown(
+            String rawMarkdown,
+            String summary,
+            List<EvaluationScoreResponse> scores,
+            String recommendation
+    ) {
+        if (rawMarkdown != null && !rawMarkdown.isBlank()) {
+            return rawMarkdown;
+        }
+
+        StringBuilder markdown = new StringBuilder();
+        markdown.append("# AI 특허 평가 레포트\n\n");
+        markdown.append("## 요약\n\n");
+        markdown.append(summary == null || summary.isBlank() ? "작성 필요" : summary).append("\n\n");
+        markdown.append("## 평가 점수\n\n");
+        if (scores == null || scores.isEmpty()) {
+            markdown.append("- 평가 점수 없음\n");
+        } else {
+            for (EvaluationScoreResponse score : scores) {
+                markdown.append("- ")
+                        .append(score.category())
+                        .append(": ")
+                        .append(score.score() == null ? "N/A" : score.score())
+                        .append(" - ")
+                        .append(score.evidence())
+                        .append("\n");
+            }
+        }
+        markdown.append("\n## 권고\n\n");
+        markdown.append(recommendation == null || recommendation.isBlank() ? "HOLD" : recommendation);
+        return markdown.toString();
     }
 
     private Recommendation toRecommendation(String value) {
@@ -1396,7 +1434,9 @@ public class PatentReviewService {
                         new EvaluationScoreResponse(EvaluationCategory.MARKET, null, "시장 규모 자료가 부족하여 추가 확인이 필요합니다."),
                         new EvaluationScoreResponse(EvaluationCategory.BUSINESS_ALIGNMENT, 72,
                                 "관련사업 분야와 기술 영역은 연결되지만 실제 제품 적용 여부는 추가 확인이 필요합니다.")),
-                List.of("시장 규모 자료", "제품 적용 여부"));
+                List.of("시장 규모 자료", "제품 적용 여부"),
+                null,
+                null);
     }
 
     private PatentListItemResponse toListItem(PatentDetailResponse detail) {
@@ -1555,7 +1595,9 @@ public class PatentReviewService {
                 state.getAiRecommendationReason(),
                 state.getAiTotalScore(),
                 readEvaluationScores(state.getAiScoresJson()),
-                readStringList(state.getAiMissingInformationJson()));
+                readStringList(state.getAiMissingInformationJson()),
+                state.getAiReportMarkdown(),
+                state.getAiReportMarkdownPath());
     }
 
     private AiEvaluationReportResponse withAiRecommendation(
@@ -1569,7 +1611,9 @@ public class PatentReviewService {
                 report.recommendationReason(),
                 report.totalScore(),
                 report.scores(),
-                report.missingInformation());
+                report.missingInformation(),
+                report.rawMarkdown(),
+                report.markdownFilePath());
     }
 
     private void applyAiReportToHistory(PatentReviewHistoryEntity state, AiEvaluationReportResponse report) {
@@ -1580,6 +1624,8 @@ public class PatentReviewService {
         state.setAiTotalScore(report.totalScore());
         state.setAiScoresJson(writeJson(report.scores()));
         state.setAiMissingInformationJson(writeJson(report.missingInformation()));
+        state.setAiReportMarkdown(report.rawMarkdown());
+        state.setAiReportMarkdownPath(report.markdownFilePath());
     }
 
     private PatentSummaryResponse summaryFromHistory(PatentReviewHistoryEntity state, PatentSummaryResponse fallback) {

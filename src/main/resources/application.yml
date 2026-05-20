@@ -64,6 +64,8 @@ patentflow:
     google-patents:
       enabled: ${PATENTFLOW_GOOGLE_PATENTS_ENABLED:true}
       base-url: ${PATENTFLOW_GOOGLE_PATENTS_BASE_URL:https://patents.google.com}
+  ai-report:
+    storage-dir: ${PATENTFLOW_AI_REPORT_STORAGE_DIR:storage/ai-reports}
 
 springdoc:
   swagger-ui:

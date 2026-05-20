@@ -56,6 +56,12 @@ public class PatentReviewHistoryEntity extends BaseEntity {
     @Column(name = "ai_missing_information_json", columnDefinition = "TEXT")
     private String aiMissingInformationJson;
 
+    @Column(name = "ai_report_markdown", columnDefinition = "TEXT")
+    private String aiReportMarkdown;
+
+    @Column(name = "ai_report_markdown_path", length = 1000)
+    private String aiReportMarkdownPath;
+
     @Column(name = "summary_text", length = 2000)
     private String summaryText;
 
@@ -186,6 +192,22 @@ public class PatentReviewHistoryEntity extends BaseEntity {
 
     public void setAiMissingInformationJson(String aiMissingInformationJson) {
         this.aiMissingInformationJson = aiMissingInformationJson;
+    }
+
+    public String getAiReportMarkdown() {
+        return aiReportMarkdown;
+    }
+
+    public void setAiReportMarkdown(String aiReportMarkdown) {
+        this.aiReportMarkdown = aiReportMarkdown;
+    }
+
+    public String getAiReportMarkdownPath() {
+        return aiReportMarkdownPath;
+    }
+
+    public void setAiReportMarkdownPath(String aiReportMarkdownPath) {
+        this.aiReportMarkdownPath = aiReportMarkdownPath;
     }
 
     public String getSummaryText() {

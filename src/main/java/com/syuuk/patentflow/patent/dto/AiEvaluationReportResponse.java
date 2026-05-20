@@ -10,6 +10,8 @@ public record AiEvaluationReportResponse(
         String recommendationReason,
         Integer totalScore,
         List<EvaluationScoreResponse> scores,
-        List<String> missingInformation
+        List<String> missingInformation,
+        String rawMarkdown,
+        String markdownFilePath
 ) {
 }
