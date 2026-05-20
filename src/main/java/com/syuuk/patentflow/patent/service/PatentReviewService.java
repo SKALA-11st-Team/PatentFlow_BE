@@ -56,7 +56,11 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+import jakarta.persistence.criteria.Predicate;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 
@@ -122,12 +126,12 @@ public class PatentReviewService {
             seedPatentMetadataIfNeeded();
             seedReviewHistoryIfNeeded();
         }
-    }
+        }
 
-    /**
-     * @relatedFR FR-001, FR-002
+        /**
+        * @relatedFR FR-001, FR-002
      * @relatedUI UI-002, UI-003
-     * @description FE 우선 연동을 위한 특허 목록 DB 기반 조회를 제공한다.
+     * @description DB 기반 페이징 및 필터링을 제공한다.
      */
     public PageResponse<PatentListItemResponse> getPatents(
             int page,
@@ -138,22 +142,125 @@ public class PatentReviewService {
             String sort) {
         int normalizedPage = Math.max(page, 1);
         int normalizedSize = Math.min(Math.max(size, 1), 20);
-        List<PatentListItemResponse> filtered = loadPatentsFromDatabase().stream()
-                .map(this::toListItem)
-                .filter(item -> matchesKeyword(item, keyword))
-                .filter(item -> departmentId == null || departmentId.isBlank()
-                        || item.departmentId().equals(departmentId))
-                .filter(item -> reviewWorkflowStatus == null || item.reviewWorkflowStatus() == reviewWorkflowStatus)
-                .sorted(sortComparator(sort))
+
+        PageRequest pageRequest = PageRequest.of(normalizedPage - 1, normalizedSize, parseSort(sort));
+
+        Specification<PatentReviewHistoryEntity> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            if (departmentId != null && !departmentId.isBlank()) {
+                predicates.add(cb.equal(root.get("departmentId"), departmentId));
+            }
+
+            if (reviewWorkflowStatus != null) {
+                predicates.add(cb.equal(root.get("reviewWorkflowStatus"), reviewWorkflowStatus));
+            }
+
+            if (keyword != null && !keyword.isBlank()) {
+                String pattern = "%" + keyword.toLowerCase() + "%";
+                // Note: Joining with patents table might be cleaner but currently using history fields
+                // Since history doesn't have title, we might need a workaround or just search history-related fields.
+                // However, current getPatents in memory searches title, managementNumber etc.
+                // For surgical change, we search managementNumber from patentId prefix or similar.
+                // A better way is to search patentIds from PatentMetadata and use them.
+                List<String> matchingPatentIds = patentMetadataRepository.findAll((rootMeta, queryMeta, cbMeta) -> {
+                    String p = "%" + keyword.toLowerCase() + "%";
+                    return cbMeta.or(
+                            cbMeta.like(cbMeta.lower(rootMeta.get("title")), p),
+                            cbMeta.like(cbMeta.lower(rootMeta.get("managementNumber")), p),
+                            cbMeta.like(cbMeta.lower(rootMeta.get("applicationNumber")), p),
+                            cbMeta.like(cbMeta.lower(rootMeta.get("registrationNumber")), p)
+                    );
+                }).stream().map(PatentMetadataEntity::getPatentId).toList();
+
+                if (matchingPatentIds.isEmpty()) {
+                    predicates.add(cb.disjunction()); // No results
+                } else {
+                    predicates.add(root.get("patentId").in(matchingPatentIds));
+                }
+            }
+
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
+        Page<PatentReviewHistoryEntity> historyPage = reviewHistoryRepository.findAll(spec, pageRequest);
+
+        List<PatentListItemResponse> items = historyPage.getContent().stream()
+                .map(history -> {
+                    PatentMetadataEntity metadata = patentMetadataRepository.findById(history.getPatentId()).orElse(null);
+                    return toListItemFromHistory(history, metadata);
+                })
                 .toList();
 
-        int fromIndex = Math.min((normalizedPage - 1) * normalizedSize, filtered.size());
-        int toIndex = Math.min(fromIndex + normalizedSize, filtered.size());
-        int totalPages = (int) Math.ceil((double) filtered.size() / normalizedSize);
-
         return PageResponse.ok(
-                filtered.subList(fromIndex, toIndex),
-                new PageInfo(normalizedPage, normalizedSize, filtered.size(), totalPages));
+                items,
+                new PageInfo(normalizedPage, normalizedSize, (int) historyPage.getTotalElements(), historyPage.getTotalPages()));
+    }
+
+    private Sort parseSort(String sort) {
+        if (sort == null || sort.isBlank()) {
+            return Sort.by(Sort.Direction.ASC, "annualFeeDueDate");
+        }
+        String[] parts = sort.split(",");
+        String property = parts[0];
+        if ("managementNumber".equals(property)) {
+            // managementNumber is in metadata, sorting history by patentId as proxy if relevant
+            property = "patentId";
+        } else if ("feeDueDate".equals(property)) {
+            property = "annualFeeDueDate";
+        }
+
+        Sort.Direction direction = (parts.length > 1 && "desc".equalsIgnoreCase(parts[1]))
+                ? Sort.Direction.DESC : Sort.Direction.ASC;
+
+        return Sort.by(direction, property);
+    }
+
+    private PatentListItemResponse toListItemFromHistory(PatentReviewHistoryEntity history, PatentMetadataEntity metadata) {
+        if (metadata == null) {
+            // Fallback for missing metadata
+            return new PatentListItemResponse(
+                    history.getPatentId(), history.getPatentId(), null, null,
+                    "Unknown", "Unknown", null, null, null, "KR", null,
+                    null, null, null, history.getDepartmentId(), history.getDepartmentName(),
+                    PatentLifecycleStatus.ACTIVE, history.getReviewWorkflowStatus(),
+                    history.getAnnualFeeDueDate(), null, history.getAiRecommendation(),
+                    history.getBusinessOpinionDecision(), history.getLegalActionResult()
+            );
+        }
+        return new PatentListItemResponse(
+                metadata.getPatentId(),
+                metadata.getManagementNumber(),
+                metadata.getApplicationNumber(),
+                metadata.getRegistrationNumber(),
+                metadata.getTitle(),
+                metadata.getDraftTitle(),
+                metadata.getBusinessArea(),
+                metadata.getTechnologyArea(),
+                metadata.getProductName(),
+                metadata.getCountry(),
+                coApplicants(metadata.getJointApplication(), metadata.getCoApplicantName()),
+                metadata.getApplicationDate(),
+                metadata.getRegistrationDate(),
+                metadata.getExpectedExpirationDate(),
+                history.getDepartmentId(),
+                history.getDepartmentName(),
+                metadata.getPatentStatus(),
+                history.getReviewWorkflowStatus(),
+                history.getAnnualFeeDueDate(),
+                "연차료 납부 검토 시점 도래", // default reason
+                history.getAiRecommendation(),
+                history.getBusinessOpinionDecision(),
+                history.getLegalActionResult()
+        );
+    }
+
+    public PageResponse<PatentListItemResponse> getReviewRequests(
+            int page,
+            int size,
+            String departmentId
+    ) {
+        return getPatents(page, size, null, departmentId, ReviewWorkflowStatus.WAITING_BUSINESS_RESPONSE, null);
     }
 
     /**

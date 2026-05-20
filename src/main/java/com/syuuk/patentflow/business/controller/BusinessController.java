@@ -90,11 +90,7 @@ public class BusinessController {
             Authentication authentication
     ) {
         String departmentId = getDepartmentId(authentication);
-        List<PatentListItemResponse> filtered = patentReviewService.getAllPatents().stream()
-                .filter(p -> departmentId.equals(p.departmentId()))
-                .filter(p -> p.reviewWorkflowStatus() == ReviewWorkflowStatus.WAITING_BUSINESS_RESPONSE)
-                .toList();
-        return paginate(filtered, page, size);
+        return patentReviewService.getReviewRequests(page, size, departmentId);
     }
 
     /**
@@ -194,20 +190,5 @@ public class BusinessController {
         if (!departmentId.equals(detail.departmentId())) {
             throw new PatentFlowException(ErrorCode.UNAUTHORIZED);
         }
-    }
-
-    private int countByStatus(List<PatentListItemResponse> patents, ReviewWorkflowStatus status) {
-        return (int) patents.stream().filter(p -> p.reviewWorkflowStatus() == status).count();
-    }
-
-    private PageResponse<PatentListItemResponse> paginate(List<PatentListItemResponse> items, int page, int size) {
-        int normalizedPage = Math.max(page, 1);
-        int normalizedSize = Math.min(Math.max(size, 1), 20);
-        int fromIndex = Math.min((normalizedPage - 1) * normalizedSize, items.size());
-        int toIndex = Math.min(fromIndex + normalizedSize, items.size());
-        int totalPages = (int) Math.ceil((double) items.size() / normalizedSize);
-        return PageResponse.ok(
-                items.subList(fromIndex, toIndex),
-                new PageInfo(normalizedPage, normalizedSize, items.size(), totalPages));
     }
 }
