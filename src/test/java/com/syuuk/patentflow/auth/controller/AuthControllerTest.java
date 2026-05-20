@@ -22,7 +22,9 @@ import org.springframework.test.web.servlet.MockMvc;
         "patentflow.lookup.kipris.enabled=false",
         "patentflow.lookup.google-patents.enabled=false",
         "patentflow.auth.max-login-failures=2",
-        "patentflow.auth.login-lock-seconds=300"
+        "patentflow.auth.login-lock-seconds=300",
+        "patentflow.bootstrap.admin.username=admin",
+        "patentflow.bootstrap.admin.password=admin1234"
 })
 @AutoConfigureMockMvc
 class AuthControllerTest {

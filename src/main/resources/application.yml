@@ -35,6 +35,11 @@ management:
       enabled: false
 
 patentflow:
+  bootstrap:
+    admin:
+      username: ${PATENTFLOW_BOOTSTRAP_ADMIN_USERNAME:}
+      password: ${PATENTFLOW_BOOTSTRAP_ADMIN_PASSWORD:}
+      display-name: ${PATENTFLOW_BOOTSTRAP_ADMIN_DISPLAY_NAME:특허관리자}
   auth:
     jwt-secret: ${PATENTFLOW_JWT_SECRET:dev-patentflow-jwt-secret-change-me-please-32bytes}
     access-token-expiration-seconds: ${PATENTFLOW_JWT_EXPIRATION_SECONDS:3600}

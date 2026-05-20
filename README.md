@@ -32,11 +32,20 @@ JWT authentication is enabled for `/api/**` endpoints. Public endpoints are:
 - `GET /actuator/health`
 - Swagger UI and OpenAPI docs
 
-Demo accounts:
+Local/demo accounts:
 
 ```text
 admin / admin1234
 business / business1234
+```
+
+For non-local profiles, create the first administrator with environment variables.
+The bootstrap runs only when the username does not already exist.
+
+```bash
+PATENTFLOW_BOOTSTRAP_ADMIN_USERNAME=admin@example.com
+PATENTFLOW_BOOTSTRAP_ADMIN_PASSWORD=change-this-initial-admin-password
+PATENTFLOW_BOOTSTRAP_ADMIN_DISPLAY_NAME=특허관리자
 ```
 
 Login example:
