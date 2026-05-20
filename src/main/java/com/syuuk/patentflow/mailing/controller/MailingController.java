@@ -2,6 +2,7 @@ package com.syuuk.patentflow.mailing.controller;
 
 import com.syuuk.patentflow.common.response.ApiResponse;
 import com.syuuk.patentflow.mailing.dto.DepartmentRecipientMappingResponse;
+import com.syuuk.patentflow.mailing.dto.DepartmentRecipientMappingRequest;
 import com.syuuk.patentflow.mailing.dto.MailingHistoryItemResponse;
 import com.syuuk.patentflow.mailing.dto.MailingSendRequest;
 import com.syuuk.patentflow.mailing.dto.MailingSendResponse;
@@ -9,7 +10,9 @@ import com.syuuk.patentflow.mailing.service.MailingService;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -30,6 +33,14 @@ public class MailingController {
             @RequestParam(required = false) String departmentId
     ) {
         return ApiResponse.ok(mailingService.getRecipientMappings(departmentId));
+    }
+
+    @PutMapping("/department-recipient-mappings/{departmentId}")
+    public ApiResponse<DepartmentRecipientMappingResponse> updateRecipientMapping(
+            @PathVariable String departmentId,
+            @RequestBody DepartmentRecipientMappingRequest request
+    ) {
+        return ApiResponse.ok(mailingService.updateRecipientMapping(departmentId, request));
     }
 
     /**

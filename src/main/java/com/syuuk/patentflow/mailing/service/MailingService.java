@@ -7,17 +7,21 @@ import com.syuuk.patentflow.common.error.PatentFlowException;
 import com.syuuk.patentflow.common.service.SystemSettingsService;
 import com.syuuk.patentflow.mailing.domain.MailingHistoryEntity;
 import com.syuuk.patentflow.mailing.dto.BusinessReviewMailPatentSummary;
+import com.syuuk.patentflow.mailing.dto.DepartmentRecipientMappingRequest;
 import com.syuuk.patentflow.mailing.dto.BusinessReviewMailSendDraft;
 import com.syuuk.patentflow.mailing.dto.DepartmentRecipientMappingResponse;
 import com.syuuk.patentflow.mailing.dto.MailingHistoryItemResponse;
 import com.syuuk.patentflow.mailing.dto.MailingSendRequest;
 import com.syuuk.patentflow.mailing.dto.MailingSendResponse;
+import com.syuuk.patentflow.mailing.domain.DepartmentEntity;
+import com.syuuk.patentflow.mailing.repository.DepartmentRepository;
 import com.syuuk.patentflow.mailing.repository.MailingHistoryRepository;
 import com.syuuk.patentflow.patent.service.PatentReviewService;
 import com.syuuk.patentflow.user.domain.UserEntity;
 import com.syuuk.patentflow.user.repository.UserRepository;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.LinkedHashMap;
@@ -52,23 +56,26 @@ public class MailingService {
     private final ObjectMapper objectMapper;
     private final UserRepository userRepository;
     private final SystemSettingsService systemSettingsService;
+    private final DepartmentRepository departmentRepository;
 
     public MailingService(
             MailingHistoryRepository mailingHistoryRepository,
             PatentReviewService patentReviewService,
             ObjectMapper objectMapper,
             UserRepository userRepository,
-            SystemSettingsService systemSettingsService
+            SystemSettingsService systemSettingsService,
+            DepartmentRepository departmentRepository
     ) {
         this.mailingHistoryRepository = mailingHistoryRepository;
         this.patentReviewService = patentReviewService;
         this.objectMapper = objectMapper;
         this.userRepository = userRepository;
         this.systemSettingsService = systemSettingsService;
+        this.departmentRepository = departmentRepository;
     }
 
     public List<DepartmentRecipientMappingResponse> getRecipientMappings(String departmentId) {
-        return userRepository.findAll(Sort.by("departmentId", "createdAt")).stream()
+        List<DepartmentRecipientMappingResponse> userMappings = userRepository.findAll(Sort.by("departmentId", "createdAt")).stream()
                 .filter(u -> "BUSINESS".equals(u.getRole()) && u.getDepartmentId() != null)
                 .filter(u -> departmentId == null || departmentId.isBlank()
                         || departmentId.equals(u.getDepartmentId()))
@@ -80,15 +87,39 @@ public class MailingService {
                     UserEntity primary = users.get(0);
                     List<String> ccEmails = users.stream().skip(1)
                             .map(UserEntity::getUsername).toList();
-                    return new DepartmentRecipientMappingResponse(
-                            entry.getKey(),
-                            primary.getDepartmentName() != null ? primary.getDepartmentName() : entry.getKey(),
-                            primary.getUsername(),
-                            primary.getDisplayName(),
-                            ccEmails,
-                            primary.getCreatedAt() != null ? primary.getCreatedAt().toLocalDate().toString() : "");
+                    DepartmentEntity department = departmentRepository.findById(entry.getKey()).orElse(null);
+                    return toMappingResponse(department, primary, ccEmails);
                 })
                 .toList();
+        if (!userMappings.isEmpty()) {
+            return userMappings;
+        }
+        return departmentRepository.findAll(Sort.by("departmentId")).stream()
+                .filter(department -> departmentId == null || departmentId.isBlank()
+                        || departmentId.equals(department.getDepartmentId()))
+                .map(department -> toMappingResponse(department, null, List.of()))
+                .toList();
+    }
+
+    public DepartmentRecipientMappingResponse updateRecipientMapping(
+            String departmentId,
+            DepartmentRecipientMappingRequest request
+    ) {
+        DepartmentEntity department = departmentRepository.findById(departmentId)
+                .orElseThrow(() -> new PatentFlowException(ErrorCode.INVALID_REQUEST,
+                        "사업부를 찾을 수 없습니다: " + departmentId));
+        List<String> ccEmails = normalizedEmails(request.ccEmails());
+        String departmentName = textOrFallback(request.departmentName(), department.getDepartmentName());
+        String managerEmail = textOrFallback(request.managerEmail(), department.getManagerEmail());
+        String managerName = textOrFallback(request.managerName(), department.getManagerName());
+        department.updateRecipientMapping(
+                departmentName,
+                managerEmail,
+                managerName,
+                writeJson(ccEmails),
+                LocalDate.now(KST));
+        departmentRepository.save(department);
+        return toMappingResponse(department, null, ccEmails);
     }
 
     public MailingSendResponse send(MailingSendRequest request) {
@@ -204,6 +235,52 @@ public class MailingService {
                 .map(String::trim)
                 .distinct()
                 .toList();
+    }
+
+    private List<String> normalizedEmails(List<String> emails) {
+        if (emails == null) {
+            return List.of();
+        }
+        return emails.stream()
+                .filter(email -> email != null && !email.isBlank())
+                .map(String::trim)
+                .distinct()
+                .toList();
+    }
+
+    private DepartmentRecipientMappingResponse toMappingResponse(
+            DepartmentEntity department,
+            UserEntity primary,
+            List<String> fallbackCcEmails
+    ) {
+        String departmentId = department != null ? department.getDepartmentId() : primary.getDepartmentId();
+        String departmentName = department != null && department.getDepartmentName() != null
+                ? department.getDepartmentName()
+                : primary.getDepartmentName() != null ? primary.getDepartmentName() : departmentId;
+        String managerEmail = department != null && department.getManagerEmail() != null && !department.getManagerEmail().isBlank()
+                ? department.getManagerEmail()
+                : primary != null ? primary.getUsername() : "";
+        String managerName = department != null && department.getManagerName() != null && !department.getManagerName().isBlank()
+                ? department.getManagerName()
+                : primary != null ? primary.getDisplayName() : "";
+        List<String> ccEmails = department != null && department.getCcEmailsJson() != null && !department.getCcEmailsJson().isBlank()
+                ? readStringList(department.getCcEmailsJson())
+                : fallbackCcEmails;
+        String updatedAt = department != null && department.getUpdatedAt() != null
+                ? department.getUpdatedAt().toString()
+                : primary != null && primary.getCreatedAt() != null ? primary.getCreatedAt().toLocalDate().toString() : "";
+
+        return new DepartmentRecipientMappingResponse(
+                departmentId,
+                departmentName,
+                managerEmail,
+                managerName,
+                ccEmails,
+                updatedAt);
+    }
+
+    private String textOrFallback(String value, String fallback) {
+        return value != null && !value.isBlank() ? value.trim() : fallback;
     }
 
     private MailingHistoryItemResponse toHistoryResponse(MailingHistoryEntity entity) {
