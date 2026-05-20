@@ -20,7 +20,7 @@ public class AiReportAgentClient {
     private static final Logger log = LoggerFactory.getLogger(AiReportAgentClient.class);
     private static final Duration TIMEOUT = Duration.ofSeconds(30);
 
-    @Value("${patentflow.agent.url:http://patentflow-agent:8000}")
+    @Value("${agent.url:http://patentflow-agent:8000}")
     private String agentUrl;
 
     private final HttpClient httpClient;
@@ -53,7 +53,16 @@ public class AiReportAgentClient {
     }
 
     private AgentEvaluateResponse fallback(String patentId) {
-        return new AgentEvaluateResponse(patentId, "AI 평가 서비스 연결 실패 — 기본 응답", List.of(), "HOLD", "", OffsetDateTime.now());
+        return new AgentEvaluateResponse(
+                patentId,
+                "AI 평가 서비스 연결 실패 - 기본 응답",
+                List.of(),
+                "HOLD",
+                null,
+                null,
+                "",
+                OffsetDateTime.now()
+        );
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -62,9 +71,32 @@ public class AiReportAgentClient {
             String summary,
             List<AgentScoreItem> scores,
             String recommendation,
+            String summaryMarkdown,
+            String valuationReportMarkdown,
             String rawMarkdown,
             OffsetDateTime generatedAt
-    ) {}
+    ) {
+        public String summaryText() {
+            if (summary != null && !summary.isBlank()) {
+                return summary;
+            }
+            return summaryMarkdown;
+        }
+
+        public String reportMarkdown() {
+            if (rawMarkdown != null && !rawMarkdown.isBlank()) {
+                return rawMarkdown;
+            }
+            if (summaryMarkdown != null && !summaryMarkdown.isBlank()
+                    && valuationReportMarkdown != null && !valuationReportMarkdown.isBlank()) {
+                return summaryMarkdown + "\n\n---\n\n" + valuationReportMarkdown;
+            }
+            if (valuationReportMarkdown != null && !valuationReportMarkdown.isBlank()) {
+                return valuationReportMarkdown;
+            }
+            return summaryMarkdown;
+        }
+    }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record AgentScoreItem(String category, Integer score, String evidence) {}

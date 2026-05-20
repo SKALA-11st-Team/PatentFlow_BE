@@ -1039,10 +1039,11 @@ public class PatentReviewService {
                         .toList();
         Integer totalScore = scores.stream().filter(s -> s.score() != null)
                 .mapToInt(EvaluationScoreResponse::score).sum();
-        String rawMarkdown = normalizeMarkdown(agent.rawMarkdown(), agent.summary(), scores, agent.recommendation());
+        String summary = agent.summaryText();
+        String rawMarkdown = normalizeMarkdown(agent.reportMarkdown(), summary, scores, agent.recommendation());
         String markdownFilePath = aiReportStorageService.storeMarkdown(patentId, reportId, rawMarkdown);
         return new AiEvaluationReportResponse(reportId, agent.generatedAt(),
-                toRecommendation(agent.recommendation()), agent.summary(),
+                toRecommendation(agent.recommendation()), summary,
                 totalScore == 0 ? null : totalScore, scores, List.of(), rawMarkdown, markdownFilePath);
     }
 
@@ -1081,9 +1082,23 @@ public class PatentReviewService {
 
     private Recommendation toRecommendation(String value) {
         if (value == null) return Recommendation.HOLD;
-        return switch (value.toUpperCase()) {
+        String normalized = value.trim().toUpperCase();
+        if (value.contains("유지")) {
+            return Recommendation.MAINTAIN;
+        }
+        if (value.contains("포기")) {
+            return Recommendation.ABANDON;
+        }
+        if (value.contains("매각")) {
+            return Recommendation.SALES_CANDIDATE;
+        }
+        if (value.contains("추가") || value.contains("재검토") || value.contains("정보")) {
+            return Recommendation.REVIEW_AGAIN;
+        }
+        return switch (normalized) {
             case "MAINTAIN" -> Recommendation.MAINTAIN;
             case "ABANDON" -> Recommendation.ABANDON;
+            case "SALES_CANDIDATE", "SALE", "SALES" -> Recommendation.SALES_CANDIDATE;
             case "HOLD" -> Recommendation.HOLD;
             default -> Recommendation.REVIEW_AGAIN;
         };
@@ -1095,6 +1110,7 @@ public class PatentReviewService {
             case "권리성" -> EvaluationCategory.RIGHTS;
             case "기술성" -> EvaluationCategory.TECHNOLOGY;
             case "시장성" -> EvaluationCategory.MARKET;
+            case "사업 연계성", "사업연계성" -> EvaluationCategory.BUSINESS_ALIGNMENT;
             default -> EvaluationCategory.BUSINESS_ALIGNMENT;
         };
     }

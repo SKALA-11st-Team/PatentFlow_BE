@@ -8,15 +8,6 @@ spring:
     hibernate:
       ddl-auto: create-drop
     open-in-view: false
-  cloud:
-    aws:
-      region:
-        static: ap-northeast-2
-      credentials:
-        access-key: test
-        secret-key: test
-      s3:
-        endpoint: http://localhost:9000
 
 patentflow:
   auth:
@@ -32,17 +23,3 @@ patentflow:
     google-patents:
       enabled: false
       base-url: https://patents.google.com
-
-cloud:
-  aws:
-    region:
-      static: ap-northeast-2
-    credentials:
-      access-key: test
-      secret-key: test
-    s3:
-      endpoint: http://localhost:9000
-
-s3:
-  bucket:
-    name: patentflow-test-bucket
