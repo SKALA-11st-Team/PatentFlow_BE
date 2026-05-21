@@ -10,7 +10,6 @@ import com.syuuk.patentflow.business.service.BusinessFixtureService;
 import com.syuuk.patentflow.common.error.ErrorCode;
 import com.syuuk.patentflow.common.error.PatentFlowException;
 import com.syuuk.patentflow.common.response.ApiResponse;
-import com.syuuk.patentflow.common.response.PageInfo;
 import com.syuuk.patentflow.common.response.PageResponse;
 import com.syuuk.patentflow.patent.dto.BusinessOpinionDecision;
 import com.syuuk.patentflow.patent.dto.PatentDetailResponse;
@@ -190,5 +189,9 @@ public class BusinessController {
         if (!departmentId.equals(detail.departmentId())) {
             throw new PatentFlowException(ErrorCode.UNAUTHORIZED);
         }
+    }
+
+    private int countByStatus(List<PatentListItemResponse> patents, ReviewWorkflowStatus status) {
+        return (int) patents.stream().filter(p -> p.reviewWorkflowStatus() == status).count();
     }
 }
