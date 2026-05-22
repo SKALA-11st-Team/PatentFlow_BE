@@ -36,7 +36,6 @@ Review target identification
   - 기술성
   - 시장성
   - 사업 연계성
-  - 라이프사이클 경제성
 - The system does not include a separate approval step. After business response, the administrator/legal user records the final decision and legal action result directly.
 - Business opinion categories are `유지` and `포기`.
 - AI report recommendation labels are:
@@ -50,40 +49,54 @@ Review target identification
 
 ## Fixed Functional Requirements
 
-Do not change the meaning or numbering of FR-001 through FR-022.
+Do not change the meaning or numbering of the latest PatentFlow requirement IDs.
 
-- FR-001: 검토 대상 특허 조회
-- FR-002: 특허 목록 검색/필터링/정렬
-- FR-003: 특허 기본 정보 등록
-- FR-004: 회사 컨텍스트 입력/수정
-- FR-005: 특허 내용 요약 생성
-- FR-006: AI 기반 특허 가치 재평가 수행
-- FR-007: 평가 근거 제공
-- FR-008: 종합 권고안 생성
-- FR-009: 사업부 의견 입력
-- FR-010: 내부 문서 반영 재평가
-- FR-011: AI 특허 평가 레포트와 최종 판단 분리 조회/수정
-- FR-012: 최종 의사결정 기록
-- FR-013: 평가/판단 이력 조회
-- FR-014: 부서별 수신자 및 메일링 매핑 등록/수정
-- FR-015: 메일 미리보기
-- FR-016: 메일 발송 이력 저장/조회
-- FR-017: 포기 특허를 매각 후보 리스트로 분류/조회
-- FR-018~FR-022: Already assumed in project planning. Do not renumber earlier requirements.
+### Legal / Admin Requirements
 
-If a new requirement is needed, assign it from FR-023 onward only in documents.
+- FR-LEGAL-01: 검토 대상 특허 목록 및 대시보드 요약 조회
+- FR-LEGAL-02: 특허 목록 검색·필터링·정렬
+- FR-LEGAL-03: 특허 기본 정보 등록 및 외부 정보 기반 입력 추천
+- FR-LEGAL-04: 회사 컨텍스트 입력 및 사업/기술 분야 추천
+- FR-LEGAL-05: 특허 내용 요약 생성
+- FR-LEGAL-06: AI 기반 특허 가치 재평가 수행
+- FR-LEGAL-07: 평가 근거 요약 제공
+- FR-LEGAL-08: 특허별 종합 권고안 생성
+- FR-LEGAL-09: AI 초안, 사람 판단, 실제 법무 처리 결과의 분리 조회 및 수정
+- FR-LEGAL-10: 특허별 최종 의사결정 기록
+- FR-LEGAL-11: 평가 및 판단 이력 조회
+- FR-LEGAL-12: 부서별 수신자 및 메일링 매핑 등록·수정
+- FR-LEGAL-13: 메일 발송 전 미리보기
+- FR-LEGAL-14: 메일 발송 이력 저장 및 조회
+- FR-LEGAL-15: 포기 특허 매각 후보 분류 및 조회
+- FR-LEGAL-16: 운영 기준 설정
+- FR-LEGAL-17: 특허 리스트 일괄 등록/업로드
+- FR-LEGAL-18: AI 작업 진행 상태 조회
+- FR-LEGAL-19: 실제 법무 처리 결과 저장 및 추적
+- FR-LEGAL-20: 최종 판단 수정 및 취소
+- FR-LEGAL-21: 평가 기준 조회 및 수정
+
+### Business Requirements
+
+- FR-BUS-01: 사업부 의견 입력
+- FR-BUS-02: 내부 문서 업로드 기반 재평가 요청 및 문서 관리
+- FR-BUS-03: AI 평가 결과 피드백 저장
+- FR-BUS-04: 사업부 평가 체크리스트 조회
+
+### Common Requirements
+
+- FR-COM-01: 역할별 메뉴·화면·기능 분리 제공
+- FR-COM-02: 알림 목록 조회 및 읽음 상태 변경
+
+If new frontend or backend features are needed, define them with a new requirement ID in project documents only. Do not alter existing requirement IDs.
 
 ## Shared Reference Docs
 
 Use the project documents in `docs/` as the managed reference set.
 
 - `docs/skax_patents_list.md`: primary source for demo patent metadata and patent list fixtures.
-- `docs/patent_evaluation_criteria.md`: official patent evaluation criteria, evaluation axes, final comprehensive indicator, and final judgment categories.
-- `docs/business_evaluavte_checklist.md`: business-side checklist reference and internal review inputs.
-- `docs/api_priority.md`: frontend/backend API priority, MVP API response shape, and enum coordination.
-- `docs/need_api.md`: additional API needs and integration notes when present.
-- `docs/prompt.md`: AI prompt/reference content when prompt behavior affects API, mock AI report structure, or frontend copy.
-- `docs/DESIGN_SYSTEM.md`: frontend UI tone and styling reference.
+- `docs/PatentFlow_FR_mapping.md`: current FR catalog, legacy FR mapping, UI mapping, and traceability guide.
+- `docs/prompt.md`: current BE-FE integration notes and API traceability summary.
+- `docs/db_seed_and_status_plan.md`: local/demo seed and DB status update plan.
 
 If implementation details conflict, follow this priority:
 
@@ -140,7 +153,7 @@ const BUSINESS_OPINION_DECISIONS = ["MAINTAIN", "ABANDON"] as const;
 
 const LEGAL_ACTION_RESULTS = ["MAINTAINED", "ABANDONED", "SOLD"] as const;
 
-const EVALUATION_CATEGORIES = ["RIGHTS", "TECHNOLOGY", "MARKET", "BUSINESS_ALIGNMENT", "LIFECYCLE_ECONOMICS"] as const;
+const EVALUATION_CATEGORIES = ["RIGHTS", "TECHNOLOGY", "MARKET", "BUSINESS_ALIGNMENT"] as const;
 ```
 
 Current display labels include:
@@ -171,7 +184,6 @@ Current display labels include:
 | EvaluationCategory | `TECHNOLOGY` | 기술성 |
 | EvaluationCategory | `MARKET` | 시장성 |
 | EvaluationCategory | `BUSINESS_ALIGNMENT` | 사업 연계성 |
-| EvaluationCategory | `LIFECYCLE_ECONOMICS` | 라이프사이클 경제성 |
 
 Workflow progress visualization currently uses this subset and order:
 
@@ -234,15 +246,24 @@ Official UI IDs:
 
 | UI ID | 화면명 | 사용자 | 설명 |
 |---|---|---|---|
-| UI-001 | 로그인 | 공통 | 관리자/사업부 사용자가 로그인하고 역할에 따라 화면 진입 |
-| UI-002 | 대시보드 | 관리자 | 검토 대상 특허, 만료 임박 특허, 상태 요약 확인 |
-| UI-003 | 특허관리 | 관리자 | 전체 특허 목록 조회, 검색, 필터링, 정렬, 일괄 업로드 |
-| UI-004 | 특허 등록/수정 | 관리자 | 특허 기본 정보, 회사 컨텍스트 정보 등록 및 수정 |
-| UI-005 | 특허상세 | 관리자, 사업부 사용자 | 특허 요약, AI 평가 결과, 근거, 권고안, 최종 판단을 확인하는 상세 화면 |
-| UI-006 | 사업부 마이페이지 | 사업부 사용자 | 사업부가 검토 요청받은 특허 목록을 확인하고 의견을 입력하는 화면 |
-| UI-007 | 메일링 | 관리자 | 메일 미리보기, 수신자 매핑, 발송 내역 조회 |
-| UI-008 | 설정 | 관리자 | 운영 기준, 평가 기준, 메일링 매핑 정보 설정 |
-| UI-009 | 레포트 | 관리자, 사업부 사용자 | 평가 이력, 최종 판단 이력, 매각 후보 리스트, AI 피드백 조회 |
+| UI-COM-01 | 로그인 | 공통 | 관리자/사업부 사용자가 로그인하고 역할에 따라 화면 진입 |
+| UI-COM-02 | 상태별 특허 리스트 | 공통 | 동일한 workflow 상태의 특허들을 표로 리스트업하고 검색과 정렬을 제공 |
+| UI-COM-03 | 알림 패널 | 공통 | 읽지 않은 알림 배지, 오늘/지난주/그 이전 그룹, 읽음 토글 액션 |
+| UI-LEGAL-01 | 관리자 대시보드 | 관리자 | 이번 분기 연차료 검토 대상 특허의 KPI와 상세 리스트를 표시 |
+| UI-LEGAL-02 | 특허 관리 | 관리자 | 특허를 새로 등록하거나 수정 대상으로 조회하는 페이지 |
+| UI-LEGAL-03 | 특허 수정 | 관리자 | 선택한 특허의 기본 정보와 회사 컨텍스트를 수정 |
+| UI-LEGAL-04 | 특허 상세 | 관리자 | 특허 요약, AI 레포트, 근거, 권고안, 최종 판단을 확인 |
+| UI-LEGAL-04-1 | 특허 상세-1 | 관리자 | 특허 상세의 보조/확장 화면 또는 발표용 세부 화면 |
+| UI-LEGAL-05 | 메일링 | 관리자 | 사업부 검토 요청 메일 미리보기, 발송, 발송 이력 조회 |
+| UI-LEGAL-06 | 매각 후보 관리 | 관리자 | 포기/매각 대상 특허 후보 목록과 처리 상태 조회 |
+| UI-LEGAL-07 | 관리자 설정 | 관리자 | 운영 기준, 평가 기준, 부서/메일링 설정 관리 |
+| UI-LEGAL-08 | 사용자 관리 | 관리자 | 관리자와 사업부 사용자 계정/부서 권한 관리 |
+| UI-BUS-01 | 사업부서 대시보드 | 사업부서 | 부서에 배정받은 연차료 검토 특허 리스트와 현황 확인 |
+| UI-BUS-02 | 사업부서 특허 상세 | 사업부서 | AI 레포트, 특허 요약, 내 사업부 의견 입력 영역 확인 |
+| UI-BUS-03 | 사업부서 특허 평가 체크리스트 모달창 | 사업부서 | 기술완성도, 기술 독창성, 시장성, 기대효과 점수와 의견 입력 |
+| UI-BUS-04 | 특허별 제출 이력 리스트 페이지 | 사업부서 | 사업 의견을 제출한 특허의 제출 이력 확인 |
+| UI-BUS-05 | 특허별 제출 상세 페이지 | 사업부서 | 특허의 제출 상세 이력과 당시 평가 근거 확인 |
+| UI-BUS-06 | 사업부 설정 | 사업부서 | 알림, 의견 템플릿, 담당자 정보 설정 |
 
 Do not invent another final UI ID system. If the UI ID is unknown, use `TODO-UI-ID`.
 
@@ -250,8 +271,8 @@ Example comment:
 
 ```ts
 /**
- * @relatedFR FR-006, FR-007, FR-008
- * @relatedUI UI-005
+ * @relatedFR FR-LEGAL-06, FR-LEGAL-07, FR-LEGAL-08
+ * @relatedUI UI-LEGAL-04
  * @description AI 특허 평가 레포트와 평가 근거를 조회한다.
  */
 ```
