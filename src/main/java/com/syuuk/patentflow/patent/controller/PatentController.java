@@ -41,8 +41,8 @@ public class PatentController {
     }
 
     /**
-     * @relatedFR FR-001, FR-002
-     * @relatedUI UI-002, UI-003
+     * @relatedFR FR-LEGAL-01, FR-LEGAL-02
+     * @relatedUI UI-COM-02, UI-LEGAL-02
      * @description 특허 목록 검색/필터링/정렬/페이징 API.
      */
     @GetMapping
@@ -57,8 +57,8 @@ public class PatentController {
     }
 
     /**
-     * @relatedFR FR-003, FR-004
-     * @relatedUI UI-004
+     * @relatedFR FR-LEGAL-03, FR-LEGAL-04
+     * @relatedUI UI-LEGAL-02, UI-LEGAL-03
      * @description 특허 기본 정보와 회사 컨텍스트 등록 API.
      */
     @PostMapping
@@ -67,8 +67,8 @@ public class PatentController {
     }
 
     /**
-     * @relatedFR FR-003
-     * @relatedUI UI-004
+     * @relatedFR FR-LEGAL-03
+     * @relatedUI UI-LEGAL-02, UI-LEGAL-03
      * @description 관리번호/출원번호/등록번호 기반 특허 외부 검색 API.
      */
     @GetMapping("/external-lookup")
@@ -81,8 +81,8 @@ public class PatentController {
     }
 
     /**
-     * @relatedFR FR-003, FR-004
-     * @relatedUI UI-004
+     * @relatedFR FR-LEGAL-03, FR-LEGAL-04
+     * @relatedUI UI-LEGAL-02, UI-LEGAL-03
      * @description 특허명/관련제품 기반 회사 컨텍스트 추천 API.
      */
     @PostMapping("/context-suggestions")
@@ -93,8 +93,8 @@ public class PatentController {
     }
 
     /**
-     * @relatedFR FR-005, FR-006, FR-007, FR-008, FR-011, FR-012
-     * @relatedUI UI-005
+     * @relatedFR FR-LEGAL-05, FR-LEGAL-06, FR-LEGAL-07, FR-LEGAL-08, FR-LEGAL-09, FR-LEGAL-10
+     * @relatedUI UI-LEGAL-04
      * @description 특허 상세, AI 평가 레포트, 최종 판단 분리 조회 API.
      */
     @GetMapping("/{patentId}")
@@ -103,8 +103,8 @@ public class PatentController {
     }
 
     /**
-     * @relatedFR FR-003, FR-004
-     * @relatedUI UI-004
+     * @relatedFR FR-LEGAL-03, FR-LEGAL-04
+     * @relatedUI UI-LEGAL-02, UI-LEGAL-03
      * @description 특허 기본 정보와 회사 컨텍스트 수정 API.
      */
     @PutMapping("/{patentId}")
@@ -116,8 +116,8 @@ public class PatentController {
     }
 
     /**
-     * @relatedFR FR-013
-     * @relatedUI UI-005, UI-009
+     * @relatedFR FR-LEGAL-11
+     * @relatedUI UI-LEGAL-04, UI-BUS-05
      * @description 평가/판단 이력 조회 API.
      */
     @GetMapping("/{patentId}/history")
@@ -126,8 +126,8 @@ public class PatentController {
     }
 
     /**
-     * @relatedFR FR-011, FR-012
-     * @relatedUI UI-005
+     * @relatedFR FR-LEGAL-09, FR-LEGAL-10
+     * @relatedUI UI-LEGAL-04
      * @description 특허 최종 판단을 기록하는 API.
      */
     @PostMapping("/{patentId}/final-decision")
@@ -139,8 +139,8 @@ public class PatentController {
     }
 
     /**
-     * @relatedFR LEGAL-23
-     * @relatedUI UI-005
+     * @relatedFR FR-LEGAL-20
+     * @relatedUI UI-LEGAL-04
      * @description 특허 최종 판단을 수정하거나 취소하는 API.
      */
     @PatchMapping("/{patentId}/final-decision")

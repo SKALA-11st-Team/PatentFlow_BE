@@ -129,8 +129,8 @@ public class PatentReviewService {
         }
 
         /**
-        * @relatedFR FR-001, FR-002
-     * @relatedUI UI-002, UI-003
+        * @relatedFR FR-LEGAL-01, FR-LEGAL-02
+     * @relatedUI UI-COM-02, UI-LEGAL-02
      * @description DB 기반 페이징 및 필터링을 제공한다.
      */
     public PageResponse<PatentListItemResponse> getPatents(
@@ -264,8 +264,8 @@ public class PatentReviewService {
     }
 
     /**
-     * @relatedFR FR-005, FR-006, FR-007, FR-008, FR-011, FR-012
-     * @relatedUI UI-005
+     * @relatedFR FR-LEGAL-05, FR-LEGAL-06, FR-LEGAL-07, FR-LEGAL-08, FR-LEGAL-09, FR-LEGAL-10
+     * @relatedUI UI-LEGAL-04
      * @description AI 특허 평가 레포트와 최종 판단을 분리해 특허 상세를 조회한다.
      */
     public PatentDetailResponse getPatentDetail(String patentId) {
@@ -322,8 +322,8 @@ public class PatentReviewService {
     }
 
     /**
-     * @relatedFR FR-013
-     * @relatedUI UI-005, UI-009
+     * @relatedFR FR-LEGAL-11
+     * @relatedUI UI-LEGAL-04, UI-BUS-05
      * @description 평가/판단 이력을 조회한다.
      */
     public List<PatentHistoryResponse> getPatentHistory(String patentId) {
@@ -348,8 +348,8 @@ public class PatentReviewService {
     }
 
     /**
-     * @relatedFR FR-003
-     * @relatedUI UI-004
+     * @relatedFR FR-LEGAL-03
+     * @relatedUI UI-LEGAL-02, UI-LEGAL-03
      * @description 공식 metadata에서 관리번호/출원번호/등록번호 기반 외부 검색 결과를 제공한다.
      */
     public PatentBibliographicInfoResponse lookupBibliographicInfo(
@@ -390,8 +390,8 @@ public class PatentReviewService {
     }
 
     /**
-     * @relatedFR FR-003, FR-004
-     * @relatedUI UI-004
+     * @relatedFR FR-LEGAL-03, FR-LEGAL-04
+     * @relatedUI UI-LEGAL-02, UI-LEGAL-03
      * @description 특허명/제품/기술 키워드를 공식 metadata와 비교해 회사 컨텍스트를 추천한다.
      */
     public PatentContextSuggestionResponse suggestContext(PatentContextSuggestionRequest request) {
@@ -419,8 +419,8 @@ public class PatentReviewService {
     }
 
     /**
-     * @relatedFR FR-014, FR-015, FR-016
-     * @relatedUI UI-007
+     * @relatedFR FR-LEGAL-12, FR-LEGAL-13, FR-LEGAL-14
+     * @relatedUI UI-LEGAL-05
      * @description 실제 발송 연동 전, 사업부 검토 요청 메일 발송 상태를 검토 상태에 반영한다.
      */
     public WorkflowBatchUpdateResult markMailingSent(List<String> patentIds) {
@@ -446,8 +446,8 @@ public class PatentReviewService {
     }
 
     /**
-     * @relatedFR FR-003, FR-004
-     * @relatedUI UI-004
+     * @relatedFR FR-LEGAL-03, FR-LEGAL-04
+     * @relatedUI UI-LEGAL-02, UI-LEGAL-03
      * @description 특허 기본 정보와 회사 컨텍스트를 DB에 등록한다.
      */
     public PatentUpsertResponse createPatent(PatentUpsertRequest request) {
@@ -459,8 +459,8 @@ public class PatentReviewService {
     }
 
     /**
-     * @relatedFR FR-003, FR-004
-     * @relatedUI UI-004
+     * @relatedFR FR-LEGAL-03, FR-LEGAL-04
+     * @relatedUI UI-LEGAL-02, UI-LEGAL-03
      * @description 특허 기본 정보와 회사 컨텍스트를 DB에서 수정한다.
      */
     public PatentUpsertResponse updatePatent(String patentId, PatentUpsertRequest request) {

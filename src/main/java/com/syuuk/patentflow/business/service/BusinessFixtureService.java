@@ -49,8 +49,8 @@ public class BusinessFixtureService {
     }
 
     /**
-     * @relatedFR FR-009
-     * @relatedUI UI-005, UI-006
+     * @relatedFR FR-BUS-01
+     * @relatedUI UI-LEGAL-04, UI-BUS-03
      * @description 사업부 평가 체크리스트 정의를 조회한다.
      */
     public List<BusinessChecklistItemResponse> getChecklistItems() {
@@ -94,8 +94,8 @@ public class BusinessFixtureService {
     }
 
     /**
-     * @relatedFR FR-009, FR-013
-     * @relatedUI UI-009
+     * @relatedFR FR-BUS-01, FR-LEGAL-11
+     * @relatedUI UI-BUS-04, UI-BUS-05
      * @description 특허별 사업부 제출 이력을 조회한다.
      */
     @Transactional
@@ -122,8 +122,8 @@ public class BusinessFixtureService {
     }
 
     /**
-     * @relatedFR FR-009
-     * @relatedUI UI-005, UI-006
+     * @relatedFR FR-BUS-01
+     * @relatedUI UI-LEGAL-04, UI-BUS-03
      * @description 사업부 의견/체크리스트 제출을 저장하고 제출 이력 응답을 반환한다.
      */
     @Transactional

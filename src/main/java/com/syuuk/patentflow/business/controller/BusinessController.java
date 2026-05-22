@@ -44,8 +44,8 @@ public class BusinessController {
     }
 
     /**
-     * @relatedFR FR-009
-     * @relatedUI UI-005, UI-006
+     * @relatedFR FR-BUS-01
+     * @relatedUI UI-LEGAL-04, UI-BUS-03
      * @description 사업부 의견 작성용 체크리스트 항목 조회 API.
      */
     @GetMapping("/api/v1/business/checklist-items")
@@ -54,7 +54,7 @@ public class BusinessController {
     }
 
     /**
-     * @relatedFR BUS-01
+     * @relatedFR FR-BUS-01
      * @relatedUI UI-BUS-01
      * @description 사업부 대시보드 집계 통계를 반환한다.
      */
@@ -78,8 +78,8 @@ public class BusinessController {
     }
 
     /**
-     * @relatedFR BUS-02
-     * @relatedUI UI-BUS-02
+     * @relatedFR FR-BUS-01
+     * @relatedUI UI-BUS-01
      * @description 사업부 검토 요청 목록을 조회한다 (WAITING_BUSINESS_RESPONSE 상태).
      */
     @GetMapping("/api/v1/business/review-requests")
@@ -93,8 +93,8 @@ public class BusinessController {
     }
 
     /**
-     * @relatedFR BUS-14
-     * @relatedUI UI-BUS-14
+     * @relatedFR FR-LEGAL-01, FR-LEGAL-02
+     * @relatedUI UI-COM-02, UI-BUS-01
      * @description 사업부 배정 특허 목록을 조회한다.
      */
     @GetMapping("/api/v1/business/patents")
@@ -110,8 +110,8 @@ public class BusinessController {
     }
 
     /**
-     * @relatedFR BUS-03
-     * @relatedUI UI-BUS-03
+     * @relatedFR FR-LEGAL-05, FR-BUS-01
+     * @relatedUI UI-BUS-02
      * @description 사업부 배정 특허 상세를 조회한다.
      */
     @GetMapping("/api/v1/business/patents/{patentId}")
@@ -128,8 +128,8 @@ public class BusinessController {
     }
 
     /**
-     * @relatedFR FR-009, FR-013
-     * @relatedUI UI-009
+     * @relatedFR FR-BUS-01, FR-LEGAL-11
+     * @relatedUI UI-BUS-04, UI-BUS-05
      * @description 특허별 사업부 제출 이력 조회 API.
      */
     @GetMapping("/api/v1/patents/{patentId}/business-submissions")
@@ -142,8 +142,8 @@ public class BusinessController {
     }
 
     /**
-     * @relatedFR FR-009
-     * @relatedUI UI-005, UI-006
+     * @relatedFR FR-BUS-01
+     * @relatedUI UI-LEGAL-04, UI-BUS-03
      * @description 사업부 의견/체크리스트 제출 API.
      */
     @PostMapping("/api/v1/patents/{patentId}/business-submissions")
