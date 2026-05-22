@@ -12,7 +12,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/patentflow
       SPRING_DATASOURCE_USERNAME: patentflow
       SPRING_DATASOURCE_PASSWORD: patentflow
-      PATENTFLOW_CORS_ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      PATENTFLOW_CORS_ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174
       PATENTFLOW_AGENT_URL: http://patentflow-agent:8000
       PATENTFLOW_AI_REPORT_STORAGE_DIR: /app/storage/ai-reports
     volumes:
