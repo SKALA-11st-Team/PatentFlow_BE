@@ -25,6 +25,7 @@ public record PatentListItemResponse(
         String reviewReason,
         Recommendation currentRecommendation,
         BusinessOpinionDecision businessOpinionDecision,
-        LegalActionResult legalActionResult
+        LegalActionResult legalActionResult,
+        String originalPatentUrl
 ) {
 }

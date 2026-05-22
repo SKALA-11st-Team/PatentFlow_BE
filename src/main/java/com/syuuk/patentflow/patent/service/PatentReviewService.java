@@ -197,6 +197,42 @@ public class PatentReviewService {
                 new PageInfo(normalizedPage, normalizedSize, (int) historyPage.getTotalElements(), historyPage.getTotalPages()));
     }
 
+    public List<PatentListItemResponse> getReviewTargets(
+            String quarter,
+            String country,
+            LocalDate dateFrom,
+            LocalDate dateTo,
+            ReviewWorkflowStatus reviewWorkflowStatus) {
+        String normalizedQuarter = quarter == null ? null : quarter.trim().toUpperCase(Locale.ROOT);
+        String normalizedCountry = country == null ? null : country.trim().toUpperCase(Locale.ROOT);
+
+        return getAllPatents().stream()
+                .filter(patent -> reviewWorkflowStatus == null || patent.reviewWorkflowStatus() == reviewWorkflowStatus)
+                .filter(patent -> normalizedCountry == null || normalizedCountry.isBlank()
+                        || "ALL".equals(normalizedCountry)
+                        || normalizedCountry.equalsIgnoreCase(patent.country()))
+                .filter(patent -> matchesDateRange(patent.feeDueDate(), dateFrom, dateTo))
+                .filter(patent -> normalizedQuarter == null || normalizedQuarter.isBlank()
+                        || "ALL".equals(normalizedQuarter)
+                        || normalizedQuarter.equals(quarterKey(patent.feeDueDate())))
+                .toList();
+    }
+
+    private boolean matchesDateRange(LocalDate date, LocalDate dateFrom, LocalDate dateTo) {
+        if (date == null) {
+            return dateFrom == null && dateTo == null;
+        }
+        return (dateFrom == null || !date.isBefore(dateFrom))
+                && (dateTo == null || !date.isAfter(dateTo));
+    }
+
+    private String quarterKey(LocalDate date) {
+        if (date == null) {
+            return null;
+        }
+        return "Q" + ((date.getMonthValue() - 1) / 3 + 1);
+    }
+
     private Sort parseSort(String sort) {
         if (sort == null || sort.isBlank()) {
             return Sort.by(Sort.Direction.ASC, "annualFeeDueDate");
@@ -225,7 +261,8 @@ public class PatentReviewService {
                     null, null, null, history.getDepartmentId(), history.getDepartmentName(),
                     PatentLifecycleStatus.ACTIVE, history.getReviewWorkflowStatus(),
                     history.getAnnualFeeDueDate(), null, history.getAiRecommendation(),
-                    history.getBusinessOpinionDecision(), history.getLegalActionResult()
+                    history.getBusinessOpinionDecision(), history.getLegalActionResult(),
+                    null
             );
         }
         return new PatentListItemResponse(
@@ -251,7 +288,8 @@ public class PatentReviewService {
                 "연차료 납부 검토 시점 도래", // default reason
                 history.getAiRecommendation(),
                 history.getBusinessOpinionDecision(),
-                history.getLegalActionResult()
+                history.getLegalActionResult(),
+                originalPatentUrl(metadata.getCountry(), metadata.getApplicationNumber(), metadata.getRegistrationNumber())
         );
     }
 
@@ -1196,16 +1234,12 @@ public class PatentReviewService {
         if (value.contains("포기")) {
             return Recommendation.ABANDON;
         }
-        if (value.contains("매각")) {
-            return Recommendation.SALES_CANDIDATE;
-        }
         if (value.contains("추가") || value.contains("재검토") || value.contains("정보")) {
             return Recommendation.REVIEW_AGAIN;
         }
         return switch (normalized) {
             case "MAINTAIN" -> Recommendation.MAINTAIN;
             case "ABANDON" -> Recommendation.ABANDON;
-            case "SALES_CANDIDATE", "SALE", "SALES" -> Recommendation.SALES_CANDIDATE;
             case "HOLD" -> Recommendation.HOLD;
             default -> Recommendation.REVIEW_AGAIN;
         };
@@ -1451,7 +1485,6 @@ public class PatentReviewService {
             case "등록", "유지", "ACTIVE" -> PatentLifecycleStatus.ACTIVE;
             case "소멸", "EXPIRED" -> PatentLifecycleStatus.EXPIRED;
             case "포기", "ABANDONED" -> PatentLifecycleStatus.ABANDONED;
-            case "SOLD" -> PatentLifecycleStatus.SOLD;
             default -> PatentLifecycleStatus.ACTIVE;
         };
     }
@@ -1500,7 +1533,6 @@ public class PatentReviewService {
         return switch (result) {
             case MAINTAINED -> "사업부 의견과 AI 평가 근거를 검토해 유지 처리했습니다.";
             case ABANDONED -> "사업부 의견과 AI 평가 근거를 검토해 포기 처리했습니다.";
-            case SOLD -> "사업부 의견과 AI 평가 근거를 검토해 매각 처리했습니다.";
         };
     }
 
@@ -1585,7 +1617,21 @@ public class PatentReviewService {
                 detail.reviewReason(),
                 detail.currentRecommendation(),
                 detail.businessOpinionDecision(),
-                detail.legalActionResult());
+                detail.legalActionResult(),
+                originalPatentUrl(detail.country(), detail.applicationNumber(), detail.registrationNumber()));
+    }
+
+    private String originalPatentUrl(String country, String applicationNumber, String registrationNumber) {
+        String number = firstNonBlank(registrationNumber, applicationNumber);
+        if (number == null) {
+            return null;
+        }
+        String normalizedCountry = country == null || country.isBlank() ? "KR" : country.trim().toUpperCase(Locale.ROOT);
+        String normalizedNumber = number.replaceAll("[^0-9A-Za-z]", "");
+        if (normalizedNumber.isBlank()) {
+            return null;
+        }
+        return "https://patents.google.com/patent/" + normalizedCountry + normalizedNumber + "/ko";
     }
 
     private boolean matchesKeyword(PatentListItemResponse item, String keyword) {

@@ -19,6 +19,7 @@ import com.syuuk.patentflow.patent.dto.PatentUpsertResponse;
 import com.syuuk.patentflow.patent.dto.ReviewWorkflowStatus;
 import com.syuuk.patentflow.patent.service.PatentReviewService;
 import jakarta.validation.Valid;
+import java.time.LocalDate;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -54,6 +55,21 @@ public class PatentController {
             @RequestParam(required = false) ReviewWorkflowStatus reviewWorkflowStatus,
             @RequestParam(required = false) String sort) {
         return patentReviewService.getPatents(page, size, keyword, departmentId, reviewWorkflowStatus, sort);
+    }
+
+    /**
+     * @relatedFR FR-LEGAL-22, FR-LEGAL-24
+     * @relatedUI UI-LEGAL-01, UI-COM-02, UI-BUS-01
+     * @description 분기/날짜 범위/국가 기준 검토 대상 특허를 조회한다.
+     */
+    @GetMapping("/review-targets")
+    public ApiResponse<List<PatentListItemResponse>> getReviewTargets(
+            @RequestParam(required = false) String quarter,
+            @RequestParam(required = false) String country,
+            @RequestParam(required = false) LocalDate dateFrom,
+            @RequestParam(required = false) LocalDate dateTo,
+            @RequestParam(required = false) ReviewWorkflowStatus reviewWorkflowStatus) {
+        return ApiResponse.ok(patentReviewService.getReviewTargets(quarter, country, dateFrom, dateTo, reviewWorkflowStatus));
     }
 
     /**
