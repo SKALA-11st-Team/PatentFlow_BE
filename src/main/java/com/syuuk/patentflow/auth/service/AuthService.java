@@ -73,7 +73,10 @@ public class AuthService {
     public UserPrincipalResponse currentUser(Authentication authentication) {
         Object principal = authentication.getPrincipal();
         if (principal instanceof UserPrincipalResponse userPrincipal) {
-            return userPrincipal;
+            return userRepository.findById(userPrincipal.userId())
+                    .or(() -> userRepository.findByUsername(userPrincipal.username()))
+                    .map(user -> toPrincipalResponse(new UserDetailsImpl(user)))
+                    .orElse(userPrincipal);
         }
         return toPrincipalResponse((UserDetails) principal);
     }

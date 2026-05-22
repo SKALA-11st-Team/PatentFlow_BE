@@ -187,6 +187,22 @@ class AuthControllerTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test
+    void businessPatentAccessUsesCurrentUserDepartmentWhenJwtDepartmentIsStale() throws Exception {
+        ensureStaleDepartmentUser();
+        String token = login("stale-dept-user", "business1234");
+
+        UserEntity user = userRepository.findByUsername("stale-dept-user").orElseThrow();
+        user.setDepartmentId("DEPT-ICT");
+        userRepository.save(user);
+
+        mockMvc.perform(get("/api/v1/business/patents/PAT-2026-0127")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.patentId").value("PAT-2026-0127"))
+                .andExpect(jsonPath("$.data.departmentId").value("DEPT-ICT"));
+    }
+
     private String loginAsAdmin() throws Exception {
         return login("admin", "admin1234");
     }
@@ -229,6 +245,21 @@ class AuthControllerTest {
                 "BUSINESS",
                 "DEPT-RND",
                 "사업부 테스트 사용자"));
+    }
+
+    private void ensureStaleDepartmentUser() {
+        userRepository.findByUsername("stale-dept-user").ifPresentOrElse(
+                user -> {
+                    user.setDepartmentId("DEPT-RND");
+                    userRepository.save(user);
+                },
+                () -> userRepository.save(new UserEntity(
+                        "USER-stale-dept-test",
+                        "stale-dept-user",
+                        passwordEncoder.encode("business1234"),
+                        "BUSINESS",
+                        "DEPT-RND",
+                        "부서 변경 테스트 사용자")));
     }
 
     private void ensureLockTestUser() {
