@@ -810,7 +810,20 @@ public class PatentReviewService {
     private List<PatentMetadataEntity> loadPatentMetadataFromDocument() {
         try {
             AtomicInteger sequence = new AtomicInteger(1);
-            return java.nio.file.Files.readAllLines(java.nio.file.Path.of(PATENT_METADATA_PATH)).stream()
+            java.util.List<String> lines;
+
+            // Prefer classpath resource (works when running from a fat jar). Fall back to filesystem.
+            try (java.io.InputStream is = this.getClass().getClassLoader().getResourceAsStream(PATENT_METADATA_PATH)) {
+                if (is != null) {
+                    try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(is, java.nio.charset.StandardCharsets.UTF_8))) {
+                        lines = reader.lines().toList();
+                    }
+                } else {
+                    lines = java.nio.file.Files.readAllLines(java.nio.file.Path.of(PATENT_METADATA_PATH));
+                }
+            }
+
+            return lines.stream()
                     .filter(line -> line.startsWith("|"))
                     .filter(line -> !line.contains("---"))
                     .map(this::parseMarkdownRow)
@@ -820,7 +833,7 @@ public class PatentReviewService {
                     .map(columns -> metadataEntityFromColumns(sequence.getAndIncrement(), columns))
                     .toList();
         } catch (java.io.IOException exception) {
-            throw new IllegalStateException("특허 metadata 문서를 읽을 수 없습니다: " + PATENT_METADATA_PATH, exception);
+            throw new PatentFlowException(ErrorCode.INTERNAL_ERROR, "특허 metadata 문서를 읽을 수 없습니다: " + PATENT_METADATA_PATH);
         }
     }
 
@@ -1533,6 +1546,7 @@ public class PatentReviewService {
         return switch (result) {
             case MAINTAINED -> "사업부 의견과 AI 평가 근거를 검토해 유지 처리했습니다.";
             case ABANDONED -> "사업부 의견과 AI 평가 근거를 검토해 포기 처리했습니다.";
+            case SOLD -> "특허가 매각되어 처리되었습니다.";
         };
     }
 
