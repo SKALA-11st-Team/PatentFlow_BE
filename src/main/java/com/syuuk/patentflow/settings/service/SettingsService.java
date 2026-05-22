@@ -2,6 +2,7 @@ package com.syuuk.patentflow.settings.service;
 
 import com.syuuk.patentflow.common.error.ErrorCode;
 import com.syuuk.patentflow.common.error.PatentFlowException;
+import com.syuuk.patentflow.common.service.SystemSettingsService;
 import com.syuuk.patentflow.patent.dto.PatentListItemResponse;
 import com.syuuk.patentflow.patent.service.PatentReviewService;
 import com.syuuk.patentflow.settings.domain.QuarterSettingEntity;
@@ -22,11 +23,14 @@ public class SettingsService {
 
     private final QuarterSettingRepository quarterSettingRepository;
     private final PatentReviewService patentReviewService;
+    private final SystemSettingsService systemSettingsService;
 
     public SettingsService(QuarterSettingRepository quarterSettingRepository,
-            PatentReviewService patentReviewService) {
+            PatentReviewService patentReviewService,
+            SystemSettingsService systemSettingsService) {
         this.quarterSettingRepository = quarterSettingRepository;
         this.patentReviewService = patentReviewService;
+        this.systemSettingsService = systemSettingsService;
         seedDefaultQuartersIfNeeded();
     }
 
@@ -50,11 +54,28 @@ public class SettingsService {
             if (request.startDate() != null) quarter.setStartDate(request.startDate());
             if (request.endDate() != null) quarter.setEndDate(request.endDate());
         }
-        if (request.submissionDeadline() != null) {
-            quarter.setSubmissionDeadline(request.submissionDeadline());
+        LocalDate businessResponseDueDate = request.businessResponseDueDate() != null
+                ? request.businessResponseDueDate()
+                : request.submissionDeadline();
+        if (businessResponseDueDate != null) {
+            quarter.setSubmissionDeadline(businessResponseDueDate);
         }
         quarterSettingRepository.save(quarter);
         return toResponse(quarter, countTargetPatents(quarter));
+    }
+
+    public List<QuarterSettingResponse> updateReviewSchedule(int year, int mailLeadMonths, LocalDate businessResponseDueDate) {
+        try {
+            systemSettingsService.updateMailLeadMonths(mailLeadMonths);
+        } catch (IllegalArgumentException exception) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, exception.getMessage());
+        }
+        List<QuarterSettingEntity> quarters = quarterSettingRepository.findByYearOrderByQuarterNumber(year);
+        if (businessResponseDueDate != null) {
+            quarters.forEach(quarter -> quarter.setSubmissionDeadline(businessResponseDueDate));
+            quarterSettingRepository.saveAll(quarters);
+        }
+        return getQuarterSettings(year);
     }
 
     public QuarterSettingResponse getActiveQuarter() {
@@ -115,6 +136,7 @@ public class SettingsService {
     }
 
     private QuarterSettingResponse toResponse(QuarterSettingEntity q, int targetCount) {
+        int mailLeadMonths = systemSettingsService.getMailLeadMonths();
         return new QuarterSettingResponse(
                 q.getQuarterKey(),
                 q.getYear(),
@@ -127,7 +149,10 @@ public class SettingsService {
                 q.isEnded(),
                 q.getEndedAt(),
                 targetCount,
-                q.getSubmissionDeadline());
+                q.getSubmissionDeadline(),
+                q.getSubmissionDeadline(),
+                mailLeadMonths,
+                q.getStartDate() == null ? null : q.getStartDate().minusMonths(mailLeadMonths));
     }
 
     private void seedDefaultQuartersIfNeeded() {

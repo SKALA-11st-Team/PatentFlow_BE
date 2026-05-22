@@ -15,6 +15,9 @@ public record QuarterSettingResponse(
         boolean ended,
         OffsetDateTime endedAt,
         int targetPatentCount,
-        LocalDate submissionDeadline
+        LocalDate submissionDeadline,
+        LocalDate businessResponseDueDate,
+        int mailLeadMonths,
+        LocalDate scheduledMailSendDate
 ) {
 }

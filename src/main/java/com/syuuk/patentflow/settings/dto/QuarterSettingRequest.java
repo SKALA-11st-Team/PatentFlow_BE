@@ -5,6 +5,7 @@ import java.time.LocalDate;
 public record QuarterSettingRequest(
         LocalDate startDate,
         LocalDate endDate,
-        LocalDate submissionDeadline
+        LocalDate submissionDeadline,
+        LocalDate businessResponseDueDate
 ) {
 }
