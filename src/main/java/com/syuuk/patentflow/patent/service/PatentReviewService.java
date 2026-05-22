@@ -1468,7 +1468,6 @@ public class PatentReviewService {
     private ReviewWorkflowStatus workflowStatus(int sequence) {
         ReviewWorkflowStatus[] statuses = {
                 ReviewWorkflowStatus.REVIEW_QUARTER_STARTED,
-                ReviewWorkflowStatus.REPORT_GENERATED,
                 ReviewWorkflowStatus.MAIL_READY,
                 ReviewWorkflowStatus.WAITING_BUSINESS_RESPONSE,
                 ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED,

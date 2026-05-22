@@ -68,12 +68,9 @@ type PatentLifecycleStatus =
 type ReviewWorkflowStatus =
   | "NOT_IN_REVIEW_QUARTER"
   | "REVIEW_QUARTER_STARTED"
-  | "REPORT_GENERATED"
   | "MAIL_READY"
   | "WAITING_BUSINESS_RESPONSE"
   | "BUSINESS_RESPONSE_RECEIVED"
-  | "WAITING_EXECUTIVE_APPROVAL"
-  | "APPROVAL_COMPLETED"
   | "LEGAL_ACTION_RECORDED";
 
 type Recommendation =
@@ -128,7 +125,7 @@ BE가 비어 있으므로 아래 순서대로 구현한다.
 ### 5.1 특허 목록 조회
 
 ```http
-GET /api/v1/patents?page=1&size=20&keyword=AI&reviewWorkflowStatus=REPORT_GENERATED&departmentId=DEPT-RND&sort=annualFeeDueDate,asc
+GET /api/v1/patents?page=1&size=20&keyword=AI&reviewWorkflowStatus=MAIL_READY&departmentId=DEPT-RND&sort=annualFeeDueDate,asc
 ```
 
 Query parameters:
@@ -165,7 +162,7 @@ Response:
       "departmentId": "DEPT-RND",
       "departmentName": "R&D본부",
       "lifecycleStatus": "ACTIVE",
-      "reviewWorkflowStatus": "REPORT_GENERATED",
+      "reviewWorkflowStatus": "MAIL_READY",
       "annualFeeDueDate": "2026-05-06",
       "reviewReason": "연차료 납부 검토 시점 도래",
       "currentRecommendation": "REVIEW_AGAIN",
@@ -213,7 +210,7 @@ Response:
     "departmentId": "DEPT-RND",
     "departmentName": "R&D본부",
     "lifecycleStatus": "ACTIVE",
-    "reviewWorkflowStatus": "REPORT_GENERATED",
+    "reviewWorkflowStatus": "MAIL_READY",
     "annualFeeDueDate": "2026-05-06",
     "reviewReason": "연차료 납부 검토 시점 도래",
     "currentRecommendation": "REVIEW_AGAIN",

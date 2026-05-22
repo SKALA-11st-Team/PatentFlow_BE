@@ -163,7 +163,7 @@ public class PatentController {
     }
 
     /**
-     * @description AI 평가 레포트 생성 요청 — FastAPI agent 호출 후 상태를 REPORT_GENERATED로 전환.
+     * @description AI 평가 레포트 생성 요청 — FastAPI agent 호출 후 상태를 MAIL_READY로 전환.
      */
     @PostMapping("/{patentId}/request-ai-report")
     public ApiResponse<PatentDetailResponse> requestAiReport(@PathVariable String patentId) {

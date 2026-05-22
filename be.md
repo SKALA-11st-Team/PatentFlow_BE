@@ -323,12 +323,9 @@ components:
       enum:
         - NOT_IN_REVIEW_QUARTER
         - REVIEW_QUARTER_STARTED
-        - REPORT_GENERATED
         - MAIL_READY
         - WAITING_BUSINESS_RESPONSE
         - BUSINESS_RESPONSE_RECEIVED
-        - WAITING_EXECUTIVE_APPROVAL
-        - APPROVAL_COMPLETED
         - LEGAL_ACTION_RECORDED
     Recommendation:
       type: string
@@ -548,7 +545,7 @@ Content-Type: application/json
 
 처리 규칙:
 
-- 허용 workflow: `BUSINESS_RESPONSE_RECEIVED`, `WAITING_EXECUTIVE_APPROVAL`.
+- 허용 workflow: `BUSINESS_RESPONSE_RECEIVED`.
 - 그 외 상태는 `409 INVALID_WORKFLOW_STATUS`.
 - 현재 구현은 부분 성공을 지원하지 않는다. 하나라도 invalid면 전체 요청이 실패한다.
 - legal action result 매핑:

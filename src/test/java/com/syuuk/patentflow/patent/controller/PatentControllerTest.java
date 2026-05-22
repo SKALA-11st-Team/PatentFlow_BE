@@ -2,6 +2,7 @@ package com.syuuk.patentflow.patent.controller;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.greaterThan;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -9,13 +10,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import com.syuuk.patentflow.patent.client.AiReportAgentClient;
+import com.syuuk.patentflow.patent.client.AiReportAgentClient.AgentEvaluateResponse;
+import com.syuuk.patentflow.patent.client.AiReportAgentClient.AgentScoreItem;
 import com.syuuk.patentflow.patent.dto.EvaluationCategory;
+import java.time.OffsetDateTime;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(properties = {
@@ -28,6 +35,9 @@ class PatentControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @MockitoBean
+    private AiReportAgentClient aiReportAgentClient;
 
     @Test
     void getPatentsReturnsPagedEnvelope() throws Exception {
@@ -72,6 +82,31 @@ class PatentControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data", hasSize(2)))
                 .andExpect(jsonPath("$.data[0].type").value("AI_EVALUATION_CREATED"));
+    }
+
+    @Test
+    void requestAiReportMovesPatentDirectlyToMailReady() throws Exception {
+        when(aiReportAgentClient.evaluate("PAT-2026-0001")).thenReturn(new AgentEvaluateResponse(
+                "PAT-2026-0001",
+                "AI 평가 레포트 생성 완료",
+                List.of(new AgentScoreItem("권리성", 82, "청구항 보호 범위가 명확합니다.")),
+                "MAINTAIN",
+                null,
+                "## AI 평가 레포트\n\n유지 검토가 가능합니다.",
+                null,
+                OffsetDateTime.parse("2026-05-22T00:00:00Z")
+        ));
+
+        mockMvc.perform(post("/api/v1/patents/PAT-2026-0001/request-ai-report"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.reviewWorkflowStatus").value("MAIL_READY"))
+                .andExpect(jsonPath("$.data.aiEvaluationReport.recommendation").value("MAINTAIN"))
+                .andExpect(jsonPath("$.data.aiEvaluationReport.scores[0].category")
+                        .value(EvaluationCategory.RIGHTS.name()));
+
+        mockMvc.perform(get("/api/v1/patents/PAT-2026-0001"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.reviewWorkflowStatus").value("MAIL_READY"));
     }
 
     @Test
@@ -252,8 +287,8 @@ class PatentControllerTest {
                                   "title": "상품 트렌드 예측을 반영한 강화학습 모델을 적용한 자산배분 시스템 및 방법"
                                 },
                                 {
-                                  "patentId": "PAT-2026-0003",
-                                  "managementNumber": "P202405003-KR0",
+                                  "patentId": "PAT-2026-0002",
+                                  "managementNumber": "P202405002-KR0",
                                   "title": "테스트 특허"
                                 }
                               ]
@@ -263,15 +298,15 @@ class PatentControllerTest {
                         """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.updatedCount").value(1))
-                .andExpect(jsonPath("$.data.updatedPatentIds[0]").value("PAT-2026-0003"))
+                .andExpect(jsonPath("$.data.updatedPatentIds[0]").value("PAT-2026-0002"))
                 .andExpect(jsonPath("$.data.skippedPatentIds[0]").value("PAT-2026-0001"));
 
-        mockMvc.perform(get("/api/v1/patents/PAT-2026-0003"))
+        mockMvc.perform(get("/api/v1/patents/PAT-2026-0002"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.reviewWorkflowStatus").value("WAITING_BUSINESS_RESPONSE"));
 
         mockMvc.perform(get("/api/v1/mailings/history")
-                .param("patentId", "PAT-2026-0003"))
+                .param("patentId", "PAT-2026-0002"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data", hasSize(1)))
                 .andExpect(jsonPath("$.data[0].recipientEmail").value("rnd.manager@syuuk.test"));

@@ -51,7 +51,7 @@ Table patent_review_history {
   id varchar(64) [pk, note: "{patent_id}|{quarter_key}"]
   patent_id varchar(32) [not null]
   quarter_key varchar(16) [not null]
-  review_workflow_status varchar(64) [note: "NOT_IN_REVIEW_QUARTER | REVIEW_QUARTER_STARTED | REPORT_GENERATED | MAIL_READY | WAITING_BUSINESS_RESPONSE | BUSINESS_RESPONSE_RECEIVED | LEGAL_ACTION_RECORDED"]
+  review_workflow_status varchar(64) [note: "NOT_IN_REVIEW_QUARTER | REVIEW_QUARTER_STARTED | MAIL_READY | WAITING_BUSINESS_RESPONSE | BUSINESS_RESPONSE_RECEIVED | LEGAL_ACTION_RECORDED"]
   ai_recommendation varchar(64) [note: "MAINTAIN | REVIEW_AGAIN | ABANDON | HOLD — 해당 분기 검토 상태의 현재 AI 추천값"]
   ai_report_id varchar(128)
   ai_report_created_at timestamp

@@ -128,7 +128,6 @@ const PATENT_LIFECYCLE_STATUSES = ["ACTIVE", "ABANDONED", "SOLD", "EXPIRED"] as 
 const REVIEW_WORKFLOW_STATUSES = [
   "NOT_IN_REVIEW_QUARTER",
   "REVIEW_QUARTER_STARTED",
-  "REPORT_GENERATED",
   "MAIL_READY",
   "WAITING_BUSINESS_RESPONSE",
   "BUSINESS_RESPONSE_RECEIVED",
@@ -154,7 +153,6 @@ Current display labels include:
 | PatentLifecycleStatus | `EXPIRED` | 소멸 |
 | ReviewWorkflowStatus | `NOT_IN_REVIEW_QUARTER` | 검토 분기 아님 |
 | ReviewWorkflowStatus | `REVIEW_QUARTER_STARTED` | 이번 분기 납부 대상 |
-| ReviewWorkflowStatus | `REPORT_GENERATED` | 레포트 생성 완료 |
 | ReviewWorkflowStatus | `MAIL_READY` | 메일 발송 대기 |
 | ReviewWorkflowStatus | `WAITING_BUSINESS_RESPONSE` | 사업부 응답 대기 |
 | ReviewWorkflowStatus | `BUSINESS_RESPONSE_RECEIVED` | 사업부 응답 완료 |
