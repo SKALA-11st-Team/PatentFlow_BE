@@ -9,9 +9,10 @@ services:
         required: false
     environment:
       SPRING_PROFILES_ACTIVE: local
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/patentflow
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/patentflow?currentSchema=patentflow
       SPRING_DATASOURCE_USERNAME: patentflow
       SPRING_DATASOURCE_PASSWORD: patentflow
+      PATENTFLOW_DB_SCHEMA: patentflow
       PATENTFLOW_CORS_ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174
       PATENTFLOW_AGENT_URL: http://patentflow-agent:8000
       PATENTFLOW_AI_REPORT_STORAGE_DIR: /app/storage/ai-reports
@@ -30,7 +31,7 @@ services:
       - path: ../PatentFlow_Agent/.env
         required: false
     environment:
-      PGVECTOR_DATABASE_URL: postgresql://patentflow:patentflow@postgres:5432/patentflow
+      PGVECTOR_DATABASE_URL: postgresql://patentflow:patentflow@postgres:5432/patentflow?options=-csearch_path%3Dpatentflow%2Cpublic
       UNIFIED_API_BASE_URL: http://patentflow-api:8080
     depends_on:
       postgres:
@@ -47,6 +48,7 @@ services:
       POSTGRES_PASSWORD: patentflow
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U patentflow -d patentflow"]
       interval: 5s

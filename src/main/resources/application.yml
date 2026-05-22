@@ -2,7 +2,7 @@ spring:
   application:
     name: PatentFlow
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/patentflow}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/patentflow?currentSchema=patentflow}
     username: ${SPRING_DATASOURCE_USERNAME:patentflow}
     password: ${SPRING_DATASOURCE_PASSWORD:patentflow}
   mail:
@@ -17,6 +17,11 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
+    properties:
+      hibernate:
+        default_schema: ${PATENTFLOW_DB_SCHEMA:patentflow}
+        hbm2ddl:
+          create_namespaces: true
     open-in-view: false
   servlet:
     multipart:

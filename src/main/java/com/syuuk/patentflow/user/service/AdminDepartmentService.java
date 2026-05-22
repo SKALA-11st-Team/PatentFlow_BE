@@ -7,6 +7,7 @@ import com.syuuk.patentflow.mailing.dto.DepartmentRecipientMappingResponse;
 import com.syuuk.patentflow.mailing.repository.DepartmentRepository;
 import com.syuuk.patentflow.patent.service.PatentReviewService;
 import com.syuuk.patentflow.user.dto.CreateDepartmentRequest;
+import com.syuuk.patentflow.user.dto.UpdateDepartmentRequest;
 import com.syuuk.patentflow.user.repository.UserRepository;
 import java.time.LocalDate;
 import java.util.List;
@@ -59,6 +60,23 @@ public class AdminDepartmentService {
                 "",
                 List.of(),
                 LocalDate.now().toString());
+    }
+
+    public DepartmentRecipientMappingResponse updateDepartment(String departmentId, UpdateDepartmentRequest request) {
+        DepartmentEntity entity = mailingRecipientMappingRepository.findById(departmentId)
+                .orElseThrow(() -> new PatentFlowException(ErrorCode.INVALID_REQUEST,
+                        "사업부를 찾을 수 없습니다: " + departmentId));
+        LocalDate updatedAt = LocalDate.now();
+        entity.rename(request.departmentName(), updatedAt);
+        mailingRecipientMappingRepository.save(entity);
+        patentReviewService.refreshDepartmentCache();
+        return new DepartmentRecipientMappingResponse(
+                entity.getDepartmentId(),
+                entity.getDepartmentName(),
+                entity.getManagerEmail() != null ? entity.getManagerEmail() : "",
+                entity.getManagerName() != null ? entity.getManagerName() : "",
+                List.of(),
+                updatedAt.toString());
     }
 
     public void deleteDepartment(String departmentId) {

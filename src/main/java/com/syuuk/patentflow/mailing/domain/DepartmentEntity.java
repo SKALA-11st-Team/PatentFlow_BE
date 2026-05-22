@@ -59,6 +59,11 @@ public class DepartmentEntity {
         return departmentName;
     }
 
+    public void rename(String departmentName, LocalDate updatedAt) {
+        this.departmentName = departmentName;
+        this.updatedAt = updatedAt;
+    }
+
     public String getManagerEmail() {
         return managerEmail;
     }

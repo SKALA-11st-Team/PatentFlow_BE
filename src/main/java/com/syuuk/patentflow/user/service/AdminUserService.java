@@ -67,6 +67,24 @@ public class AdminUserService {
         return UserResponse.from(user);
     }
 
+    public UserResponse updateUser(String userId, CreateUserRequest request) {
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new PatentFlowException(ErrorCode.INVALID_REQUEST,
+                        "사용자를 찾을 수 없습니다: " + userId));
+        userRepository.findByUsername(request.username())
+                .filter(existingUser -> !existingUser.getId().equals(userId))
+                .ifPresent(existingUser -> {
+                    throw new PatentFlowException(ErrorCode.INVALID_REQUEST,
+                            "이미 존재하는 계정입니다: " + request.username());
+                });
+
+        user.setUsername(request.username());
+        user.setRole(request.role());
+        user.setDepartmentId(request.departmentId());
+        user.setDisplayName(request.displayName());
+        return UserResponse.from(userRepository.save(user));
+    }
+
     public void deleteUser(String userId) {
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new PatentFlowException(ErrorCode.INVALID_REQUEST,
