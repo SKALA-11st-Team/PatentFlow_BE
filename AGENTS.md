@@ -47,6 +47,30 @@ Review target identification
 - For not-yet-written user input, use state/action copy such as `작성 필요`, `대기 중`, or `의견 대기` instead of `N/A`.
 - Checklist totals and detail scores must use the same source. Do not mix AI 0-100 evaluation scores with business checklist 1-4 item scores in one total.
 
+## Quarter, Deadline, And Mailing Domain Rules
+
+- Quarter ranges are fixed by calendar month:
+  - Q1: January 1 through the last day of March
+  - Q2: April 1 through the last day of June
+  - Q3: July 1 through the last day of September
+  - Q4: October 1 through the last day of December
+- A quarter query includes every patent whose relevant annual-fee/review date falls inside that quarter.
+- APIs that list review targets should support quarter filters (`Q1` through `Q4`) and explicit date ranges.
+- Business-facing fields, mail templates, and DTO display labels should use `회신 기한`, not `마감 기한`.
+- `회신 기한` is a business-response due date configured in bulk by administrators. It is distinct from the internal/legal `실제 마감 기한`.
+- Review-request mail is sent by default two months before the quarter start date:
+  - Q1 patents: November 1 of the previous year
+  - Q2 patents: February 1
+  - Q3 patents: May 1
+  - Q4 patents: August 1
+- The lead time in months must be administrator-configurable. Backend settings/query APIs should return the calculated send date per quarter after the setting is applied.
+- Review-request mail payloads, previews, and history records must include the patent original-document URL.
+- Country-specific patent views must distinguish domestic patents from overseas patents because annual-fee payment rules differ by country.
+- Store or expose enough data to visualize and adjust future annual-fee payment dates, including country, base due date, adjusted due date, and adjustment reason/history.
+- 특허 연차료의 기준일은 등록일이 아니라 출원일이다. 연차료 계산, 안내 문구, 필터, mock data, API contract 모두 이 기준을 따른다.
+- In business classification, `기존 사업` means an ended business, not an existing/active business.
+- Business classification and technology classification must be administrator-editable reference data: add, delete, rename, and reuse across patent records, filters, dashboards, and AI report output.
+
 ## Fixed Functional Requirements
 
 Do not change the meaning or numbering of the latest PatentFlow requirement IDs.
@@ -74,6 +98,10 @@ Do not change the meaning or numbering of the latest PatentFlow requirement IDs.
 - FR-LEGAL-19: 실제 법무 처리 결과 저장 및 추적
 - FR-LEGAL-20: 최종 판단 수정 및 취소
 - FR-LEGAL-21: 평가 기준 조회 및 수정
+- FR-LEGAL-22: 분기 및 날짜 범위 기반 검토 대상 조회
+- FR-LEGAL-23: 회신 기한 및 분기별 검토 요청 메일 발송 기준 설정
+- FR-LEGAL-24: 국가별 특허 조회 및 미래 연차료 납부 예정일 시각화/조정
+- FR-LEGAL-25: 사업 분류 및 기술 분류 기준값 관리
 
 ### Business Requirements
 
@@ -81,6 +109,7 @@ Do not change the meaning or numbering of the latest PatentFlow requirement IDs.
 - FR-BUS-02: 내부 문서 업로드 기반 재평가 요청 및 문서 관리
 - FR-BUS-03: AI 평가 결과 피드백 저장
 - FR-BUS-04: 사업부 평가 체크리스트 조회
+- FR-BUS-05: 기존 의사결정 기록과 AI 레포트를 병렬 참고하며 사업부 의견 입력
 
 ### Common Requirements
 
