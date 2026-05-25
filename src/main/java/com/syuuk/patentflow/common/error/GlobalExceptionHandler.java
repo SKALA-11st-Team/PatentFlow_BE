@@ -6,9 +6,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -29,6 +31,12 @@ public class GlobalExceptionHandler {
                 .forEach(error -> details.put(error.getField(), error.getDefaultMessage()));
         log.warn("Validation failed: {}", details);
         return ResponseEntity.badRequest().body(ErrorResponse.of(ErrorCode.INVALID_REQUEST, details));
+    }
+
+    @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class})
+    public ResponseEntity<ErrorResponse> handleMalformedRequest(Exception exception) {
+        log.warn("Malformed request: {}", exception.getMessage());
+        return ResponseEntity.badRequest().body(ErrorResponse.of(ErrorCode.INVALID_REQUEST));
     }
 
     @ExceptionHandler(AuthenticationException.class)

@@ -1498,7 +1498,6 @@ public class PatentReviewService {
             case "등록", "유지", "ACTIVE" -> PatentLifecycleStatus.ACTIVE;
             case "소멸", "EXPIRED" -> PatentLifecycleStatus.EXPIRED;
             case "포기", "ABANDONED" -> PatentLifecycleStatus.ABANDONED;
-            case "매각", "SOLD" -> PatentLifecycleStatus.SOLD;
             default -> PatentLifecycleStatus.ACTIVE;
         };
     }
@@ -1507,7 +1506,6 @@ public class PatentReviewService {
         return switch (legalActionResult) {
             case MAINTAINED -> PatentLifecycleStatus.ACTIVE;
             case ABANDONED -> PatentLifecycleStatus.ABANDONED;
-            case SOLD -> PatentLifecycleStatus.SOLD;
         };
     }
 
@@ -1555,7 +1553,6 @@ public class PatentReviewService {
         return switch (result) {
             case MAINTAINED -> "사업부 의견과 AI 평가 근거를 검토해 유지 처리했습니다.";
             case ABANDONED -> "사업부 의견과 AI 평가 근거를 검토해 포기 처리했습니다.";
-            case SOLD -> "특허가 매각되어 처리되었습니다.";
         };
     }
 

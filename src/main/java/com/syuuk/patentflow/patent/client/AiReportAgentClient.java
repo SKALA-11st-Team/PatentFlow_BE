@@ -59,7 +59,6 @@ public class AiReportAgentClient {
                 List.of(),
                 "HOLD",
                 null,
-                null,
                 "",
                 OffsetDateTime.now()
         );
@@ -72,7 +71,6 @@ public class AiReportAgentClient {
             List<AgentScoreItem> scores,
             String recommendation,
             String summaryMarkdown,
-            String valuationReportMarkdown,
             String rawMarkdown,
             OffsetDateTime generatedAt
     ) {
@@ -86,13 +84,6 @@ public class AiReportAgentClient {
         public String reportMarkdown() {
             if (rawMarkdown != null && !rawMarkdown.isBlank()) {
                 return rawMarkdown;
-            }
-            if (summaryMarkdown != null && !summaryMarkdown.isBlank()
-                    && valuationReportMarkdown != null && !valuationReportMarkdown.isBlank()) {
-                return summaryMarkdown + "\n\n---\n\n" + valuationReportMarkdown;
-            }
-            if (valuationReportMarkdown != null && !valuationReportMarkdown.isBlank()) {
-                return valuationReportMarkdown;
             }
             return summaryMarkdown;
         }

@@ -93,7 +93,6 @@ class PatentControllerTest {
                 "MAINTAIN",
                 null,
                 "## AI 평가 레포트\n\n유지 검토가 가능합니다.",
-                null,
                 OffsetDateTime.parse("2026-05-22T00:00:00Z")
         ));
 
@@ -134,23 +133,17 @@ class PatentControllerTest {
     }
 
     @Test
-    void recordSoldFinalDecisionPersistsSoldLifecycleStatus() throws Exception {
+    void recordFinalDecisionRejectsRemovedSalesState() throws Exception {
         mockMvc.perform(post("/api/v1/patents/PAT-2026-0005/final-decision")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {
                           "legalActionResult": "SOLD",
-                          "reason": "포기 특허 매각 후보로 분류해 매각 처리합니다."
+                          "reason": "매각 상태는 사용하지 않습니다."
                         }
                         """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.legalActionResult").value("SOLD"));
-
-        mockMvc.perform(get("/api/v1/patents/PAT-2026-0005"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.reviewWorkflowStatus").value("LEGAL_ACTION_RECORDED"))
-                .andExpect(jsonPath("$.data.legalActionResult").value("SOLD"))
-                .andExpect(jsonPath("$.data.lifecycleStatus").value("SOLD"));
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
     }
 
     @Test
