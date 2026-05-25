@@ -1,6 +1,7 @@
 package com.syuuk.patentflow.auth.controller;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -130,6 +131,27 @@ class AuthControllerTest {
         mockMvc.perform(get("/api/v1/admin/users")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void businessUserCannotReadOrMutateAdminNotifications() throws Exception {
+        ensureBusinessUser();
+        String token = login("business-user", "business1234");
+
+        mockMvc.perform(get("/api/v1/notifications")
+                .param("role", "ADMIN")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(patch("/api/v1/notifications/NOTIF-001/read-state")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                          "isRead": true
+                        }
+                        """)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

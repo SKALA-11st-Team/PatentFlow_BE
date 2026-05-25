@@ -1,10 +1,13 @@
 package com.syuuk.patentflow.notification.controller;
 
+import com.syuuk.patentflow.common.error.ErrorCode;
+import com.syuuk.patentflow.common.error.PatentFlowException;
 import com.syuuk.patentflow.common.response.ApiResponse;
 import com.syuuk.patentflow.notification.dto.NotificationReadStateRequest;
 import com.syuuk.patentflow.notification.dto.NotificationResponse;
 import com.syuuk.patentflow.notification.service.NotificationService;
 import java.util.List;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -30,8 +33,13 @@ public class NotificationController {
      */
     @GetMapping
     public ApiResponse<List<NotificationResponse>> getNotifications(
-            @RequestParam(required = false, defaultValue = "COMMON") String role
+            @RequestParam(required = false, defaultValue = "COMMON") String role,
+            Authentication authentication
     ) {
+        String currentRole = currentRole(authentication);
+        if (!"COMMON".equals(role) && !currentRole.equals(role)) {
+            throw new PatentFlowException(ErrorCode.UNAUTHORIZED);
+        }
         return ApiResponse.ok(notificationService.getNotifications(role));
     }
 
@@ -43,8 +51,19 @@ public class NotificationController {
     @PatchMapping("/{notificationId}/read-state")
     public ApiResponse<NotificationResponse> updateReadState(
             @PathVariable String notificationId,
-            @RequestBody NotificationReadStateRequest request
+            @RequestBody NotificationReadStateRequest request,
+            Authentication authentication
     ) {
-        return ApiResponse.ok(notificationService.updateReadState(notificationId, request.isRead()));
+        return ApiResponse.ok(notificationService.updateReadState(notificationId, request.isRead(), currentRole(authentication)));
+    }
+
+    private String currentRole(Authentication authentication) {
+        if (authentication == null) {
+            throw new PatentFlowException(ErrorCode.UNAUTHORIZED);
+        }
+        return authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()))
+                ? "ADMIN"
+                : "BUSINESS";
     }
 }

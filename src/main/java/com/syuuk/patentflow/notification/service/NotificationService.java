@@ -33,10 +33,13 @@ public class NotificationService {
                 .toList();
     }
 
-    public NotificationResponse updateReadState(String notificationId, boolean isRead) {
+    public NotificationResponse updateReadState(String notificationId, boolean isRead, String currentRole) {
         for (int i = 0; i < notifications.size(); i++) {
             NotificationResponse n = notifications.get(i);
             if (n.notificationId().equals(notificationId)) {
+                if (!"COMMON".equals(n.targetRole()) && !n.targetRole().equals(currentRole)) {
+                    throw new PatentFlowException(ErrorCode.UNAUTHORIZED);
+                }
                 NotificationResponse updated = new NotificationResponse(
                         n.notificationId(), n.title(), n.message(), n.targetRole(), isRead, n.createdAt(), n.link());
                 notifications.set(i, updated);
