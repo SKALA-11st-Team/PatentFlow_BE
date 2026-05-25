@@ -32,16 +32,6 @@ public class AnnualFeeScheduleService {
             LocalDate expectedExpirationDate,
             LocalDate baseDate
     ) {
-        if ("US".equalsIgnoreCase(country) && registrationDate != null) {
-            for (int[] ym : new int[][]{{3, 6}, {7, 6}, {11, 6}}) {
-                LocalDate feeDate = registrationDate.plusYears(ym[0]).plusMonths(ym[1]);
-                if (!feeDate.isBefore(baseDate)) {
-                    return capAtExpiration(feeDate, expectedExpirationDate);
-                }
-            }
-            return expectedExpirationDate != null ? expectedExpirationDate : baseDate.plusYears(1);
-        }
-
         LocalDate base = applicationDate != null ? applicationDate : registrationDate;
         if (base == null) {
             return LocalDate.of(baseDate.getYear(), 12, 31);

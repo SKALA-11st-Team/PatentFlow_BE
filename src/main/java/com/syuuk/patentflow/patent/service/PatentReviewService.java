@@ -1331,7 +1331,7 @@ public class PatentReviewService {
                 patent.expectedExpirationDate(),
                 patent.departmentId(),
                 patent.departmentName(),
-                patent.lifecycleStatus(),
+                lifecycleStatusByLegalAction(request.legalActionResult()),
                 ReviewWorkflowStatus.LEGAL_ACTION_RECORDED,
                 newDueDate,
                 patent.reviewReason(),
@@ -1412,7 +1412,7 @@ public class PatentReviewService {
                 patent.expectedExpirationDate(),
                 patent.departmentId(),
                 patent.departmentName(),
-                patent.lifecycleStatus(),
+                legalActionResult != null ? lifecycleStatusByLegalAction(legalActionResult) : patent.lifecycleStatus(),
                 ReviewWorkflowStatus.LEGAL_ACTION_RECORDED,
                 newDueDate,
                 patent.reviewReason(),
@@ -1498,7 +1498,16 @@ public class PatentReviewService {
             case "등록", "유지", "ACTIVE" -> PatentLifecycleStatus.ACTIVE;
             case "소멸", "EXPIRED" -> PatentLifecycleStatus.EXPIRED;
             case "포기", "ABANDONED" -> PatentLifecycleStatus.ABANDONED;
+            case "매각", "SOLD" -> PatentLifecycleStatus.SOLD;
             default -> PatentLifecycleStatus.ACTIVE;
+        };
+    }
+
+    private PatentLifecycleStatus lifecycleStatusByLegalAction(LegalActionResult legalActionResult) {
+        return switch (legalActionResult) {
+            case MAINTAINED -> PatentLifecycleStatus.ACTIVE;
+            case ABANDONED -> PatentLifecycleStatus.ABANDONED;
+            case SOLD -> PatentLifecycleStatus.SOLD;
         };
     }
 
@@ -1884,6 +1893,7 @@ public class PatentReviewService {
         state.setDepartmentName(patent.departmentName());
         patentMetadataRepository.findById(patent.patentId()).ifPresent(entity -> {
             entity.setFeeDueDate(patent.feeDueDate());
+            entity.setPatentStatus(patent.lifecycleStatus());
             patentMetadataRepository.save(entity);
         });
         reviewHistoryRepository.save(state);

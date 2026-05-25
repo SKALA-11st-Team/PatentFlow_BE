@@ -129,7 +129,28 @@ class PatentControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.reviewWorkflowStatus").value("LEGAL_ACTION_RECORDED"))
                 .andExpect(jsonPath("$.data.legalActionResult").value("MAINTAINED"))
+                .andExpect(jsonPath("$.data.lifecycleStatus").value("ACTIVE"))
                 .andExpect(jsonPath("$.data.finalDecisionRecord.reason").value("사업부 의견과 AI 평가를 종합해 유지합니다."));
+    }
+
+    @Test
+    void recordSoldFinalDecisionPersistsSoldLifecycleStatus() throws Exception {
+        mockMvc.perform(post("/api/v1/patents/PAT-2026-0005/final-decision")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                          "legalActionResult": "SOLD",
+                          "reason": "포기 특허 매각 후보로 분류해 매각 처리합니다."
+                        }
+                        """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.legalActionResult").value("SOLD"));
+
+        mockMvc.perform(get("/api/v1/patents/PAT-2026-0005"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.reviewWorkflowStatus").value("LEGAL_ACTION_RECORDED"))
+                .andExpect(jsonPath("$.data.legalActionResult").value("SOLD"))
+                .andExpect(jsonPath("$.data.lifecycleStatus").value("SOLD"));
     }
 
     @Test
