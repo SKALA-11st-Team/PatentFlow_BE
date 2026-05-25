@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: patentflow-postgres
+  namespace: patentflow
+spec:
+  type: ClusterIP
+  selector:
+    app: patentflow-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres

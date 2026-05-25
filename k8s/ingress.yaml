@@ -4,8 +4,9 @@ metadata:
   name: patentflow-be
   namespace: patentflow
   annotations:
-    kubernetes.io/ingress.class: nginx
+    kubernetes.io/ingress.class: public-nginx
 spec:
+  ingressClassName: public-nginx
   rules:
     - host: api.patentflow.example.com
       http:

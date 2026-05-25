@@ -7,6 +7,7 @@ main push
 -> GitHub Actions builds a Docker image
 -> GitHub Actions pushes the image to Harbor with the commit SHA tag
 -> GitHub Actions connects to EKS with kubeconfig
+-> GitHub Actions applies PostgreSQL manifests in the team namespace
 -> GitHub Actions applies Kubernetes manifests
 -> GitHub Actions updates the Deployment image tag
 -> EKS pulls the new image from Harbor and rolls out new Pods
@@ -59,6 +60,13 @@ PATENTFLOW_AGENT_URL=http://patentflow-agent:8000
 
 ## One-time cluster setup
 
-If Harbor is private, the workflow creates or updates `harbor-regcred` in the namespace. The app secret is also applied from GitHub Secrets.
+If Harbor is private, the workflow creates or updates `harbor-regcred` in the namespace. The app secret and PostgreSQL secret are also applied from GitHub Secrets.
 
-Before first deploy, make sure a PostgreSQL database is reachable from the cluster and that `SPRING_DATASOURCE_URL` points to it.
+The default setup deploys PostgreSQL in the same namespace as the backend:
+
+```text
+KUBE_NAMESPACE=skala3-finalproj-class3-team11
+SPRING_DATASOURCE_URL=jdbc:postgresql://patentflow-postgres:5432/patentflow?currentSchema=patentflow
+```
+
+PostgreSQL is exposed only as a `ClusterIP` service inside the cluster. Do not create an Ingress for the database.

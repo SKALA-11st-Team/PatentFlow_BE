@@ -82,6 +82,21 @@ jobs:
             --namespace="${KUBE_NAMESPACE}" \
             --dry-run=client -o yaml | kubectl apply -f -
 
+      - name: Apply PostgreSQL secret
+        run: |
+          kubectl create secret generic patentflow-postgres-secret \
+            --namespace="${KUBE_NAMESPACE}" \
+            --from-literal=POSTGRES_DB="patentflow" \
+            --from-literal=POSTGRES_USER="${SPRING_DATASOURCE_USERNAME}" \
+            --from-literal=POSTGRES_PASSWORD="${{ secrets.SPRING_DATASOURCE_PASSWORD }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Apply PostgreSQL manifests
+        run: |
+          kubectl apply -f /tmp/patentflow-k8s/postgres-service.yaml
+          kubectl apply -f /tmp/patentflow-k8s/postgres-statefulset.yaml
+          kubectl rollout status statefulset/patentflow-postgres --namespace="${KUBE_NAMESPACE}" --timeout=180s
+
       - name: Apply app secret
         run: |
           kubectl create secret generic patentflow-be-secret \
