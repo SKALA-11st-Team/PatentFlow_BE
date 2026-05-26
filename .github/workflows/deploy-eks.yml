@@ -182,7 +182,15 @@ jobs:
         run: |
           kubectl apply -f /tmp/patentflow-k8s/postgres-service.yaml
           kubectl apply -f /tmp/patentflow-k8s/postgres-statefulset.yaml
-          kubectl rollout status statefulset/team11-patentflow-postgres-statefulset --namespace="${KUBE_NAMESPACE}" --timeout=180s
+          kubectl rollout status statefulset/team11-patentflow-postgres-statefulset --namespace="${KUBE_NAMESPACE}" --timeout=420s
+
+      - name: Diagnose PostgreSQL rollout failure
+        if: failure()
+        run: |
+          kubectl get statefulset,svc,pvc,pod --namespace="${KUBE_NAMESPACE}" -o wide
+          kubectl describe statefulset/team11-patentflow-postgres-statefulset --namespace="${KUBE_NAMESPACE}" || true
+          kubectl describe pod --namespace="${KUBE_NAMESPACE}" -l app=team11-patentflow-postgres || true
+          kubectl logs --namespace="${KUBE_NAMESPACE}" -l app=team11-patentflow-postgres --all-containers --tail=200 || true
 
       - name: Apply app secret
         run: |
