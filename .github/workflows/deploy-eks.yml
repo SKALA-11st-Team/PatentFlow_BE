@@ -230,3 +230,11 @@ jobs:
 
       - name: Rollout status
         run: kubectl rollout status deployment/team11-patentflow-be-deployment --namespace="${KUBE_NAMESPACE}" --timeout=180s
+
+      - name: Diagnose backend rollout failure
+        if: failure()
+        run: |
+          kubectl get deployment,replicaset,svc,ingress,pod --namespace="${KUBE_NAMESPACE}" -o wide
+          kubectl describe deployment/team11-patentflow-be-deployment --namespace="${KUBE_NAMESPACE}" || true
+          kubectl describe pod --namespace="${KUBE_NAMESPACE}" -l app=team11-patentflow-be || true
+          kubectl logs --namespace="${KUBE_NAMESPACE}" -l app=team11-patentflow-be --all-containers --tail=300 || true
