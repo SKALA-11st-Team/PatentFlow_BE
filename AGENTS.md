@@ -34,6 +34,7 @@ Review target identification
 - The seeded patent metadata comes from managed project sources such as `docs/skax_patents_list.md` and `src/main/resources/db/seed/skax_patents.sql`.
 - Do not change the EKS deployment profile from `demo` to `prod` unless the team explicitly decides to stop loading the demonstration workflow seed data.
 - With `demo`, `LocalDemoSeedRunner` runs and `BootstrapAdminInitializer` does not run. Therefore bootstrap admin environment variables are not the source of the initial admin account in the demo deployment.
+- Demo business login credentials must be managed through bootstrap business secrets: `PATENTFLOW_BOOTSTRAP_BUSINESS_USERNAME`, `PATENTFLOW_BOOTSTRAP_BUSINESS_PASSWORD`, `PATENTFLOW_BOOTSTRAP_BUSINESS_DEPARTMENT_ID`, and `PATENTFLOW_BOOTSTRAP_BUSINESS_DISPLAY_NAME`.
 
 ## Kubernetes Naming Rules
 

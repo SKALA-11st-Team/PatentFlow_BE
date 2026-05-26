@@ -45,6 +45,11 @@ patentflow:
       username: ${PATENTFLOW_BOOTSTRAP_ADMIN_USERNAME:}
       password: ${PATENTFLOW_BOOTSTRAP_ADMIN_PASSWORD:}
       display-name: ${PATENTFLOW_BOOTSTRAP_ADMIN_DISPLAY_NAME:특허관리자}
+    business:
+      username: ${PATENTFLOW_BOOTSTRAP_BUSINESS_USERNAME:}
+      password: ${PATENTFLOW_BOOTSTRAP_BUSINESS_PASSWORD:}
+      department-id: ${PATENTFLOW_BOOTSTRAP_BUSINESS_DEPARTMENT_ID:DEPT-ICT}
+      display-name: ${PATENTFLOW_BOOTSTRAP_BUSINESS_DISPLAY_NAME:사업부 데모 담당자}
   auth:
     jwt-secret: ${PATENTFLOW_JWT_SECRET:dev-patentflow-jwt-secret-change-me-please-32bytes}
     access-token-expiration-seconds: ${PATENTFLOW_JWT_EXPIRATION_SECONDS:3600}

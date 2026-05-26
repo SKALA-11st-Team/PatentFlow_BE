@@ -10,10 +10,12 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.init.ScriptUtils;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 @Component
 @Profile({"local", "demo"})
+@Order(0)
 public class LocalDemoSeedRunner implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(LocalDemoSeedRunner.class);
