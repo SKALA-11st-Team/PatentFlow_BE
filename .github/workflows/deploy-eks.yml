@@ -33,6 +33,50 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate required inputs
+        env:
+          HARBOR_REGISTRY_VALUE: ${{ secrets.HARBOR_REGISTRY }}
+          HARBOR_PROJECT_VALUE: ${{ secrets.HARBOR_PROJECT }}
+          HARBOR_USERNAME_VALUE: ${{ secrets.HARBOR_USERNAME }}
+          HARBOR_PASSWORD_VALUE: ${{ secrets.HARBOR_PASSWORD }}
+          KUBE_CONFIG_VALUE: ${{ secrets.KUBE_CONFIG }}
+          AWS_ACCESS_KEY_ID_VALUE: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY_VALUE: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          SPRING_DATASOURCE_PASSWORD_VALUE: ${{ secrets.SPRING_DATASOURCE_PASSWORD }}
+          PATENTFLOW_JWT_SECRET_VALUE: ${{ secrets.PATENTFLOW_JWT_SECRET }}
+        run: |
+          missing=0
+          for name in \
+            HARBOR_REGISTRY_VALUE \
+            HARBOR_PROJECT_VALUE \
+            HARBOR_USERNAME_VALUE \
+            HARBOR_PASSWORD_VALUE \
+            KUBE_CONFIG_VALUE \
+            AWS_ACCESS_KEY_ID_VALUE \
+            AWS_SECRET_ACCESS_KEY_VALUE \
+            SPRING_DATASOURCE_PASSWORD_VALUE \
+            PATENTFLOW_JWT_SECRET_VALUE
+          do
+            if [ -z "${!name}" ]; then
+              echo "Missing required secret: ${name%_VALUE}" >&2
+              missing=1
+            fi
+          done
+
+          if [ "${BE_INGRESS_HOST}" = "api.patentflow.example.com" ]; then
+            echo "BE_INGRESS_HOST is still the placeholder value." >&2
+            missing=1
+          fi
+
+          if [ -n "${PATENTFLOW_JWT_SECRET_VALUE}" ] && [ "${#PATENTFLOW_JWT_SECRET_VALUE}" -lt 32 ]; then
+            echo "PATENTFLOW_JWT_SECRET must be at least 32 characters." >&2
+            missing=1
+          fi
+
+          if [ "${missing}" -ne 0 ]; then
+            exit 1
+          fi
+
       - name: Set image coordinates
         run: |
           echo "IMAGE_TAG=${GITHUB_SHA}" >> "$GITHUB_ENV"
@@ -90,6 +134,20 @@ jobs:
           mkdir -p "$HOME/.kube"
           echo "${{ secrets.KUBE_CONFIG }}" | base64 --decode > "$HOME/.kube/config"
           chmod 600 "$HOME/.kube/config"
+          aws --version
+          kubectl version --client=true
+          kubectl config current-context
+
+      - name: Check cluster prerequisites
+        run: |
+          kubectl get ingressclass alb
+          kubectl get namespace "${KUBE_NAMESPACE}" >/dev/null 2>&1 || kubectl auth can-i create namespaces
+          kubectl auth can-i create deployments.apps --namespace="${KUBE_NAMESPACE}"
+          kubectl auth can-i create statefulsets.apps --namespace="${KUBE_NAMESPACE}"
+          kubectl auth can-i create services --namespace="${KUBE_NAMESPACE}"
+          kubectl auth can-i create ingresses.networking.k8s.io --namespace="${KUBE_NAMESPACE}"
+          kubectl auth can-i create secrets --namespace="${KUBE_NAMESPACE}"
+          kubectl auth can-i create configmaps --namespace="${KUBE_NAMESPACE}"
 
       - name: Prepare manifests
         run: |
