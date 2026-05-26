@@ -73,6 +73,36 @@ jobs:
             missing=1
           fi
 
+          expected_postgres_host="team11-patentflow-postgres-svc"
+          expected_agent_url="http://team11-patentflow-agent-svc:8000"
+
+          if [[ "${SPRING_DATASOURCE_URL}" != jdbc:postgresql://${expected_postgres_host}:5432/* ]]; then
+            echo "SPRING_DATASOURCE_URL must use Kubernetes Service host '${expected_postgres_host}'." >&2
+            echo "Current SPRING_DATASOURCE_URL='${SPRING_DATASOURCE_URL}'" >&2
+            missing=1
+          fi
+
+          if [[ "${SPRING_DATASOURCE_URL}" != *"currentSchema=${PATENTFLOW_DB_SCHEMA}"* ]]; then
+            echo "SPRING_DATASOURCE_URL must include currentSchema=${PATENTFLOW_DB_SCHEMA}." >&2
+            missing=1
+          fi
+
+          if [ "${PATENTFLOW_AGENT_URL}" != "${expected_agent_url}" ]; then
+            echo "PATENTFLOW_AGENT_URL must use Kubernetes Service URL '${expected_agent_url}'." >&2
+            echo "Current PATENTFLOW_AGENT_URL='${PATENTFLOW_AGENT_URL}'" >&2
+            missing=1
+          fi
+
+          if [[ "${SPRING_DATASOURCE_URL}" == *"11-team-"* ]] || [[ "${PATENTFLOW_AGENT_URL}" == *"11-team-"* ]]; then
+            echo "Service URLs must not use the legacy numeric prefix '11-team-'." >&2
+            missing=1
+          fi
+
+          if [[ "${SPRING_DATASOURCE_URL}" != *"-svc"* ]] || [[ "${PATENTFLOW_AGENT_URL}" != *"-svc"* ]]; then
+            echo "Service-to-service URLs must use '-svc' Kubernetes Service names." >&2
+            missing=1
+          fi
+
           if [ "${missing}" -ne 0 ]; then
             exit 1
           fi
