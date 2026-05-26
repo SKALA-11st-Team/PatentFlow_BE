@@ -26,6 +26,9 @@ spec:
           envFrom:
             - secretRef:
                 name: team11-patentflow-postgres-secret
+          env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/postgresql/data
