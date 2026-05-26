@@ -19,6 +19,8 @@ env:
   PATENTFLOW_COOKIE_SECURE: "true"
   PATENTFLOW_COOKIE_SAME_SITE: None
   BE_INGRESS_HOST: ${{ vars.BE_INGRESS_HOST || 'api.patentflow.example.com' }}
+  AWS_REGION: ${{ vars.AWS_REGION || 'ap-northeast-2' }}
+  AWS_PROFILE_NAME: ${{ vars.AWS_PROFILE_NAME || 'skala-student' }}
 
 jobs:
   deploy:
@@ -55,6 +57,33 @@ jobs:
 
       - name: Install kubectl
         uses: azure/setup-kubectl@v4
+
+      - name: Configure AWS profile for kubeconfig exec auth
+        env:
+          AWS_ACCESS_KEY_ID_VALUE: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY_VALUE: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN_VALUE: ${{ secrets.AWS_SESSION_TOKEN }}
+        run: |
+          if [ -z "${AWS_ACCESS_KEY_ID_VALUE}" ] || [ -z "${AWS_SECRET_ACCESS_KEY_VALUE}" ]; then
+            echo "AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY secrets are required because KUBE_CONFIG uses aws eks get-token." >&2
+            exit 1
+          fi
+
+          mkdir -p "$HOME/.aws"
+          {
+            echo "[${AWS_PROFILE_NAME}]"
+            echo "aws_access_key_id=${AWS_ACCESS_KEY_ID_VALUE}"
+            echo "aws_secret_access_key=${AWS_SECRET_ACCESS_KEY_VALUE}"
+            if [ -n "${AWS_SESSION_TOKEN_VALUE}" ]; then
+              echo "aws_session_token=${AWS_SESSION_TOKEN_VALUE}"
+            fi
+          } > "$HOME/.aws/credentials"
+
+          {
+            echo "[profile ${AWS_PROFILE_NAME}]"
+            echo "region=${AWS_REGION}"
+            echo "output=json"
+          } > "$HOME/.aws/config"
 
       - name: Configure kubeconfig
         run: |
