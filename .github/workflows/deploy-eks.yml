@@ -216,6 +216,7 @@ jobs:
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Apply PostgreSQL manifests
+        id: postgres_rollout
         run: |
           kubectl apply -f /tmp/patentflow-k8s/postgres-service.yaml
           kubectl apply -f /tmp/patentflow-k8s/postgres-statefulset.yaml
@@ -223,7 +224,7 @@ jobs:
           kubectl rollout status statefulset/team11-patentflow-postgres-statefulset --namespace="${KUBE_NAMESPACE}" --timeout=420s
 
       - name: Diagnose PostgreSQL rollout failure
-        if: failure()
+        if: ${{ failure() && steps.postgres_rollout.outcome == 'failure' }}
         run: |
           kubectl get statefulset,svc,pvc,pod --namespace="${KUBE_NAMESPACE}" -o wide
           kubectl describe statefulset/team11-patentflow-postgres-statefulset --namespace="${KUBE_NAMESPACE}" || true
@@ -266,10 +267,11 @@ jobs:
           kubectl apply -f /tmp/patentflow-k8s/ingress.yaml
 
       - name: Rollout status
+        id: backend_rollout
         run: kubectl rollout status deployment/team11-patentflow-be-deployment --namespace="${KUBE_NAMESPACE}" --timeout=180s
 
       - name: Diagnose backend rollout failure
-        if: failure()
+        if: ${{ failure() && steps.backend_rollout.outcome == 'failure' }}
         run: |
           kubectl get deployment,replicaset,svc,ingress,pod --namespace="${KUBE_NAMESPACE}" -o wide
           kubectl describe deployment/team11-patentflow-be-deployment --namespace="${KUBE_NAMESPACE}" || true
