@@ -37,19 +37,19 @@ Review target identification
 
 ## Kubernetes Naming Rules
 
-- Team 11 Kubernetes resources must use the `11-team-patentflow-` prefix.
+- Team 11 Kubernetes resources must use the `team11-patentflow-` prefix.
 - Use kind-specific suffixes for primary workload exposure resources:
-  - Backend Deployment: `11-team-patentflow-be-deployment`
-  - Backend Service: `11-team-patentflow-be-svc`
-  - Backend Ingress: `11-team-patentflow-be-ingress`
-  - Backend ConfigMap: `11-team-patentflow-be-config`
-  - Backend Secret: `11-team-patentflow-be-secret`
-  - PostgreSQL StatefulSet: `11-team-patentflow-postgres-statefulset`
-  - PostgreSQL Service: `11-team-patentflow-postgres-svc`
-  - PostgreSQL Secret: `11-team-patentflow-postgres-secret`
-  - Agent Service: `11-team-patentflow-agent-svc`
-- Keep label selectors app-oriented rather than kind-oriented. For example, backend Pods and Services should share `app: 11-team-patentflow-be`.
-- Service-to-service URLs in EKS and Docker Compose must use the shared service-style names, such as `http://11-team-patentflow-agent-svc:8000` and `jdbc:postgresql://11-team-patentflow-postgres-svc:5432/patentflow?currentSchema=patentflow`.
+  - Backend Deployment: `team11-patentflow-be-deployment`
+  - Backend Service: `team11-patentflow-be-svc`
+  - Backend Ingress: `team11-patentflow-be-ingress`
+  - Backend ConfigMap: `team11-patentflow-be-config`
+  - Backend Secret: `team11-patentflow-be-secret`
+  - PostgreSQL StatefulSet: `team11-patentflow-postgres-statefulset`
+  - PostgreSQL Service: `team11-patentflow-postgres-svc`
+  - PostgreSQL Secret: `team11-patentflow-postgres-secret`
+  - Agent Service: `team11-patentflow-agent-svc`
+- Keep label selectors app-oriented rather than kind-oriented. For example, backend Pods and Services should share `app: team11-patentflow-be`.
+- Service-to-service URLs in EKS and Docker Compose must use the shared service-style names, such as `http://team11-patentflow-agent-svc:8000` and `jdbc:postgresql://team11-patentflow-postgres-svc:5432/patentflow?currentSchema=patentflow`.
 - Do not use legacy Docker Compose service names such as `patentflow-agent` for deployment configuration.
 
 ## Shared Domain Rules

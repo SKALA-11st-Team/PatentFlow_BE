@@ -58,22 +58,22 @@ AWS_REGION=ap-northeast-2
 AWS_PROFILE_NAME=skala-student
 PATENTFLOW_CORS_ALLOWED_ORIGINS=https://patentflow.live
 SPRING_PROFILES_ACTIVE=demo
-SPRING_DATASOURCE_URL=jdbc:postgresql://11-team-patentflow-postgres-svc:5432/patentflow?currentSchema=patentflow
+SPRING_DATASOURCE_URL=jdbc:postgresql://team11-patentflow-postgres-svc:5432/patentflow?currentSchema=patentflow
 SPRING_DATASOURCE_USERNAME=patentflow
-PATENTFLOW_AGENT_URL=http://11-team-patentflow-agent-svc:8000
+PATENTFLOW_AGENT_URL=http://team11-patentflow-agent-svc:8000
 ```
 
 ## One-time cluster setup
 
 If Harbor is private, the workflow creates or updates `harbor-regcred` in the namespace. The app secret and PostgreSQL secret are also applied from GitHub Secrets.
 
-The backend Ingress uses AWS Load Balancer Controller with `ingressClassName=alb`. Do not route this service through the shared `public-nginx` class. The ALB name is `11-team-patentflow-be`, and `BE_INGRESS_HOST` should be pointed to the ALB DNS name after the Ingress is provisioned.
+The backend Ingress uses AWS Load Balancer Controller with `ingressClassName=alb`. Do not route this service through the shared `public-nginx` class. The ALB name is `team11-patentflow-be`, and `BE_INGRESS_HOST` should be pointed to the ALB DNS name after the Ingress is provisioned.
 
 The default setup deploys PostgreSQL in the same namespace as the backend:
 
 ```text
 KUBE_NAMESPACE=skala3-finalproj-class3-team11
-SPRING_DATASOURCE_URL=jdbc:postgresql://11-team-patentflow-postgres-svc:5432/patentflow?currentSchema=patentflow
+SPRING_DATASOURCE_URL=jdbc:postgresql://team11-patentflow-postgres-svc:5432/patentflow?currentSchema=patentflow
 ```
 
 PostgreSQL is exposed only as a `ClusterIP` service inside the cluster. Do not create an Ingress for the database.

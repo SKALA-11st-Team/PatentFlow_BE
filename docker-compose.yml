@@ -1,7 +1,7 @@
 services:
-  11-team-patentflow-be-svc:
+  team11-patentflow-be-svc:
     build: .
-    container_name: 11-team-patentflow-be
+    container_name: team11-patentflow-be
     ports:
       - "8080:8080"
     env_file:
@@ -9,37 +9,37 @@ services:
         required: false
     environment:
       SPRING_PROFILES_ACTIVE: local
-      SPRING_DATASOURCE_URL: jdbc:postgresql://11-team-patentflow-postgres-svc:5432/patentflow?currentSchema=patentflow
+      SPRING_DATASOURCE_URL: jdbc:postgresql://team11-patentflow-postgres-svc:5432/patentflow?currentSchema=patentflow
       SPRING_DATASOURCE_USERNAME: patentflow
       SPRING_DATASOURCE_PASSWORD: patentflow
       PATENTFLOW_DB_SCHEMA: patentflow
       PATENTFLOW_CORS_ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174
-      PATENTFLOW_AGENT_URL: http://11-team-patentflow-agent-svc:8000
+      PATENTFLOW_AGENT_URL: http://team11-patentflow-agent-svc:8000
       PATENTFLOW_AI_REPORT_STORAGE_DIR: /app/storage/ai-reports
     volumes:
       - ai-report-storage:/app/storage/ai-reports
     depends_on:
-      11-team-patentflow-postgres-svc:
+      team11-patentflow-postgres-svc:
         condition: service_healthy
 
-  11-team-patentflow-agent-svc:
+  team11-patentflow-agent-svc:
     build: ../PatentFlow_Agent
-    container_name: 11-team-patentflow-agent
+    container_name: team11-patentflow-agent
     ports:
       - "8000:8000"
     env_file:
       - path: ../PatentFlow_Agent/.env
         required: false
     environment:
-      PGVECTOR_DATABASE_URL: postgresql://patentflow:patentflow@11-team-patentflow-postgres-svc:5432/patentflow?options=-csearch_path%3Dpatentflow%2Cpublic
-      UNIFIED_API_BASE_URL: http://11-team-patentflow-be-svc:8080
+      PGVECTOR_DATABASE_URL: postgresql://patentflow:patentflow@team11-patentflow-postgres-svc:5432/patentflow?options=-csearch_path%3Dpatentflow%2Cpublic
+      UNIFIED_API_BASE_URL: http://team11-patentflow-be-svc:8080
     depends_on:
-      11-team-patentflow-postgres-svc:
+      team11-patentflow-postgres-svc:
         condition: service_healthy
 
-  11-team-patentflow-postgres-svc:
+  team11-patentflow-postgres-svc:
     image: ankane/pgvector:v0.5.1
-    container_name: 11-team-patentflow-postgres
+    container_name: team11-patentflow-postgres
     ports:
       - "5432:5432"
     environment:

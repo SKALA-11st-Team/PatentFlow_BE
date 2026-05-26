@@ -1,20 +1,20 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: 11-team-patentflow-postgres-statefulset
+  name: team11-patentflow-postgres-statefulset
   namespace: patentflow
   labels:
-    app: 11-team-patentflow-postgres
+    app: team11-patentflow-postgres
 spec:
-  serviceName: 11-team-patentflow-postgres-svc
+  serviceName: team11-patentflow-postgres-svc
   replicas: 1
   selector:
     matchLabels:
-      app: 11-team-patentflow-postgres
+      app: team11-patentflow-postgres
   template:
     metadata:
       labels:
-        app: 11-team-patentflow-postgres
+        app: team11-patentflow-postgres
     spec:
       containers:
         - name: postgres
@@ -25,7 +25,7 @@ spec:
               name: postgres
           envFrom:
             - secretRef:
-                name: 11-team-patentflow-postgres-secret
+                name: team11-patentflow-postgres-secret
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/postgresql/data

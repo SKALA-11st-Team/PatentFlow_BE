@@ -23,7 +23,7 @@ http://localhost:8080/api/v1
 Agent URL is configured with `PATENTFLOW_AGENT_URL`. In Docker Compose it points to:
 
 ```text
-http://11-team-patentflow-agent-svc:8000
+http://team11-patentflow-agent-svc:8000
 ```
 
 JWT authentication is enabled for `/api/**` endpoints. Public endpoints are:
