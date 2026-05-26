@@ -182,6 +182,7 @@ jobs:
         run: |
           kubectl apply -f /tmp/patentflow-k8s/postgres-service.yaml
           kubectl apply -f /tmp/patentflow-k8s/postgres-statefulset.yaml
+          kubectl delete pod --namespace="${KUBE_NAMESPACE}" -l app=team11-patentflow-postgres --ignore-not-found=true
           kubectl rollout status statefulset/team11-patentflow-postgres-statefulset --namespace="${KUBE_NAMESPACE}" --timeout=420s
 
       - name: Diagnose PostgreSQL rollout failure
