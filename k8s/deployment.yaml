@@ -1,35 +1,35 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: patentflow-be
+  name: 11-team-patentflow-be-deployment
   namespace: patentflow
   labels:
-    app: patentflow-be
+    app: 11-team-patentflow-be
 spec:
   replicas: 1
   revisionHistoryLimit: 3
   selector:
     matchLabels:
-      app: patentflow-be
+      app: 11-team-patentflow-be
   template:
     metadata:
       labels:
-        app: patentflow-be
+        app: 11-team-patentflow-be
     spec:
       imagePullSecrets:
         - name: harbor-regcred
       containers:
-        - name: patentflow-be
-          image: harbor.example.com/patentflow/patentflow-be:placeholder
+        - name: 11-team-patentflow-be
+          image: harbor.example.com/patentflow/11-team-patentflow-be:placeholder
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
               name: http
           envFrom:
             - configMapRef:
-                name: patentflow-be-config
+                name: 11-team-patentflow-be-config
             - secretRef:
-                name: patentflow-be-secret
+                name: 11-team-patentflow-be-secret
           readinessProbe:
             httpGet:
               path: /actuator/health

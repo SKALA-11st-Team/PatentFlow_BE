@@ -27,6 +27,31 @@ Review target identification
 → Abandoned patent sales-candidate management
 ```
 
+## Backend Deployment Profile
+
+- For the current EKS demonstration environment, keep `SPRING_PROFILES_ACTIVE=demo`.
+- In this project, the `demo` profile is not disposable fake data. It loads presentation-ready workflow state around the real SK AX patent metadata used by the team.
+- The seeded patent metadata comes from managed project sources such as `docs/skax_patents_list.md` and `src/main/resources/db/seed/skax_patents.sql`.
+- Do not change the EKS deployment profile from `demo` to `prod` unless the team explicitly decides to stop loading the demonstration workflow seed data.
+- With `demo`, `LocalDemoSeedRunner` runs and `BootstrapAdminInitializer` does not run. Therefore bootstrap admin environment variables are not the source of the initial admin account in the demo deployment.
+
+## Kubernetes Naming Rules
+
+- Team 11 Kubernetes resources must use the `11-team-patentflow-` prefix.
+- Use kind-specific suffixes for primary workload exposure resources:
+  - Backend Deployment: `11-team-patentflow-be-deployment`
+  - Backend Service: `11-team-patentflow-be-svc`
+  - Backend Ingress: `11-team-patentflow-be-ingress`
+  - Backend ConfigMap: `11-team-patentflow-be-config`
+  - Backend Secret: `11-team-patentflow-be-secret`
+  - PostgreSQL StatefulSet: `11-team-patentflow-postgres-statefulset`
+  - PostgreSQL Service: `11-team-patentflow-postgres-svc`
+  - PostgreSQL Secret: `11-team-patentflow-postgres-secret`
+  - Agent Service: `11-team-patentflow-agent-svc`
+- Keep label selectors app-oriented rather than kind-oriented. For example, backend Pods and Services should share `app: 11-team-patentflow-be`.
+- Service-to-service URLs in EKS and Docker Compose must use the shared service-style names, such as `http://11-team-patentflow-agent-svc:8000` and `jdbc:postgresql://11-team-patentflow-postgres-svc:5432/patentflow?currentSchema=patentflow`.
+- Do not use legacy Docker Compose service names such as `patentflow-agent` for deployment configuration.
+
 ## Shared Domain Rules
 
 - AI output is an evaluation report or recommendation, not the final recorded decision.

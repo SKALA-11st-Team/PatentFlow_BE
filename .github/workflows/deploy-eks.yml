@@ -7,14 +7,14 @@ on:
   workflow_dispatch:
 
 env:
-  IMAGE_NAME: patentflow-be
+  IMAGE_NAME: 11-team-patentflow-be
   KUBE_NAMESPACE: ${{ vars.KUBE_NAMESPACE || 'patentflow' }}
   SPRING_PROFILES_ACTIVE: ${{ vars.SPRING_PROFILES_ACTIVE || 'demo' }}
-  SPRING_DATASOURCE_URL: ${{ vars.SPRING_DATASOURCE_URL || 'jdbc:postgresql://patentflow-postgres:5432/patentflow?currentSchema=patentflow' }}
+  SPRING_DATASOURCE_URL: ${{ vars.SPRING_DATASOURCE_URL || 'jdbc:postgresql://11-team-patentflow-postgres-svc:5432/patentflow?currentSchema=patentflow' }}
   SPRING_DATASOURCE_USERNAME: ${{ vars.SPRING_DATASOURCE_USERNAME || 'patentflow' }}
   PATENTFLOW_DB_SCHEMA: ${{ vars.PATENTFLOW_DB_SCHEMA || 'patentflow' }}
   PATENTFLOW_CORS_ALLOWED_ORIGINS: ${{ vars.PATENTFLOW_CORS_ALLOWED_ORIGINS || 'https://patentflow.live' }}
-  PATENTFLOW_AGENT_URL: ${{ vars.PATENTFLOW_AGENT_URL || 'http://patentflow-agent:8000' }}
+  PATENTFLOW_AGENT_URL: ${{ vars.PATENTFLOW_AGENT_URL || 'http://11-team-patentflow-agent-svc:8000' }}
   PATENTFLOW_AI_REPORT_STORAGE_DIR: /app/storage/ai-reports
   PATENTFLOW_COOKIE_SECURE: "true"
   PATENTFLOW_COOKIE_SAME_SITE: None
@@ -68,7 +68,7 @@ jobs:
           sed -i "s/name: patentflow/name: ${KUBE_NAMESPACE}/g" /tmp/patentflow-k8s/namespace.yaml
           sed -i "s/namespace: patentflow/namespace: ${KUBE_NAMESPACE}/g" /tmp/patentflow-k8s/*.yaml
           sed -i "s|api.patentflow.example.com|${BE_INGRESS_HOST}|g" /tmp/patentflow-k8s/ingress.yaml
-          sed -i "s|harbor.example.com/patentflow/patentflow-be:placeholder|${IMAGE_REF}|g" /tmp/patentflow-k8s/deployment.yaml
+          sed -i "s|harbor.example.com/patentflow/11-team-patentflow-be:placeholder|${IMAGE_REF}|g" /tmp/patentflow-k8s/deployment.yaml
 
       - name: Apply namespace
         run: kubectl apply -f /tmp/patentflow-k8s/namespace.yaml
@@ -84,7 +84,7 @@ jobs:
 
       - name: Apply PostgreSQL secret
         run: |
-          kubectl create secret generic patentflow-postgres-secret \
+          kubectl create secret generic 11-team-patentflow-postgres-secret \
             --namespace="${KUBE_NAMESPACE}" \
             --from-literal=POSTGRES_DB="patentflow" \
             --from-literal=POSTGRES_USER="${SPRING_DATASOURCE_USERNAME}" \
@@ -95,11 +95,11 @@ jobs:
         run: |
           kubectl apply -f /tmp/patentflow-k8s/postgres-service.yaml
           kubectl apply -f /tmp/patentflow-k8s/postgres-statefulset.yaml
-          kubectl rollout status statefulset/patentflow-postgres --namespace="${KUBE_NAMESPACE}" --timeout=180s
+          kubectl rollout status statefulset/11-team-patentflow-postgres-statefulset --namespace="${KUBE_NAMESPACE}" --timeout=180s
 
       - name: Apply app secret
         run: |
-          kubectl create secret generic patentflow-be-secret \
+          kubectl create secret generic 11-team-patentflow-be-secret \
             --namespace="${KUBE_NAMESPACE}" \
             --from-literal=SPRING_DATASOURCE_PASSWORD="${{ secrets.SPRING_DATASOURCE_PASSWORD }}" \
             --from-literal=PATENTFLOW_JWT_SECRET="${{ secrets.PATENTFLOW_JWT_SECRET }}" \
@@ -113,7 +113,7 @@ jobs:
 
       - name: Apply app config
         run: |
-          kubectl create configmap patentflow-be-config \
+          kubectl create configmap 11-team-patentflow-be-config \
             --namespace="${KUBE_NAMESPACE}" \
             --from-literal=SPRING_PROFILES_ACTIVE="${SPRING_PROFILES_ACTIVE}" \
             --from-literal=SPRING_DATASOURCE_URL="${SPRING_DATASOURCE_URL}" \
@@ -133,4 +133,4 @@ jobs:
           kubectl apply -f /tmp/patentflow-k8s/ingress.yaml
 
       - name: Rollout status
-        run: kubectl rollout status deployment/patentflow-be --namespace="${KUBE_NAMESPACE}" --timeout=180s
+        run: kubectl rollout status deployment/11-team-patentflow-be-deployment --namespace="${KUBE_NAMESPACE}" --timeout=180s
