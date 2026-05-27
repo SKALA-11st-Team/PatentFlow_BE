@@ -4,8 +4,10 @@ import com.syuuk.patentflow.patent.config.PatentLookupProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
+@EnableScheduling // QuarterActivationScheduler의 @Scheduled 크론이 동작하려면 반드시 필요
 @EnableConfigurationProperties(PatentLookupProperties.class)
 public class PatentFlowApplication {
 

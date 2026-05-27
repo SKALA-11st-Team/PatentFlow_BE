@@ -37,6 +37,10 @@ ON CONFLICT (setting_key) DO UPDATE SET
     setting_value = EXCLUDED.setting_value,
     updated_at = EXCLUDED.updated_at;
 
+
+-- Q1은 납부 기간(3월)이 지났으므로 ended=true, Q2는 현재 진행 중, Q3/Q4는 아직 미활성화.
+-- submission_deadline = 활성화일(검토 시작일) + 회신기한(기본 1개월): Q1=2026-02-01, Q2=2026-05-01
+-- mail_lead_months_snapshot = 활성화 시점의 메일 발송 기준 개월 수 스냅샷 (기본 2)
 INSERT INTO quarter_settings (
     quarter_key,
     setting_year,
@@ -47,12 +51,13 @@ INSERT INTO quarter_settings (
     activated_at,
     ended,
     ended_at,
-    submission_deadline
+    submission_deadline,
+    mail_lead_months_snapshot
 ) VALUES
-    ('2026-Q1', 2026, 1, DATE '2026-01-01', DATE '2026-03-31', false, NULL, true, TIMESTAMP WITH TIME ZONE '2026-03-31 18:00:00+09', DATE '2026-03-20'),
-    ('2026-Q2', 2026, 2, DATE '2026-04-01', DATE '2026-06-30', true, TIMESTAMP WITH TIME ZONE '2026-04-01 09:00:00+09', false, NULL, DATE '2026-06-15'),
-    ('2026-Q3', 2026, 3, DATE '2026-07-01', DATE '2026-09-30', false, NULL, false, NULL, DATE '2026-09-15'),
-    ('2026-Q4', 2026, 4, DATE '2026-10-01', DATE '2026-12-31', false, NULL, false, NULL, DATE '2026-12-15')
+    ('2026-Q1', 2026, 1, DATE '2026-01-01', DATE '2026-03-31', true, TIMESTAMP WITH TIME ZONE '2026-01-01 09:00:00+09', true, TIMESTAMP WITH TIME ZONE '2026-03-31 18:00:00+09', DATE '2026-02-01', 2),
+    ('2026-Q2', 2026, 2, DATE '2026-04-01', DATE '2026-06-30', true, TIMESTAMP WITH TIME ZONE '2026-04-01 09:00:00+09', false, NULL, DATE '2026-05-01', 2),
+    ('2026-Q3', 2026, 3, DATE '2026-07-01', DATE '2026-09-30', false, NULL, false, NULL, NULL, NULL),
+    ('2026-Q4', 2026, 4, DATE '2026-10-01', DATE '2026-12-31', false, NULL, false, NULL, NULL, NULL)
 ON CONFLICT (quarter_key) DO UPDATE SET
     setting_year = EXCLUDED.setting_year,
     quarter_number = EXCLUDED.quarter_number,
@@ -62,7 +67,8 @@ ON CONFLICT (quarter_key) DO UPDATE SET
     activated_at = EXCLUDED.activated_at,
     ended = EXCLUDED.ended,
     ended_at = EXCLUDED.ended_at,
-    submission_deadline = EXCLUDED.submission_deadline;
+    submission_deadline = EXCLUDED.submission_deadline,
+    mail_lead_months_snapshot = EXCLUDED.mail_lead_months_snapshot;
 
 INSERT INTO patent_review_history (
     id,

@@ -129,8 +129,9 @@ public class BusinessFixtureService {
     @Transactional
     public BusinessSubmissionVersionResponse submit(String patentId, BusinessChecklistSubmissionRequest request) {
         patentReviewService.ensurePatentExists(patentId);
+        // ended 분기도 허용 — 종료된 분기에 속한 특허 중 아직 처리 안 된 것이 있을 수 있다.
         String quarterKey = quarterSettingRepository.findAll().stream()
-                .filter(q -> q.isActivated() && !q.isEnded())
+                .filter(q -> q.isActivated())
                 .findFirst()
                 .map(q -> q.getQuarterKey())
                 .orElse(null);

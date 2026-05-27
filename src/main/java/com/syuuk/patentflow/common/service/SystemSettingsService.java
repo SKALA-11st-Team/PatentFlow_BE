@@ -19,6 +19,9 @@ public class SystemSettingsService {
     static final String KEY_GMAIL_USERNAME = "mail.gmail.username";
     static final String KEY_GMAIL_APP_PASSWORD = "mail.gmail.app_password";
     static final String KEY_MAIL_LEAD_MONTHS = "review.mail.lead_months";
+    // 회신 기한 = 검토 시작일(활성화일) + N개월 + M일. 개월과 일을 분리 저장해 세밀한 설정 허용
+    static final String KEY_RESPONSE_DEADLINE_MONTHS = "review.response.deadline.months";
+    static final String KEY_RESPONSE_DEADLINE_DAYS = "review.response.deadline.days";
     private static final String KEY_COUNTRY_EXT_PREFIX = "country.extension.";
     private static final String KEY_CLASSIFICATION_PREFIX = "classification.";
 
@@ -32,6 +35,8 @@ public class SystemSettingsService {
     );
     private static final int DEFAULT_EXTENSION_MONTHS = 12;
     private static final int DEFAULT_MAIL_LEAD_MONTHS = 2;
+    private static final int DEFAULT_RESPONSE_DEADLINE_MONTHS = 1;
+    private static final int DEFAULT_RESPONSE_DEADLINE_DAYS = 0;
     private static final List<String> DEFAULT_BUSINESS_CLASSIFICATIONS = List.of(
             "AI", "Data", "Blockchain", "Cloud", "ESG", "제조", "통신", "금융/전략", "통합서비스", "기존 사업");
     private static final List<String> DEFAULT_TECHNOLOGY_CLASSIFICATIONS = List.of(
@@ -98,6 +103,42 @@ public class SystemSettingsService {
         }
         set(KEY_MAIL_LEAD_MONTHS, String.valueOf(mailLeadMonths));
         return mailLeadMonths;
+    }
+
+    public int getResponseDeadlineMonths() {
+        String value = get(KEY_RESPONSE_DEADLINE_MONTHS);
+        if (value != null) {
+            try {
+                int parsed = Integer.parseInt(value);
+                if (parsed >= 0) return parsed;
+            } catch (NumberFormatException ignored) {}
+        }
+        return DEFAULT_RESPONSE_DEADLINE_MONTHS;
+    }
+
+    public int getResponseDeadlineDays() {
+        String value = get(KEY_RESPONSE_DEADLINE_DAYS);
+        if (value != null) {
+            try {
+                int parsed = Integer.parseInt(value);
+                if (parsed >= 0) return parsed;
+            } catch (NumberFormatException ignored) {}
+        }
+        return DEFAULT_RESPONSE_DEADLINE_DAYS;
+    }
+
+    public void updateResponseDeadline(int months, int days) {
+        if (months < 0 || days < 0) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "개월과 일은 0 이상이어야 합니다.");
+        }
+        if (months == 0 && days == 0) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "회신 기한은 1일 이상이어야 합니다.");
+        }
+        if (months > 12) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "회신 기한은 12개월 이하로 설정해야 합니다.");
+        }
+        set(KEY_RESPONSE_DEADLINE_MONTHS, String.valueOf(months));
+        set(KEY_RESPONSE_DEADLINE_DAYS, String.valueOf(days));
     }
 
     public List<CountryExtensionResponse> getCountryExtensions() {
