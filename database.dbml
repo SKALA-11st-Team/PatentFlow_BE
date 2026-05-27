@@ -1,4 +1,4 @@
-// PatentFlow Database Schema — 2026-05-19
+// PatentFlow Database Schema — 2026-05-27
 //
 // Architecture
 //   FE(:5173) -> BE(:8080) -> PostgreSQL(:5432)   patent lifecycle, JPA
@@ -6,9 +6,9 @@
 //   FE(:5173) -> BE(:8080) -> FastAPI(:8000) -> PostgreSQL(:5432)  AI RAG
 //
 // Tables managed by Spring Boot JPA (ddl-auto: update):
-//   patents, patent_review_history, quarter_settings,
+//   patents, patent_review_history, quarter_settings, review_period_templates,
 //   business_submissions, mailing_history, departments,
-//   users
+//   users, auth_sessions, annual_fee_adjustments, system_settings
 //
 // Table managed by FastAPI psycopg3 (manual DDL):
 //   industry_report_chunks  (pgvector extension required)
@@ -31,20 +31,32 @@ Table patents {
   registration_number varchar(64)
   expected_expiration_date date [note: "법정 만료일 (연장 불가)"]
   fee_due_date date [note: "연차료 납부 기한 (납부 완료 시 갱신). 분기 간 지속되는 최신값; patent_review_history.annual_fee_due_date는 분기별 스냅샷"]
-  department_id varchar(64) [note: "현재 담당 사업부 — FK to departments.department_id. 메일 발송 또는 분기 배정 시 설정"]
+  created_at timestamp [not null, note: "JPA @CreatedDate — 레코드 최초 저장 시각"]
+  updated_at timestamp [not null, note: "JPA @LastModifiedDate — 마지막 수정 시각"]
 }
 
 Table quarter_settings {
   quarter_key varchar(12) [pk, note: "e.g. 2026-Q2"]
   year int [not null]
   quarter_number int [not null, note: "1~4"]
-  start_date date [note: "납부 기간 시작일 (관리자 설정)"]
-  end_date date [note: "납부 기간 종료일 (관리자 설정)"]
-  submission_deadline date [note: "사업부 의견 제출 마감일 (관리자 설정)"]
-  activated boolean [not null, note: "분기 시작 여부"]
+  start_date date [note: "납부 기간 시작일 (관리자 설정 또는 review_period_templates에서 계산)"]
+  end_date date [note: "납부 기간 종료일 (관리자 설정 또는 review_period_templates에서 계산)"]
+  submission_deadline date [note: "사업부 회신 기한 — 활성화일 + responseDeadlineMonths + responseDeadlineDays 로 자동 계산"]
+  activated boolean [not null, note: "분기 시작 여부 — QuarterActivationScheduler가 자동 처리, 수동 활성화도 가능"]
   activated_at timestamptz [note: "분기 활성화 시각"]
-  ended boolean [not null, default: false, note: "분기 종료 여부"]
+  ended boolean [not null, default: false, note: "납부 기간 종료 여부 — endDate 경과 후 스케줄러가 자동 처리"]
   ended_at timestamptz [note: "분기 종료 시각"]
+  mail_lead_months_snapshot int [note: "활성화 시점의 mail.lead_months 스냅샷 — 이후 설정 변경 시에도 이력 고정. null이면 미활성"]
+}
+
+Table review_period_templates {
+  period_number int [pk, note: "1-based 분기 번호 (1~4)"]
+  start_month int [not null, note: "납부 기간 시작 월 (1~12)"]
+  start_day int [not null, note: "납부 기간 시작 일 (1~31)"]
+  end_month int [not null, note: "납부 기간 종료 월 (1~12)"]
+  end_day int [not null, note: "납부 기간 종료 일 (1~31)"]
+
+  note: "연도 무관 분기 경계(월/일) 템플릿. 앱 최초 기동 시 Q1~Q4 기본값 자동 시드. 이 테이블 덕분에 연도별 quarter_settings를 미리 시드할 필요 없이 임의 연도 분기를 동적으로 생성할 수 있다."
 }
 
 Table patent_review_history {
@@ -59,6 +71,8 @@ Table patent_review_history {
   ai_total_score int
   ai_scores_json text [note: "JSON: [{category, score, evidence}]"]
   ai_missing_information_json text [note: "JSON: [missing information string]"]
+  ai_report_markdown text [note: "AI 레포트 전체 마크다운 본문 — MinIO 저장 전 DB 캐시용"]
+  ai_report_markdown_path varchar(1000) [note: "MinIO 오브젝트 경로 — 본문 대신 파일 참조 시 사용"]
   summary_text varchar(2000)
   summary_problem_solved varchar(2000)
   summary_core_technical_points_json text [note: "JSON: [core technical point string]"]
@@ -74,7 +88,8 @@ Table patent_review_history {
   annual_fee_due_date date [note: "분기별 납부 기한 스냅샷; 납부 완료 시 연장된 값으로 갱신. 최신값은 patents.fee_due_date 참조"]
   department_id varchar(64) [note: "담당 사업부 — FK to departments.department_id; 메일 발송 또는 분기 검토 시 설정. null/blank이면 FE에서 '-' 표시"]
   department_name varchar(128) [note: "담당 사업부명 스냅샷 (departments.department_name 복사본)"]
-  created_at timestamp [note: "분기 활성화 시 생성"]
+  created_at timestamp [not null, note: "JPA @CreatedDate — 분기 활성화 시 레코드 생성"]
+  updated_at timestamp [not null, note: "JPA @LastModifiedDate — 마지막 수정 시각"]
 
   indexes {
     (patent_id, quarter_key) [unique]
@@ -116,6 +131,9 @@ Table mailing_history {
 Table departments {
   department_id varchar(64) [pk, note: "사업부 마스터. BE 기동 시 테이블이 비어있으면 기본 6개 사업부 자동 시드"]
   department_name varchar(128)
+  manager_email varchar(256) [note: "메일 발송 대상 담당자 이메일"]
+  manager_name varchar(128) [note: "담당자 이름"]
+  cc_emails_json text [note: "JSON: [email string] — 참조 수신자 목록"]
   updated_at date [note: "부서 생성/수정 일자"]
 }
 
@@ -127,6 +145,27 @@ Table users {
   department_id varchar(64) [note: "Null for ADMIN; DEPT-* for BUSINESS — FK to departments.department_id"]
   display_name varchar(128)
   created_at timestamp
+}
+
+Table auth_sessions {
+  session_id varchar(64) [pk]
+  user_id varchar(64) [not null, note: "FK to users.id"]
+  username varchar(256) [not null, note: "로그인 시점의 이메일 — users.username 스냅샷"]
+  refresh_token_hash varchar(128) [not null, unique, note: "Refresh token SHA-256 해시. 평문은 저장하지 않음"]
+  created_at timestamptz [not null]
+  expires_at timestamptz [not null, note: "만료 시각; 이 시각 이후 토큰 갱신 불가"]
+  last_used_at timestamptz [note: "마지막 토큰 갱신 시각"]
+  revoked_at timestamptz [note: "로그아웃 또는 강제 폐기 시각; null이면 유효 세션"]
+}
+
+Table annual_fee_adjustments {
+  adjustment_id varchar(64) [pk, note: "ADJ-{UUID}"]
+  patent_id varchar(32) [not null, note: "FK to patents.patent_id"]
+  previous_due_date date [note: "조정 전 납부 기한"]
+  adjusted_due_date date [not null, note: "조정 후 납부 기한"]
+  reason varchar(1000) [note: "조정 사유"]
+  adjusted_by varchar(128) [note: "조정한 사용자 (관리자 이름)"]
+  adjusted_at timestamptz [note: "조정 시각"]
 }
 
 Table industry_report_chunks {
@@ -145,27 +184,31 @@ Table industry_report_chunks {
 }
 
 Table system_settings {
-  key varchar(128) [pk, note: "Dot-separated key e.g. mail.gmail.username | country.extension.KR"]
-  value text [note: "String value; numeric values stored as string"]
+  setting_key varchar(128) [pk, note: "Dot-separated key e.g. mail.gmail.username | country.extension.KR"]
+  setting_value text [note: "String value; numeric values stored as string"]
   updated_at timestamptz [note: "Last update timestamp"]
 
   note: '''
   Key patterns in use:
-    mail.gmail.username       — Gmail sender address for review-request mailings
-    mail.gmail.app_password   — Gmail app password (stored in plaintext; production should use a secret manager)
-    country.extension.KR      — 납부일 연장 개월 수 (한국), default 12
-    country.extension.JP      — 납부일 연장 개월 수 (일본), default 12
-    country.extension.CN      — 납부일 연장 개월 수 (중국), default 12
-    country.extension.US      — 납부일 연장 개월 수 (미국), default 12
-    country.extension.TW      — 납부일 연장 개월 수 (대만), default 12
+    mail.gmail.username                — Gmail sender address for review-request mailings
+    mail.gmail.app_password            — Gmail app password (stored in plaintext; production should use a secret manager)
+    review.mail.lead_months            — 분기 시작 N개월 전에 자동 활성화(메일 발송) 트리거, default 2
+    review.response.deadline.months    — 회신 기한 계산용 개월 수 (활성화일 + N개월 + M일), default 1
+    review.response.deadline.days      — 회신 기한 계산용 일 수, default 0
+    country.extension.KR               — 납부일 연장 개월 수 (한국), default 12
+    country.extension.JP               — 납부일 연장 개월 수 (일본), default 12
+    country.extension.CN               — 납부일 연장 개월 수 (중국), default 12
+    country.extension.US               — 납부일 연장 개월 수 (미국), default 12
+    country.extension.TW               — 납부일 연장 개월 수 (대만), default 12
   '''
 }
 
 Ref: patent_review_history.patent_id > patents.patent_id
 Ref: patent_review_history.quarter_key > quarter_settings.quarter_key
 Ref: patent_review_history.department_id > departments.department_id
-Ref: patents.department_id > departments.department_id
 Ref: users.department_id > departments.department_id
 Ref: business_submissions.patent_id > patents.patent_id
 Ref: business_submissions.quarter_key > quarter_settings.quarter_key
 Ref: mailing_history.department_id > departments.department_id
+Ref: auth_sessions.user_id > users.id
+Ref: annual_fee_adjustments.patent_id > patents.patent_id
