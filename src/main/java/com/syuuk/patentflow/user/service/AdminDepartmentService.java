@@ -31,6 +31,7 @@ public class AdminDepartmentService {
     }
 
     public List<DepartmentRecipientMappingResponse> getDepartments() {
+        // 부서 목록 조회 — 수신자(email·name) 정보는 MailingService.getRecipientMappings에서 users 테이블과 합산
         return mailingRecipientMappingRepository.findAll(Sort.by("departmentId")).stream()
                 .map(e -> new DepartmentRecipientMappingResponse(
                         e.getDepartmentId(),
@@ -73,9 +74,7 @@ public class AdminDepartmentService {
         return new DepartmentRecipientMappingResponse(
                 entity.getDepartmentId(),
                 entity.getDepartmentName(),
-                entity.getManagerEmail() != null ? entity.getManagerEmail() : "",
-                entity.getManagerName() != null ? entity.getManagerName() : "",
-                List.of(),
+                "", "", List.of(),
                 updatedAt.toString());
     }
 

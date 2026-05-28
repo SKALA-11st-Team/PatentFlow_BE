@@ -20,14 +20,15 @@ import com.syuuk.patentflow.patent.service.PatentReviewService;
 import com.syuuk.patentflow.user.domain.UserEntity;
 import com.syuuk.patentflow.user.repository.UserRepository;
 import jakarta.mail.MessagingException;
+import jakarta.mail.Session;
+import jakarta.mail.Transport;
+import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Properties;
-import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -57,6 +58,7 @@ public class MailingService {
     private final UserRepository userRepository;
     private final SystemSettingsService systemSettingsService;
     private final DepartmentRepository departmentRepository;
+    private final MailOAuth2Service mailOAuth2Service;
 
     public MailingService(
             MailingHistoryRepository mailingHistoryRepository,
@@ -64,7 +66,8 @@ public class MailingService {
             ObjectMapper objectMapper,
             UserRepository userRepository,
             SystemSettingsService systemSettingsService,
-            DepartmentRepository departmentRepository
+            DepartmentRepository departmentRepository,
+            MailOAuth2Service mailOAuth2Service
     ) {
         this.mailingHistoryRepository = mailingHistoryRepository;
         this.patentReviewService = patentReviewService;
@@ -72,35 +75,31 @@ public class MailingService {
         this.userRepository = userRepository;
         this.systemSettingsService = systemSettingsService;
         this.departmentRepository = departmentRepository;
+        this.mailOAuth2Service = mailOAuth2Service;
     }
 
     public List<DepartmentRecipientMappingResponse> getRecipientMappings(String departmentId) {
-        List<DepartmentRecipientMappingResponse> userMappings = userRepository.findAll(Sort.by("departmentId", "createdAt")).stream()
-                .filter(u -> "BUSINESS".equals(u.getRole()) && u.getDepartmentId() != null)
-                .filter(u -> departmentId == null || departmentId.isBlank()
-                        || departmentId.equals(u.getDepartmentId()))
-                .collect(Collectors.groupingBy(UserEntity::getDepartmentId,
-                        LinkedHashMap::new, Collectors.toList()))
-                .entrySet().stream()
-                .map(entry -> {
-                    List<UserEntity> users = entry.getValue();
-                    UserEntity primary = users.get(0);
-                    List<String> ccEmails = users.stream().skip(1)
-                            .map(UserEntity::getUsername).toList();
-                    DepartmentEntity department = departmentRepository.findById(entry.getKey()).orElse(null);
-                    return toMappingResponse(department, primary, ccEmails);
-                })
-                .toList();
-        if (!userMappings.isEmpty()) {
-            return userMappings;
-        }
+        // users.department_id 기준으로 사업부별 수신자를 도출한다.
+        // 같은 부서의 첫 번째 BUSINESS 계정(createdAt 오름차순) = 주 수신자, 나머지 = CC
         return departmentRepository.findAll(Sort.by("departmentId")).stream()
-                .filter(department -> departmentId == null || departmentId.isBlank()
-                        || departmentId.equals(department.getDepartmentId()))
-                .map(department -> toMappingResponse(department, null, List.of()))
+                .filter(dept -> departmentId == null || departmentId.isBlank()
+                        || departmentId.equals(dept.getDepartmentId()))
+                .map(dept -> {
+                    List<UserEntity> members = userRepository
+                            .findAll(Sort.by("createdAt"))
+                            .stream()
+                            .filter(u -> "BUSINESS".equals(u.getRole())
+                                    && dept.getDepartmentId().equals(u.getDepartmentId()))
+                            .toList();
+                    UserEntity primary = members.isEmpty() ? null : members.get(0);
+                    List<String> ccEmails = members.stream().skip(1)
+                            .map(UserEntity::getEmail).toList();
+                    return toMappingResponse(dept, primary, ccEmails);
+                })
                 .toList();
     }
 
+    // 부서명만 변경 가능 — 수신자 이메일은 users 테이블에서 파생되므로 여기서 관리하지 않는다.
     public DepartmentRecipientMappingResponse updateRecipientMapping(
             String departmentId,
             DepartmentRecipientMappingRequest request
@@ -108,30 +107,39 @@ public class MailingService {
         DepartmentEntity department = departmentRepository.findById(departmentId)
                 .orElseThrow(() -> new PatentFlowException(ErrorCode.INVALID_REQUEST,
                         "사업부를 찾을 수 없습니다: " + departmentId));
-        List<String> ccEmails = normalizedEmails(request.ccEmails());
-        String departmentName = textOrFallback(request.departmentName(), department.getDepartmentName());
-        String managerEmail = textOrFallback(request.managerEmail(), department.getManagerEmail());
-        String managerName = textOrFallback(request.managerName(), department.getManagerName());
-        department.updateRecipientMapping(
-                departmentName,
-                managerEmail,
-                managerName,
-                writeJson(ccEmails),
-                LocalDate.now(KST));
-        departmentRepository.save(department);
-        return toMappingResponse(department, null, ccEmails);
+        if (request.departmentName() != null && !request.departmentName().isBlank()) {
+            department.rename(request.departmentName(), LocalDate.now(KST));
+            departmentRepository.save(department);
+        }
+        return getRecipientMappings(departmentId).get(0);
     }
 
     public MailingSendResponse send(MailingSendRequest request) {
+        // OAuth2 연동 우선 → 앱 비밀번호(레거시) → 미발송 기록
+        boolean oauth2Connected = mailOAuth2Service.isConnected();
         String username = resolve(systemSettingsService.getGmailUsername(), envGmailUsername);
-        String password = resolve(systemSettingsService.getGmailAppPassword(), envGmailAppPassword);
-        boolean smtpConfigured = username != null && !username.isBlank() && password != null && !password.isBlank();
+        String appPassword = resolve(systemSettingsService.getGmailAppPassword(), envGmailAppPassword);
+        boolean appPasswordConfigured = username != null && !username.isBlank()
+                && appPassword != null && !appPassword.isBlank();
+
         String mailingBatchId = "MAIL-BATCH-" + System.currentTimeMillis();
 
-        if (smtpConfigured) {
+        if (oauth2Connected) {
+            String senderEmail = systemSettingsService.getGmailOAuth2ConnectedEmail();
+            String accessToken = mailOAuth2Service.getValidAccessToken();
             request.drafts().forEach(draft -> {
                 try {
-                    sendEmail(username, password, draft);
+                    sendEmailOAuth2(senderEmail, accessToken, draft);
+                    saveHistory(mailingBatchId, draft, STATUS_SENT);
+                } catch (PatentFlowException exception) {
+                    saveHistory(mailingBatchId, draft, STATUS_FAILED);
+                    throw exception;
+                }
+            });
+        } else if (appPasswordConfigured) {
+            request.drafts().forEach(draft -> {
+                try {
+                    sendEmail(username, appPassword, draft);
                     saveHistory(mailingBatchId, draft, STATUS_SENT);
                 } catch (PatentFlowException exception) {
                     saveHistory(mailingBatchId, draft, STATUS_FAILED);
@@ -139,6 +147,7 @@ public class MailingService {
                 }
             });
         } else {
+            // OAuth2·앱비밀번호 모두 미연동 — 실제 발송 없이 이력만 기록(RECORDED) 해 워크플로우는 유지
             log.info("Gmail credentials are not configured; recording mailing workflow without SMTP delivery.");
             request.drafts().forEach(draft -> saveHistory(mailingBatchId, draft, STATUS_RECORDED));
         }
@@ -156,6 +165,42 @@ public class MailingService {
                 updateResult.updatedPatentIds().size(),
                 updateResult.updatedPatentIds(),
                 updateResult.skippedPatentIds());
+    }
+
+    // OAuth2 XOAUTH2 방식 — access_token을 비밀번호로 사용해 Gmail SMTP 인증
+    private void sendEmailOAuth2(String senderEmail, String accessToken, BusinessReviewMailSendDraft draft) {
+        Properties props = new Properties();
+        props.put("mail.smtp.host", "smtp.gmail.com");
+        props.put("mail.smtp.port", "587");
+        props.put("mail.smtp.auth", "true");
+        props.put("mail.smtp.auth.mechanisms", "XOAUTH2");
+        props.put("mail.smtp.starttls.enable", "true");
+        props.put("mail.smtp.starttls.required", "true");
+
+        try {
+            Session session = Session.getInstance(props);
+            MimeMessage message = new MimeMessage(session);
+            message.setFrom(new InternetAddress(senderEmail));
+            message.setRecipients(MimeMessage.RecipientType.TO,
+                    InternetAddress.parse(draft.recipientEmail()));
+            List<String> ccEmails = normalizedCcEmails(draft);
+            if (!ccEmails.isEmpty()) {
+                message.setRecipients(MimeMessage.RecipientType.CC,
+                        InternetAddress.parse(String.join(",", ccEmails)));
+            }
+            message.setSubject(draft.subject(), "UTF-8");
+            message.setText(draft.body(), "UTF-8");
+            message.saveChanges();
+
+            Transport transport = session.getTransport("smtp");
+            transport.connect("smtp.gmail.com", 587, senderEmail, accessToken);
+            transport.sendMessage(message, message.getAllRecipients());
+            transport.close();
+            log.info("Email sent via OAuth2 to {} (subject={})", draft.recipientEmail(), draft.subject());
+        } catch (Exception e) {
+            log.warn("Failed to send OAuth2 email to {}: {}", draft.recipientEmail(), e.getMessage());
+            throw new PatentFlowException(ErrorCode.MAIL_SEND_FAILED);
+        }
     }
 
     private void sendEmail(String username, String password, BusinessReviewMailSendDraft draft) {
@@ -207,8 +252,10 @@ public class MailingService {
     }
 
     private void saveHistory(String mailingBatchId, BusinessReviewMailSendDraft draft, String status) {
+        // 배치ID + 수신자 해시로 이력 ID 생성 — 같은 배치 내 수신자별 고유성 보장
         String mailingId = mailingBatchId + "-" + Math.abs(draft.recipientEmail().hashCode());
-        String departmentId = userRepository.findByUsername(draft.recipientEmail())
+        // 이력에 부서ID를 남기기 위해 users 테이블에서 수신자 이메일로 역조회
+        String departmentId = userRepository.findByEmail(draft.recipientEmail())
                 .map(u -> u.getDepartmentId())
                 .orElse(null);
         mailingHistoryRepository.save(new MailingHistoryEntity(
@@ -237,50 +284,25 @@ public class MailingService {
                 .toList();
     }
 
-    private List<String> normalizedEmails(List<String> emails) {
-        if (emails == null) {
-            return List.of();
-        }
-        return emails.stream()
-                .filter(email -> email != null && !email.isBlank())
-                .map(String::trim)
-                .distinct()
-                .toList();
-    }
-
+    // 이메일·이름·CC는 모두 users 테이블에서 파생 — departments에 별도 저장하지 않는다.
     private DepartmentRecipientMappingResponse toMappingResponse(
             DepartmentEntity department,
             UserEntity primary,
-            List<String> fallbackCcEmails
+            List<String> ccEmails
     ) {
-        String departmentId = department != null ? department.getDepartmentId() : primary.getDepartmentId();
-        String departmentName = department != null && department.getDepartmentName() != null
-                ? department.getDepartmentName()
-                : primary.getDepartmentName() != null ? primary.getDepartmentName() : departmentId;
-        String managerEmail = department != null && department.getManagerEmail() != null && !department.getManagerEmail().isBlank()
-                ? department.getManagerEmail()
-                : primary != null ? primary.getUsername() : "";
-        String managerName = department != null && department.getManagerName() != null && !department.getManagerName().isBlank()
-                ? department.getManagerName()
-                : primary != null ? primary.getDisplayName() : "";
-        List<String> ccEmails = department != null && department.getCcEmailsJson() != null && !department.getCcEmailsJson().isBlank()
-                ? readStringList(department.getCcEmailsJson())
-                : fallbackCcEmails;
-        String updatedAt = department != null && department.getUpdatedAt() != null
-                ? department.getUpdatedAt().toString()
-                : primary != null && primary.getCreatedAt() != null ? primary.getCreatedAt().toLocalDate().toString() : "";
+        String departmentId = department.getDepartmentId();
+        String departmentName = department.getDepartmentName() != null
+                ? department.getDepartmentName() : departmentId;
+        String managerEmail = primary != null ? primary.getEmail() : "";
+        String managerName = primary != null && primary.getUsername() != null
+                ? primary.getUsername() : "";
+        String updatedAt = department.getUpdatedAt() != null
+                ? department.getUpdatedAt().toString() : "";
 
         return new DepartmentRecipientMappingResponse(
-                departmentId,
-                departmentName,
-                managerEmail,
-                managerName,
-                ccEmails,
-                updatedAt);
-    }
-
-    private String textOrFallback(String value, String fallback) {
-        return value != null && !value.isBlank() ? value.trim() : fallback;
+                departmentId, departmentName,
+                managerEmail, managerName,
+                ccEmails, updatedAt);
     }
 
     private MailingHistoryItemResponse toHistoryResponse(MailingHistoryEntity entity) {
