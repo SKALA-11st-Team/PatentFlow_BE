@@ -1,4 +1,4 @@
-// PatentFlow Database Schema — 2026-05-27
+// PatentFlow Database Schema — 2026-05-28
 //
 // Architecture
 //   FE(:5173) -> BE(:8080) -> PostgreSQL(:5432)   patent lifecycle, JPA
@@ -131,10 +131,9 @@ Table mailing_history {
 Table departments {
   department_id varchar(64) [pk, note: "사업부 마스터. BE 기동 시 테이블이 비어있으면 기본 6개 사업부 자동 시드"]
   department_name varchar(128)
-  manager_email varchar(256) [note: "메일 발송 대상 담당자 이메일"]
-  manager_name varchar(128) [note: "담당자 이름"]
-  cc_emails_json text [note: "JSON: [email string] — 참조 수신자 목록"]
   updated_at date [note: "부서 생성/수정 일자"]
+
+  note: "수신자 이메일·이름·CC는 users 테이블에서 파생 (users.department_id 기준). departments에 별도 저장하지 않는다."
 }
 
 Table users {
@@ -190,8 +189,10 @@ Table system_settings {
 
   note: '''
   Key patterns in use:
-    mail.gmail.username                — Gmail sender address for review-request mailings
-    mail.gmail.app_password            — Gmail app password (stored in plaintext; production should use a secret manager)
+    mail.gmail.username                — Gmail 발신 계정 (레거시 앱 비밀번호 방식)
+    mail.gmail.app_password            — Gmail 앱 비밀번호 (레거시; production에서는 secret manager 권장)
+    mail.gmail.oauth2.refresh_token    — Gmail OAuth2 refresh token — 만료 없음, 영구 보관
+    mail.gmail.oauth2.connected_email  — OAuth2 연동된 Gmail 주소 (UI 표시용 스냅샷)
     review.mail.lead_months            — 분기 시작 N개월 전에 자동 활성화(메일 발송) 트리거, default 2
     review.response.deadline.months    — 회신 기한 계산용 개월 수 (활성화일 + N개월 + M일), default 1
     review.response.deadline.days      — 회신 기한 계산용 일 수, default 0
