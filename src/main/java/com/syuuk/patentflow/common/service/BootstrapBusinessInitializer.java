@@ -19,7 +19,7 @@ public class BootstrapBusinessInitializer implements ApplicationRunner {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final String username;
+    private final String email;
     private final String password;
     private final String departmentId;
     private final String displayName;
@@ -27,14 +27,14 @@ public class BootstrapBusinessInitializer implements ApplicationRunner {
     public BootstrapBusinessInitializer(
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
-            @Value("${patentflow.bootstrap.business.username:}") String username,
+            @Value("${patentflow.bootstrap.business.email:}") String email,
             @Value("${patentflow.bootstrap.business.password:}") String password,
             @Value("${patentflow.bootstrap.business.department-id:DEPT-ICT}") String departmentId,
             @Value("${patentflow.bootstrap.business.display-name:사업부 데모 담당자}") String displayName
     ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
-        this.username = username;
+        this.email = email;
         this.password = password;
         this.departmentId = departmentId;
         this.displayName = displayName;
@@ -42,27 +42,28 @@ public class BootstrapBusinessInitializer implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        if (isBlank(username) || isBlank(password)) {
+        if (isBlank(email) || isBlank(password)) {
             log.info("Bootstrap business user is not configured; skipping initial business user creation.");
             return;
         }
 
-        String normalizedUsername = username.trim();
-        UserEntity user = userRepository.findByUsername(normalizedUsername)
+        String normalizedEmail = email.trim();
+        // upsert 방식 — 재기동 시마다 env에 설정된 비밀번호·부서·이름으로 덮어써 일관성 유지
+        UserEntity user = userRepository.findByEmail(normalizedEmail)
                 .orElseGet(() -> new UserEntity(
                         "USER-business-demo",
-                        normalizedUsername,
+                        normalizedEmail,
                         passwordEncoder.encode(password),
                         "BUSINESS",
                         normalizedDepartmentId(),
-                        normalizedDisplayName(normalizedUsername)));
+                        normalizedDisplayName(normalizedEmail)));
 
         user.setPassword(passwordEncoder.encode(password));
         user.setRole("BUSINESS");
         user.setDepartmentId(normalizedDepartmentId());
-        user.setDisplayName(normalizedDisplayName(normalizedUsername));
+        user.setUsername(normalizedDisplayName(normalizedEmail));
         userRepository.save(user);
-        log.info("Bootstrap business user upserted: {}", normalizedUsername);
+        log.info("Bootstrap business user upserted: {}", normalizedEmail);
     }
 
     private String normalizedDepartmentId() {

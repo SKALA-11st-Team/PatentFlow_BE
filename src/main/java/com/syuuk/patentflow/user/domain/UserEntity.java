@@ -13,7 +13,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 
 @Entity
-@Table(name = "users", uniqueConstraints = @UniqueConstraint(columnNames = {"username"}))
+@Table(name = "users", uniqueConstraints = @UniqueConstraint(columnNames = {"email"}))
 public class UserEntity {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
@@ -22,8 +22,9 @@ public class UserEntity {
     @Column(length = 64)
     private String id;
 
+    // 로그인 ID — 반드시 이메일 형식, UNIQUE
     @Column(nullable = false, length = 256)
-    private String username;
+    private String email;
 
     @Column(nullable = false, length = 256)
     private String password;
@@ -38,28 +39,29 @@ public class UserEntity {
     @JoinColumn(name = "department_id", insertable = false, updatable = false)
     private DepartmentEntity department;
 
-    @Column(name = "display_name", length = 128)
-    private String displayName;
+    // 실제 사람 이름 (예: 이소율)
+    @Column(length = 128)
+    private String username;
 
     @Column(name = "created_at")
     private OffsetDateTime createdAt;
 
     protected UserEntity() {}
 
-    public UserEntity(String id, String username, String password, String role,
-            String departmentId, String displayName) {
+    public UserEntity(String id, String email, String password, String role,
+            String departmentId, String username) {
         this.id = id;
-        this.username = username;
+        this.email = email;
         this.password = password;
         this.role = role;
         this.departmentId = departmentId;
-        this.displayName = displayName;
+        this.username = username;
         this.createdAt = OffsetDateTime.now(KST);
     }
 
     public String getId() { return id; }
-    public String getUsername() { return username; }
-    public void setUsername(String username) { this.username = username; }
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
     public String getPassword() { return password; }
     public void setPassword(String password) { this.password = password; }
     public String getRole() { return role; }
@@ -67,7 +69,7 @@ public class UserEntity {
     public String getDepartmentId() { return departmentId; }
     public void setDepartmentId(String departmentId) { this.departmentId = departmentId; }
     public String getDepartmentName() { return department != null ? department.getDepartmentName() : null; }
-    public String getDisplayName() { return displayName; }
-    public void setDisplayName(String displayName) { this.displayName = displayName; }
+    public String getUsername() { return username; }
+    public void setUsername(String username) { this.username = username; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
 }

@@ -50,6 +50,7 @@ public class JwtTokenProvider {
         return Instant.ofEpochSecond(((Number) claims(token).get("exp")).longValue());
     }
 
+    // sub = email (로그인 ID) — Spring Security의 username 개념과 동일
     public String getUsername(String token) {
         return (String) claims(token).get("sub");
     }
@@ -64,15 +65,13 @@ public class JwtTokenProvider {
 
     public UserPrincipalResponse getUserPrincipal(String token) {
         Map<String, Object> claims = claims(token);
-        String username = stringClaim(claims, "sub", "");
+        String email = stringClaim(claims, "sub", "");
         List<String> roles = getRoles(token);
         return new UserPrincipalResponse(
-                username,
-                stringClaim(claims, "displayName", username),
+                email,
+                stringClaim(claims, "username", email),
                 roles,
-                stringClaim(claims, "userId", username),
-                stringClaim(claims, "name", stringClaim(claims, "displayName", username)),
-                stringClaim(claims, "email", username),
+                stringClaim(claims, "userId", email),
                 stringClaim(claims, "role", roles.stream().anyMatch("ROLE_ADMIN"::equals) ? "ADMIN" : "BUSINESS"),
                 stringClaim(claims, "departmentId", null),
                 stringClaim(claims, "departmentName", null));
@@ -85,6 +84,7 @@ public class JwtTokenProvider {
                 return false;
             }
             String signedContent = parts[0] + "." + parts[1];
+            // MessageDigest.isEqual — 타이밍 어택 방지를 위한 상수 시간 비교
             if (!MessageDigest.isEqual(sign(signedContent).getBytes(StandardCharsets.UTF_8), parts[2].getBytes(StandardCharsets.UTF_8))) {
                 return false;
             }
@@ -99,11 +99,10 @@ public class JwtTokenProvider {
         try {
             String header = encodeJson(Map.of("alg", "HS256", "typ", "JWT"));
             String payload = encodeJson(Map.ofEntries(
-                    Map.entry("sub", principal.username()),
+                    Map.entry("sub", principal.email()),      // sub = 로그인 ID (email)
                     Map.entry("roles", principal.roles()),
                     Map.entry("userId", principal.userId()),
-                    Map.entry("displayName", principal.displayName()),
-                    Map.entry("name", principal.name()),
+                    Map.entry("username", principal.username()), // 실제 이름
                     Map.entry("email", principal.email()),
                     Map.entry("role", principal.role()),
                     Map.entry("departmentId", valueOrEmpty(principal.departmentId())),
@@ -122,17 +121,12 @@ public class JwtTokenProvider {
         if (userDetails instanceof UserDetailsImpl impl) {
             UserEntity user = impl.getUser();
             return new UserPrincipalResponse(
-                    user.getUsername(),
-                    user.getDisplayName(),
-                    roles,
-                    user.getId(),
-                    user.getDisplayName(),
-                    user.getUsername(),
-                    user.getRole(),
-                    user.getDepartmentId(),
-                    user.getDepartmentName());
+                    user.getEmail(), user.getUsername(), roles,
+                    user.getId(), user.getRole(),
+                    user.getDepartmentId(), user.getDepartmentName());
         }
-        return new UserPrincipalResponse(userDetails.getUsername(), userDetails.getUsername(), roles);
+        String email = userDetails.getUsername();
+        return new UserPrincipalResponse(email, email, roles, email, "BUSINESS", null, null);
     }
 
     private String stringClaim(Map<String, Object> claims, String key, String defaultValue) {
