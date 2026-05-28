@@ -11,6 +11,7 @@ import com.syuuk.patentflow.common.error.PatentFlowException;
 import com.syuuk.patentflow.common.repository.SystemSettingsRepository;
 import java.util.List;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -18,6 +19,12 @@ public class SystemSettingsService {
 
     static final String KEY_GMAIL_USERNAME = "mail.gmail.username";
     static final String KEY_GMAIL_APP_PASSWORD = "mail.gmail.app_password";
+    // OAuth2 앱 자격증명 — 관리자 UI에서 입력, env 폴백 지원
+    static final String KEY_GMAIL_OAUTH2_CLIENT_ID = "mail.gmail.oauth2.client_id";
+    static final String KEY_GMAIL_OAUTH2_CLIENT_SECRET = "mail.gmail.oauth2.client_secret";
+    // OAuth2 연동 토큰 — refresh_token은 영구 보관, connected_email은 UI 표시용
+    static final String KEY_GMAIL_OAUTH2_REFRESH_TOKEN = "mail.gmail.oauth2.refresh_token";
+    static final String KEY_GMAIL_OAUTH2_CONNECTED_EMAIL = "mail.gmail.oauth2.connected_email";
     static final String KEY_MAIL_LEAD_MONTHS = "review.mail.lead_months";
     // 회신 기한 = 검토 시작일(활성화일) + N개월 + M일. 개월과 일을 분리 저장해 세밀한 설정 허용
     static final String KEY_RESPONSE_DEADLINE_MONTHS = "review.response.deadline.months";
@@ -44,6 +51,11 @@ public class SystemSettingsService {
             "인증", "보안", "Network", "NFC", "AR", "VR (Avatar)", "사내시스템");
 
     private final SystemSettingsRepository repository;
+    // env 폴백 — DB에 값이 없을 때 환경변수 값을 사용 (Docker 배포 시 편의)
+    @Value("${GOOGLE_OAUTH2_CLIENT_ID:}")
+    private String envGoogleClientId;
+    @Value("${GOOGLE_OAUTH2_CLIENT_SECRET:}")
+    private String envGoogleClientSecret;
 
     public SystemSettingsService(SystemSettingsRepository repository) {
         this.repository = repository;
@@ -71,6 +83,39 @@ public class SystemSettingsService {
         String username = getGmailUsername();
         String password = getGmailAppPassword();
         return new MailSettingsResponse(username, password != null && !password.isBlank());
+    }
+
+    // ── Gmail OAuth2 앱 자격증명 ──────────────────────────────
+    // DB 값 우선, 없으면 env 폴백 — 관리자 UI 입력 또는 Docker env 모두 지원
+
+    public String getGmailOAuth2ClientId() {
+        String dbValue = get(KEY_GMAIL_OAUTH2_CLIENT_ID);
+        return (dbValue != null && !dbValue.isBlank()) ? dbValue : envGoogleClientId;
+    }
+
+    public String getGmailOAuth2ClientSecret() {
+        String dbValue = get(KEY_GMAIL_OAUTH2_CLIENT_SECRET);
+        return (dbValue != null && !dbValue.isBlank()) ? dbValue : envGoogleClientSecret;
+    }
+
+    // ── Gmail OAuth2 연동 토큰 ────────────────────────────────
+
+    public String getGmailOAuth2RefreshToken() {
+        return get(KEY_GMAIL_OAUTH2_REFRESH_TOKEN);
+    }
+
+    public String getGmailOAuth2ConnectedEmail() {
+        return get(KEY_GMAIL_OAUTH2_CONNECTED_EMAIL);
+    }
+
+    public void saveGmailOAuth2(String refreshToken, String email) {
+        set(KEY_GMAIL_OAUTH2_REFRESH_TOKEN, refreshToken);
+        set(KEY_GMAIL_OAUTH2_CONNECTED_EMAIL, email);
+    }
+
+    public void clearGmailOAuth2() {
+        set(KEY_GMAIL_OAUTH2_REFRESH_TOKEN, "");
+        set(KEY_GMAIL_OAUTH2_CONNECTED_EMAIL, "");
     }
 
     public MailSettingsResponse saveMailSettings(MailSettingsRequest request) {
