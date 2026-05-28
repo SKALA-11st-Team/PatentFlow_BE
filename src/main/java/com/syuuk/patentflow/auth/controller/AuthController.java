@@ -1,5 +1,6 @@
 package com.syuuk.patentflow.auth.controller;
 
+import com.syuuk.patentflow.auth.dto.ChangePasswordRequest;
 import com.syuuk.patentflow.auth.dto.LoginRequest;
 import com.syuuk.patentflow.auth.dto.LoginResponse;
 import com.syuuk.patentflow.auth.dto.UpdateProfileRequest;
@@ -72,6 +73,19 @@ public class AuthController {
         return ApiResponse.ok(authService.updateProfile(authentication, request));
     }
 
+    @PatchMapping("/password")
+    public ApiResponse<Void> changePassword(
+            Authentication authentication,
+            @Valid @RequestBody ChangePasswordRequest request,
+            HttpServletRequest httpRequest,
+            HttpServletResponse httpResponse
+    ) {
+        authService.changePassword(authentication, request);
+        // 세션 무효화 후 쿠키도 제거 — FE가 이 응답을 받으면 로그인 페이지로 이동
+        authCookieService.clearAuthCookies(httpResponse);
+        return ApiResponse.ok(null);
+    }
+
     @PostMapping("/logout")
     public ApiResponse<Void> logout(
             Authentication authentication,
@@ -79,6 +93,7 @@ public class AuthController {
             HttpServletRequest request,
             HttpServletResponse response
     ) {
+        // Authorization 헤더 우선, 없으면 쿠키에서 추출 — SPA·앱 클라이언트 모두 지원
         String accessToken = authorization != null ? authorization : authCookieService.getAccessToken(request);
         authService.logout(accessToken, authCookieService.getRefreshToken(request));
         authCookieService.clearAuthCookies(response);
