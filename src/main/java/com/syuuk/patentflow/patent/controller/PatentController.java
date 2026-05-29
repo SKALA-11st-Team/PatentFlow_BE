@@ -90,10 +90,15 @@ public class PatentController {
     @GetMapping("/external-lookup")
     public ApiResponse<PatentBibliographicInfoResponse> lookupBibliographicInfo(
             @RequestParam(required = false) String managementNumber,
+            @RequestParam(required = false) String applicationNumber,
             @RequestParam(required = false) String registrationNumber,
             @RequestParam(required = false) String sourcePriority
     ) {
-        return ApiResponse.ok(patentReviewService.lookupBibliographicInfo(managementNumber, registrationNumber, sourcePriority));
+        return ApiResponse.ok(patentReviewService.lookupBibliographicInfo(
+                managementNumber,
+                applicationNumber,
+                registrationNumber,
+                sourcePriority));
     }
 
     /**

@@ -156,7 +156,7 @@ class PatentControllerTest {
     @Test
     void lookupBibliographicInfoReturnsMetadataFromDocument() throws Exception {
         mockMvc.perform(get("/api/v1/patents/external-lookup")
-                .param("managementNumber", "P202405001-KR0")
+                .param("applicationNumber", "10-2024-0115774")
                 .param("sourcePriority", "KIPRIS,GOOGLE_PATENTS"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.managementNumber").value("P202405001-KR0"))

@@ -56,7 +56,7 @@ type ReviewWorkflowStatus =
 | `/patents/{patentId}` | GET | 특허 상세 조회 | `FR-LEGAL-05`~`FR-LEGAL-11`, `FR-BUS-01` | `UI-LEGAL-04`, `UI-BUS-02` |
 | `/patents` | POST | 특허 기본 정보 등록 | `FR-LEGAL-03` | `UI-LEGAL-02` |
 | `/patents/{patentId}` | PUT | 특허 기본 정보 수정 | `FR-LEGAL-03`, `FR-LEGAL-04` | `UI-LEGAL-03` |
-| `/patents/external-lookup` | GET | 외부/문서 기반 특허 정보 조회 | `FR-LEGAL-03` | `UI-LEGAL-02`, `UI-LEGAL-03` |
+| `/patents/external-lookup` | GET | 출원번호 우선 외부/문서 기반 특허 정보 조회 (`applicationNumber` 권장) | `FR-LEGAL-03` | `UI-LEGAL-02`, `UI-LEGAL-03` |
 | `/patents/context-suggestions` | POST | 사업/기술 분야 추천 | `FR-LEGAL-04` | `UI-LEGAL-03` |
 | `/patents/review-targets` | GET | 분기/날짜 범위/국가 기준 검토 대상 조회 | `FR-LEGAL-22`, `FR-LEGAL-24` | `UI-LEGAL-01`, `UI-COM-02`, `UI-BUS-01` |
 | `/patents/{patentId}/request-ai-report` | POST | AI 평가 레포트 생성, 성공 시 `MAIL_READY` 전환 | `FR-LEGAL-06`, `FR-LEGAL-18` | `UI-LEGAL-04`, `UI-BUS-02` |

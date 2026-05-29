@@ -104,9 +104,10 @@ The same SK AX patent metadata is also available as an idempotent SQL seed in `s
 
 ## External Patent Lookup
 
-`GET /api/v1/patents/external-lookup` tries sources in `sourcePriority` order.
+`GET /api/v1/patents/external-lookup` searches by `applicationNumber` first and tries sources in `sourcePriority` order.
 
 ```text
+applicationNumber=10-2024-0115774
 sourcePriority=KIPRIS,GOOGLE_PATENTS
 ```
 

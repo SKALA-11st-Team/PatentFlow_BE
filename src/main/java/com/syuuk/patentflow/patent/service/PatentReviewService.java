@@ -392,10 +392,11 @@ public class PatentReviewService {
      */
     public PatentBibliographicInfoResponse lookupBibliographicInfo(
             String managementNumber,
+            String applicationNumber,
             String registrationNumber,
             String sourcePriority
     ) {
-        String lookupValue = firstNonBlank(registrationNumber, managementNumber);
+        String lookupValue = firstNonBlank(applicationNumber, firstNonBlank(registrationNumber, managementNumber));
         if (lookupValue == null) {
             return null;
         }
@@ -409,8 +410,8 @@ public class PatentReviewService {
                 .orElse(null);
         PatentLookupQuery query = new PatentLookupQuery(
                 knownPatent == null ? lookupValue.trim() : knownPatent.managementNumber(),
-                knownPatent == null ? lookupValue.trim() : knownPatent.applicationNumber(),
-                knownPatent == null ? lookupValue.trim() : knownPatent.registrationNumber(),
+                knownPatent == null ? firstNonBlank(applicationNumber, lookupValue.trim()) : knownPatent.applicationNumber(),
+                knownPatent == null ? registrationNumber : knownPatent.registrationNumber(),
                 knownPatent == null ? "KR" : knownPatent.country());
 
         for (String source : lookupPriority(sourcePriority)) {
