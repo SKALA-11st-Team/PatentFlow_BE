@@ -6,20 +6,11 @@ import com.syuuk.patentflow.common.error.ErrorCode;
 import com.syuuk.patentflow.common.error.PatentFlowException;
 import com.syuuk.patentflow.common.response.PageInfo;
 import com.syuuk.patentflow.common.response.PageResponse;
-import com.syuuk.patentflow.patent.client.AiReportAgentClient;
-import com.syuuk.patentflow.patent.client.AiReportAgentClient.AgentEvaluateResponse;
-import com.syuuk.patentflow.patent.client.GooglePatentsLookupClient;
-import com.syuuk.patentflow.patent.client.KiprisPatentLookupClient;
-import com.syuuk.patentflow.patent.client.PatentLookupQuery;
 import com.syuuk.patentflow.patent.domain.PatentMetadataEntity;
 import com.syuuk.patentflow.patent.domain.PatentReviewHistoryEntity;
 import com.syuuk.patentflow.patent.dto.AiEvaluationReportResponse;
 import com.syuuk.patentflow.patent.dto.BusinessOpinionDecision;
 import com.syuuk.patentflow.patent.dto.BusinessOpinionResponse;
-import com.syuuk.patentflow.patent.dto.EvaluationCategory;
-import com.syuuk.patentflow.patent.dto.EvaluationScoreResponse;
-import com.syuuk.patentflow.patent.dto.FinalDecisionRequest;
-import com.syuuk.patentflow.patent.dto.PatchFinalDecisionRequest;
 import com.syuuk.patentflow.patent.dto.FinalDecisionResponse;
 import com.syuuk.patentflow.patent.dto.FinalDecisionRecordResponse;
 import com.syuuk.patentflow.patent.dto.LegalActionResult;
@@ -45,16 +36,11 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.HashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.Sort;
 import org.springframework.core.env.Environment;
@@ -65,50 +51,40 @@ public class PatentReviewService {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private static final String PATENT_METADATA_PATH = "docs/skax_patents_list.md";
-    private static final Set<String> CONTEXT_STOP_WORDS = Set.of("관련", "기술", "시스템", "방법", "특허", "장치");
-    private static final Pattern CONTEXT_TOKEN_SPLITTER = Pattern.compile("[^0-9a-z가-힣]+");
 
-    private final KiprisPatentLookupClient kiprisPatentLookupClient;
-    private final GooglePatentsLookupClient googlePatentsLookupClient;
     private final PatentMetadataRepository patentMetadataRepository;
     private final PatentReviewHistoryRepository reviewHistoryRepository;
-    private final AiReportAgentClient aiReportAgentClient;
-    private final AiReportStorageService aiReportStorageService;
     private final AnnualFeeScheduleService annualFeeScheduleService;
     private final DepartmentRepository mailingRecipientMappingRepository;
     private final ObjectMapper objectMapper;
     private final Environment environment;
+    private final PatentWorkflowService workflowService;
+    private final PatentLookupService lookupService;
     private Map<String, String> departmentNameCache;
-
 
     public record WorkflowBatchUpdateResult(
             List<String> updatedPatentIds,
             List<String> skippedPatentIds
-    ) {
-    }
+    ) {}
 
     public PatentReviewService(
-            KiprisPatentLookupClient kiprisPatentLookupClient,
-            GooglePatentsLookupClient googlePatentsLookupClient,
             PatentMetadataRepository patentMetadataRepository,
             PatentReviewHistoryRepository reviewHistoryRepository,
-            AiReportAgentClient aiReportAgentClient,
-            AiReportStorageService aiReportStorageService,
             AnnualFeeScheduleService annualFeeScheduleService,
             DepartmentRepository mailingRecipientMappingRepository,
             ObjectMapper objectMapper,
-            Environment environment
+            Environment environment,
+            PatentWorkflowService workflowService,
+            PatentLookupService lookupService
     ) {
-        this.kiprisPatentLookupClient = kiprisPatentLookupClient;
-        this.googlePatentsLookupClient = googlePatentsLookupClient;
         this.patentMetadataRepository = patentMetadataRepository;
         this.reviewHistoryRepository = reviewHistoryRepository;
-        this.aiReportAgentClient = aiReportAgentClient;
-        this.aiReportStorageService = aiReportStorageService;
         this.annualFeeScheduleService = annualFeeScheduleService;
         this.mailingRecipientMappingRepository = mailingRecipientMappingRepository;
         this.objectMapper = objectMapper;
         this.environment = environment;
+        this.workflowService = workflowService;
+        this.lookupService = lookupService;
         if (!usesSqlSeedRunner()) {
             seedDepartmentsIfNeeded();
         }
@@ -122,7 +98,7 @@ public class PatentReviewService {
             seedPatentMetadataIfNeeded();
             // patent_review_history는 시드하지 않음 — 서버 시작 시 스케줄러가 분기 활성화를 처리
         }
-        }
+    }
 
         /**
         * @relatedFR FR-LEGAL-01, FR-LEGAL-02
@@ -141,7 +117,8 @@ public class PatentReviewService {
 
         List<PatentListItemResponse> filtered = getAllPatents().stream()
                 .filter(item -> departmentId == null || departmentId.isBlank()
-                        || departmentId.equals(item.departmentId()))
+                     
+                || departmentId.equals(item.departmentId()))
                 .filter(item -> reviewWorkflowStatus == null
                         || item.reviewWorkflowStatus() == reviewWorkflowStatus)
                 .filter(item -> matchesKeyword(item, keyword))
@@ -225,7 +202,8 @@ public class PatentReviewService {
                     history.getAnnualFeeDueDate(), null, history.getAiRecommendation(),
                     history.getBusinessOpinionDecision(), history.getLegalActionResult(),
                     null,
-                    history.getReviewWorkflowStatus() != ReviewWorkflowStatus.NOT_IN_REVIEW
+                    history.getReviewWorkflowStatus() != ReviewWorkflowStatus.NOT_IN_REVIEW,
+                    null
             );
         }
         return new PatentListItemResponse(
@@ -292,39 +270,16 @@ public class PatentReviewService {
     }
 
     public PatentDetailResponse generateAiReport(String patentId) {
-        PatentDetailResponse patent = findPatent(patentId);
-        if (patent.reviewWorkflowStatus() != ReviewWorkflowStatus.REVIEW_QUARTER_STARTED) {
-            throw new PatentFlowException(ErrorCode.INVALID_WORKFLOW_STATUS,
-                    "AI 레포트는 검토 시작(REVIEW_QUARTER_STARTED) 상태에서만 생성할 수 있습니다.");
-        }
-        AgentEvaluateResponse agentResponse = aiReportAgentClient.evaluate(patentId);
-        AiEvaluationReportResponse report = mapAgentResponse(agentResponse, patentId);
-        return updatePatent(patentId, p -> withAiReport(p, report, agentResponse.summaryText()));
+        return workflowService.generateAiReport(patentId);
     }
 
-    // 배치 자동 생성 전용 — evaluateForBatch(20분 타임아웃)를 사용해 장시간 실행을 허용
+    // 배치 자동 생성 전용 — PatentWorkflowService.generateAiReportForBatch 참조
     public PatentDetailResponse generateAiReportForBatch(String patentId) {
-        PatentDetailResponse patent = findPatent(patentId);
-        if (patent.reviewWorkflowStatus() != ReviewWorkflowStatus.REVIEW_QUARTER_STARTED) {
-            throw new PatentFlowException(ErrorCode.INVALID_WORKFLOW_STATUS,
-                    "AI 레포트는 검토 시작(REVIEW_QUARTER_STARTED) 상태에서만 생성할 수 있습니다.");
-        }
-        AgentEvaluateResponse agentResponse = aiReportAgentClient.evaluateForBatch(patentId);
-        AiEvaluationReportResponse report = mapAgentResponse(agentResponse, patentId);
-        return updatePatent(patentId, p -> withAiReport(p, report, agentResponse.summaryText()));
+        return workflowService.generateAiReportForBatch(patentId);
     }
 
     public List<String> markMailReady(List<String> patentIds) {
-        List<String> updated = new ArrayList<>();
-        for (String patentId : patentIds) {
-            try {
-                PatentDetailResponse patent = findPatent(patentId);
-                if (patent.reviewWorkflowStatus() == ReviewWorkflowStatus.MAIL_READY) {
-                    updated.add(patentId);
-                }
-            } catch (Exception ignored) {}
-        }
-        return updated;
+        return workflowService.markMailReady(patentIds);
     }
 
     public void recordBusinessOpinion(
@@ -333,7 +288,7 @@ public class PatentReviewService {
             String reason,
             OffsetDateTime submittedAt
     ) {
-        updatePatent(patentId, patent -> withBusinessOpinion(patent, decision, reason, submittedAt));
+        workflowService.recordBusinessOpinion(patentId, decision, reason, submittedAt);
     }
 
     /**
@@ -372,65 +327,13 @@ public class PatentReviewService {
             String registrationNumber,
             String sourcePriority
     ) {
-        String lookupValue = firstNonBlank(registrationNumber, managementNumber);
-        if (lookupValue == null) {
-            return null;
-        }
-
-        String keyword = lookupValue.trim().toLowerCase(Locale.ROOT);
-        PatentDetailResponse knownPatent = loadPatentsFromDatabase().stream()
-                .filter(patent -> lowerEquals(patent.managementNumber(), keyword)
-                        || lowerEquals(patent.applicationNumber(), keyword)
-                        || lowerEquals(patent.registrationNumber(), keyword))
-                .findFirst()
-                .orElse(null);
-        PatentLookupQuery query = new PatentLookupQuery(
-                knownPatent == null ? lookupValue.trim() : knownPatent.managementNumber(),
-                knownPatent == null ? lookupValue.trim() : knownPatent.applicationNumber(),
-                knownPatent == null ? lookupValue.trim() : knownPatent.registrationNumber(),
-                knownPatent == null ? "KR" : knownPatent.country());
-
-        for (String source : lookupPriority(sourcePriority)) {
-            PatentBibliographicInfoResponse externalResult = switch (source) {
-                case "KIPRIS" -> kiprisPatentLookupClient.lookup(query).orElse(null);
-                case "GOOGLE_PATENTS" -> googlePatentsLookupClient.lookup(query).orElse(null);
-                default -> null;
-            };
-            if (externalResult != null) {
-                return mergeBibliographicInfo(externalResult, knownPatent);
-            }
-        }
-
-        return knownPatent == null ? null : toBibliographicInfo(knownPatent);
+        // allPatents를 여기서 로드해 PatentLookupService에 전달 — 순환 의존성 없이 DB 접근 분리
+        return lookupService.lookupBibliographicInfo(
+                managementNumber, registrationNumber, sourcePriority, loadPatentsFromDatabase());
     }
 
-    /**
-     * @relatedFR FR-LEGAL-03, FR-LEGAL-04
-     * @relatedUI UI-LEGAL-02, UI-LEGAL-03
-     * @description 특허명/제품/기술 키워드를 공식 metadata와 비교해 회사 컨텍스트를 추천한다.
-     */
     public PatentContextSuggestionResponse suggestContext(PatentContextSuggestionRequest request) {
-        List<String> sourceTokens = tokenizeContextText(String.join(" ",
-                valueOrDefault(request.title(), ""),
-                valueOrDefault(request.productName(), ""),
-                valueOrDefault(request.technologyArea(), ""),
-                valueOrDefault(request.businessArea(), ""),
-                valueOrDefault(request.applicationNumber(), "")));
-        if (sourceTokens.isEmpty()) {
-            return null;
-        }
-
-        return loadPatentsFromDatabase().stream()
-                .map(patent -> scoredSuggestion(sourceTokens, patent))
-                .max(Comparator.comparingInt(ScoredContextSuggestion::score))
-                .filter(candidate -> candidate.score() > 0)
-                .map(candidate -> new PatentContextSuggestionResponse(
-                        candidate.patent().businessArea(),
-                        confidenceText(candidate.score()),
-                        "%s 특허의 공식 metadata 키워드와 입력값을 비교했습니다."
-                                .formatted(candidate.patent().title()),
-                        candidate.patent().technologyArea()))
-                .orElse(null);
+        return lookupService.suggestContext(request, loadPatentsFromDatabase());
     }
 
     /**
@@ -439,25 +342,7 @@ public class PatentReviewService {
      * @description 실제 발송 연동 전, 사업부 검토 요청 메일 발송 상태를 검토 상태에 반영한다.
      */
     public WorkflowBatchUpdateResult markMailingSent(List<String> patentIds) {
-        List<String> updatedPatentIds = new ArrayList<>();
-        List<String> skippedPatentIds = new ArrayList<>();
-
-        for (String patentId : new LinkedHashSet<>(patentIds)) {
-            PatentDetailResponse patent = findPatentOrNull(patentId);
-            if (patent == null || patent.reviewWorkflowStatus() != ReviewWorkflowStatus.MAIL_READY) {
-                skippedPatentIds.add(patentId);
-                continue;
-            }
-
-            PatentDetailResponse updatedPatent = updatePatent(
-                    patentId,
-                    currentPatent -> withReviewWorkflowStatus(
-                            currentPatent,
-                            ReviewWorkflowStatus.WAITING_BUSINESS_RESPONSE));
-            updatedPatentIds.add(updatedPatent.patentId());
-        }
-
-        return new WorkflowBatchUpdateResult(updatedPatentIds, skippedPatentIds);
+        return workflowService.markMailingSent(patentIds);
     }
 
     /**
@@ -507,58 +392,13 @@ public class PatentReviewService {
     }
 
     public List<String> createQuarterReviewTargets(
-            String quarterKey,
-            LocalDate paymentPeriodStart,
-            LocalDate paymentPeriodEnd
+            String quarterKey, LocalDate paymentPeriodStart, LocalDate paymentPeriodEnd
     ) {
-        List<String> reviewStarted = new ArrayList<>();
-        patentMetadataRepository.findAll(Sort.by("patentId")).forEach(entity -> {
-            if (entity.getPatentStatus() != PatentLifecycleStatus.ACTIVE) {
-                return;
-            }
-            LocalDate dueDate = entity.getFeeDueDate() != null
-                    ? entity.getFeeDueDate()
-                    : annualFeeScheduleService.calculateNextDueDate(
-                            entity.getCountry(),
-                            entity.getApplicationDate(),
-                            entity.getRegistrationDate(),
-                            entity.getExpectedExpirationDate());
-            if (entity.getFeeDueDate() == null && dueDate != null) {
-                entity.setFeeDueDate(dueDate);
-            }
-            if (dueDate == null || dueDate.isBefore(paymentPeriodStart) || dueDate.isAfter(paymentPeriodEnd)) {
-                patentMetadataRepository.save(entity);
-                return;
-            }
-            entity.setInReview(true);
-            entity.setCurrentQuarterKey(quarterKey);
-            patentMetadataRepository.save(entity);
-            PatentReviewHistoryEntity history = reviewHistoryRepository
-                    .findByPatentIdAndQuarterKey(entity.getPatentId(), quarterKey)
-                    .orElseGet(() -> new PatentReviewHistoryEntity(entity.getPatentId(), quarterKey));
-            history.setReviewWorkflowStatus(ReviewWorkflowStatus.REVIEW_QUARTER_STARTED);
-            if (history.getAiRecommendation() == null) {
-                history.setAiRecommendation(Recommendation.HOLD);
-            }
-            history.setAnnualFeeDueDate(dueDate);
-            history.setDepartmentId(departmentId(entity.getBusinessArea()));
-            history.setDepartmentName(departmentName(entity.getBusinessArea()));
-            reviewHistoryRepository.save(history);
-            reviewStarted.add(entity.getPatentId());
-        });
-
-        return reviewStarted;
+        return workflowService.createQuarterReviewTargets(quarterKey, paymentPeriodStart, paymentPeriodEnd);
     }
 
     public void bulkUpdateWorkflowStatus(List<String> patentIds, ReviewWorkflowStatus newStatus, String quarterKey) {
-        if (patentIds == null || patentIds.isEmpty()) return;
-        for (String patentId : patentIds) {
-            PatentReviewHistoryEntity history = reviewHistoryRepository
-                    .findByPatentIdAndQuarterKey(patentId, quarterKey)
-                    .orElseGet(() -> new PatentReviewHistoryEntity(patentId, quarterKey));
-            history.setReviewWorkflowStatus(newStatus);
-            reviewHistoryRepository.save(history);
-        }
+        workflowService.bulkUpdateWorkflowStatus(patentIds, newStatus, quarterKey);
     }
 
     public List<PatentReviewHistoryItemResponse> getReviewHistory(String patentId) {
@@ -570,43 +410,21 @@ public class PatentReviewService {
 
 
     public FinalDecisionResponse patchFinalDecision(String patentId, PatchFinalDecisionRequest request) {
-        OffsetDateTime decidedAt = OffsetDateTime.now(KST);
-        PatentDetailResponse updated = updatePatent(patentId, patent -> {
-            if (request.legalActionResult() == null && request.reason() == null) {
-                return withClearedFinalDecision(patent);
-            }
-            return withPatchedFinalDecision(patent, request, decidedAt);
-        });
-        return new FinalDecisionResponse(
-                updated.patentId(),
-                updated.finalDecisionRecord(),
-                updated.legalActionResult(),
-                updated.reviewWorkflowStatus());
+        return workflowService.patchFinalDecision(patentId, request);
     }
 
     public FinalDecisionResponse recordFinalDecision(String patentId, FinalDecisionRequest request) {
-        OffsetDateTime decidedAt = OffsetDateTime.now(KST);
-        PatentDetailResponse updated = updatePatent(patentId, patent -> {
-            if (!canRecordFinalDecision(patent.reviewWorkflowStatus())) {
-                throw new PatentFlowException(ErrorCode.INVALID_WORKFLOW_STATUS);
-            }
-            return withFinalDecision(patent, request, decidedAt);
-        });
-        return new FinalDecisionResponse(
-                updated.patentId(),
-                updated.finalDecisionRecord(),
-                updated.legalActionResult(),
-                updated.reviewWorkflowStatus());
+        return workflowService.recordFinalDecision(patentId, request);
     }
 
-    private PatentDetailResponse findPatent(String patentId) {
+    PatentDetailResponse findPatent(String patentId) {
         return loadPatentsFromDatabase().stream()
                 .filter(patent -> patent.patentId().equals(patentId))
                 .findFirst()
                 .orElseThrow(() -> new PatentFlowException(ErrorCode.PATENT_NOT_FOUND));
     }
 
-    private PatentDetailResponse findPatentOrNull(String patentId) {
+    PatentDetailResponse findPatentOrNull(String patentId) {
         return loadPatentsFromDatabase().stream()
                 .filter(patent -> patent.patentId().equals(patentId))
                 .findFirst()
@@ -614,144 +432,15 @@ public class PatentReviewService {
     }
 
     private PatentDetailResponse updatePatent(String patentId, PatentUpdater updater) {
+        return updatePatentInternal(patentId, updater::update);
+    }
+
+    // PatentWorkflowService에서 접근 — 같은 패키지 내 공유 메서드
+    PatentDetailResponse updatePatentInternal(String patentId, java.util.function.Function<PatentDetailResponse, PatentDetailResponse> fn) {
         PatentDetailResponse patent = findPatent(patentId);
-        PatentDetailResponse updated = updater.update(patent);
+        PatentDetailResponse updated = fn.apply(patent);
         persistPatentState(updated);
         return updated;
-    }
-
-    private PatentDetailResponse patent(
-            String patentId,
-            String managementNumber,
-            String applicationNumber,
-            String registrationNumber,
-            String title,
-            String draftTitle,
-            String businessArea,
-            String technologyArea,
-            String productName,
-            String departmentId,
-            String departmentName,
-            ReviewWorkflowStatus reviewWorkflowStatus,
-            Recommendation recommendation,
-            BusinessOpinionDecision businessOpinionDecision,
-            LegalActionResult legalActionResult,
-            LocalDate annualFeeDueDate) {
-        return new PatentDetailResponse(
-                patentId,
-                managementNumber,
-                applicationNumber,
-                registrationNumber,
-                title,
-                draftTitle,
-                businessArea,
-                technologyArea,
-                productName,
-                "KR",
-                "없음",
-                LocalDate.of(2021, 5, 6),
-                LocalDate.of(2023, 5, 6),
-                LocalDate.of(2041, 5, 6),
-                departmentId,
-                departmentName,
-                PatentLifecycleStatus.ACTIVE,
-                reviewWorkflowStatus,
-                annualFeeDueDate,
-                "연차료 납부 검토 시점 도래",
-                recommendation,
-                businessOpinionDecision,
-                legalActionResult,
-                summary(),
-                aiEvaluationReport(recommendation),
-                new FinalDecisionRecordResponse(null, null, null),
-                new BusinessOpinionResponse(businessOpinionDecision, null, null),
-                reviewWorkflowStatus != ReviewWorkflowStatus.NOT_IN_REVIEW);
-    }
-
-    private PatentBibliographicInfoResponse toBibliographicInfo(PatentDetailResponse patent) {
-        return new PatentBibliographicInfoResponse(
-                patent.managementNumber(),
-                valueOrDefault(patent.title(), patent.draftTitle()),
-                patent.applicationDate(),
-                patent.coApplicants(),
-                patent.country(),
-                patent.registrationDate(),
-                patent.applicationNumber(),
-                patent.registrationNumber(),
-                patent.expectedExpirationDate(),
-                "KIPRIS");
-    }
-
-    private PatentBibliographicInfoResponse mergeBibliographicInfo(
-            PatentBibliographicInfoResponse externalResult,
-            PatentDetailResponse knownPatent
-    ) {
-        if (knownPatent == null) {
-            return externalResult;
-        }
-
-        return new PatentBibliographicInfoResponse(
-                valueOrDefault(knownPatent.managementNumber(), externalResult.managementNumber()),
-                valueOrDefault(externalResult.title(), knownPatent.title()),
-                valueOrDefault(externalResult.applicationDate(), knownPatent.applicationDate()),
-                valueOrDefault(externalResult.coApplicants(), knownPatent.coApplicants()),
-                valueOrDefault(externalResult.country(), knownPatent.country()),
-                valueOrDefault(externalResult.registrationDate(), knownPatent.registrationDate()),
-                valueOrDefault(externalResult.applicationNumber(), knownPatent.applicationNumber()),
-                valueOrDefault(externalResult.registrationNumber(), knownPatent.registrationNumber()),
-                valueOrDefault(externalResult.expectedExpirationDate(), knownPatent.expectedExpirationDate()),
-                externalResult.source());
-    }
-
-    private List<String> lookupPriority(String sourcePriority) {
-        if (sourcePriority == null || sourcePriority.isBlank()) {
-            return List.of("KIPRIS", "GOOGLE_PATENTS");
-        }
-        return Arrays.stream(sourcePriority.split(","))
-                .map(String::trim)
-                .filter(source -> !source.isBlank())
-                .toList();
-    }
-
-    private ScoredContextSuggestion scoredSuggestion(List<String> sourceTokens, PatentDetailResponse patent) {
-        Set<String> targetTokens = Set.copyOf(tokenizeContextText(String.join(" ",
-                valueOrDefault(patent.title(), ""),
-                valueOrDefault(patent.draftTitle(), ""),
-                valueOrDefault(patent.productName(), ""),
-                valueOrDefault(patent.businessArea(), ""),
-                valueOrDefault(patent.technologyArea(), ""))));
-        int overlapScore = sourceTokens.stream()
-                .mapToInt(token -> targetTokens.contains(token) ? contextTokenWeight(token) : 0)
-                .sum();
-        int categoryScore = sourceTokens.stream()
-                .anyMatch(token -> lowerContains(patent.businessArea(), token)
-                        || lowerContains(patent.technologyArea(), token))
-                ? 3
-                : 0;
-        return new ScoredContextSuggestion(patent, overlapScore + categoryScore);
-    }
-
-    private List<String> tokenizeContextText(String value) {
-        return Arrays.stream(CONTEXT_TOKEN_SPLITTER.split(value.toLowerCase(Locale.ROOT)))
-                .map(String::trim)
-                .filter(token -> token.length() >= 2)
-                .filter(token -> !CONTEXT_STOP_WORDS.contains(token))
-                .distinct()
-                .toList();
-    }
-
-    private int contextTokenWeight(String token) {
-        return token.length() >= 4 ? 2 : 1;
-    }
-
-    private String confidenceText(int score) {
-        if (score >= 6) {
-            return "높음";
-        }
-        if (score >= 3) {
-            return "보통";
-        }
-        return "낮음";
     }
 
     private void seedDepartmentsIfNeeded() {
@@ -1023,346 +712,6 @@ public class PatentReviewService {
                 patent.inReview());
     }
 
-    private PatentDetailResponse withReviewWorkflowStatus(PatentDetailResponse patent, ReviewWorkflowStatus status) {
-        return new PatentDetailResponse(
-                patent.patentId(),
-                patent.managementNumber(),
-                patent.applicationNumber(),
-                patent.registrationNumber(),
-                patent.title(),
-                patent.draftTitle(),
-                patent.businessArea(),
-                patent.technologyArea(),
-                patent.productName(),
-                patent.country(),
-                patent.coApplicants(),
-                patent.applicationDate(),
-                patent.registrationDate(),
-                patent.expectedExpirationDate(),
-                patent.departmentId(),
-                patent.departmentName(),
-                patent.lifecycleStatus(),
-                status,
-                patent.feeDueDate(),
-                patent.reviewReason(),
-                patent.currentRecommendation(),
-                patent.businessOpinionDecision(),
-                patent.legalActionResult(),
-                patent.summary(),
-                patent.aiEvaluationReport(),
-                patent.finalDecisionRecord(),
-                patent.businessOpinion(),
-                status != ReviewWorkflowStatus.NOT_IN_REVIEW);
-    }
-
-    private PatentDetailResponse withStatus(PatentDetailResponse patent, ReviewWorkflowStatus newStatus) {
-        return new PatentDetailResponse(
-                patent.patentId(), patent.managementNumber(), patent.applicationNumber(),
-                patent.registrationNumber(), patent.title(), patent.draftTitle(),
-                patent.businessArea(), patent.technologyArea(), patent.productName(),
-                patent.country(), patent.coApplicants(), patent.applicationDate(),
-                patent.registrationDate(), patent.expectedExpirationDate(),
-                patent.departmentId(), patent.departmentName(), patent.lifecycleStatus(),
-                newStatus, patent.feeDueDate(), patent.reviewReason(),
-                patent.currentRecommendation(), patent.businessOpinionDecision(),
-                patent.legalActionResult(),
-                patent.summary(), patent.aiEvaluationReport(),
-                patent.finalDecisionRecord(), patent.businessOpinion(),
-                newStatus != ReviewWorkflowStatus.NOT_IN_REVIEW);
-    }
-
-    private PatentDetailResponse withAiReport(
-            PatentDetailResponse patent,
-            AiEvaluationReportResponse report,
-            String agentSummary
-    ) {
-        return new PatentDetailResponse(
-                patent.patentId(), patent.managementNumber(), patent.applicationNumber(),
-                patent.registrationNumber(), patent.title(), patent.draftTitle(),
-                patent.businessArea(), patent.technologyArea(), patent.productName(),
-                patent.country(), patent.coApplicants(), patent.applicationDate(),
-                patent.registrationDate(), patent.expectedExpirationDate(),
-                patent.departmentId(), patent.departmentName(), patent.lifecycleStatus(),
-                ReviewWorkflowStatus.MAIL_READY, patent.feeDueDate(),
-                patent.reviewReason(), report.recommendation(),
-                patent.businessOpinionDecision(),
-                patent.legalActionResult(), withAgentSummary(patent.summary(), agentSummary), report,
-                patent.finalDecisionRecord(), patent.businessOpinion(), true);
-    }
-
-    private PatentSummaryResponse withAgentSummary(PatentSummaryResponse summary, String agentSummary) {
-        if (agentSummary == null || agentSummary.isBlank()) {
-            return summary;
-        }
-        return new PatentSummaryResponse(
-                agentSummary,
-                summary.problemSolved(),
-                summary.coreTechnicalPoints(),
-                summary.claimsSummary(),
-                summary.missingFields());
-    }
-
-    private AiEvaluationReportResponse mapAgentResponse(AgentEvaluateResponse agent, String patentId) {
-        String reportId = "REPORT-" + patentId + "-" + System.currentTimeMillis();
-        List<EvaluationScoreResponse> scores = agent.scores() == null ? List.of() :
-                agent.scores().stream()
-                        .map(s -> new EvaluationScoreResponse(toCategory(s.category()), s.score(), s.evidence()))
-                        .toList();
-        // agent가 직접 계산한 totalScore를 우선 사용하고, 없으면 scores 합계로 보완
-        Integer totalScore = agent.totalScore() != null
-                ? agent.totalScore()
-                : scores.stream().filter(s -> s.score() != null).mapToInt(EvaluationScoreResponse::score).sum();
-        String summary = agent.summaryText();
-        String rawMarkdown = normalizeMarkdown(agent.reportMarkdown(), summary, scores, agent.recommendation());
-        String markdownFilePath = aiReportStorageService.storeMarkdown(patentId, reportId, rawMarkdown);
-        return new AiEvaluationReportResponse(reportId, agent.generatedAt(),
-                toRecommendation(agent.recommendation()), summary,
-                totalScore == 0 ? null : totalScore, scores, List.of(), rawMarkdown, markdownFilePath);
-    }
-
-    private String normalizeMarkdown(
-            String rawMarkdown,
-            String summary,
-            List<EvaluationScoreResponse> scores,
-            String recommendation
-    ) {
-        if (rawMarkdown != null && !rawMarkdown.isBlank()) {
-            return rawMarkdown;
-        }
-
-        StringBuilder markdown = new StringBuilder();
-        markdown.append("# AI 특허 평가 레포트\n\n");
-        markdown.append("## 요약\n\n");
-        markdown.append(summary == null || summary.isBlank() ? "작성 필요" : summary).append("\n\n");
-        markdown.append("## 평가 점수\n\n");
-        if (scores == null || scores.isEmpty()) {
-            markdown.append("- 평가 점수 없음\n");
-        } else {
-            for (EvaluationScoreResponse score : scores) {
-                markdown.append("- ")
-                        .append(score.category())
-                        .append(": ")
-                        .append(score.score() == null ? "N/A" : score.score())
-                        .append(" - ")
-                        .append(score.evidence())
-                        .append("\n");
-            }
-        }
-        markdown.append("\n## 권고\n\n");
-        markdown.append(recommendation == null || recommendation.isBlank() ? "HOLD" : recommendation);
-        return markdown.toString();
-    }
-
-    private Recommendation toRecommendation(String value) {
-        if (value == null) return Recommendation.HOLD;
-        String normalized = value.trim().toUpperCase();
-        if (value.contains("유지")) {
-            return Recommendation.MAINTAIN;
-        }
-        if (value.contains("포기")) {
-            return Recommendation.ABANDON;
-        }
-        if (value.contains("추가") || value.contains("재검토") || value.contains("정보")) {
-            return Recommendation.REVIEW_AGAIN;
-        }
-        return switch (normalized) {
-            case "MAINTAIN" -> Recommendation.MAINTAIN;
-            case "ABANDON" -> Recommendation.ABANDON;
-            case "HOLD" -> Recommendation.HOLD;
-            default -> Recommendation.REVIEW_AGAIN;
-        };
-    }
-
-    private EvaluationCategory toCategory(String category) {
-        if (category == null) return EvaluationCategory.BUSINESS_ALIGNMENT;
-        return switch (category) {
-            case "권리성" -> EvaluationCategory.RIGHTS;
-            case "기술성" -> EvaluationCategory.TECHNOLOGY;
-            case "시장성" -> EvaluationCategory.MARKET;
-            case "사업 연계성", "사업연계성" -> EvaluationCategory.BUSINESS_ALIGNMENT;
-            default -> EvaluationCategory.BUSINESS_ALIGNMENT;
-        };
-    }
-
-    private PatentDetailResponse withBusinessOpinion(
-            PatentDetailResponse patent,
-            BusinessOpinionDecision decision,
-            String reason,
-            OffsetDateTime submittedAt
-    ) {
-        return new PatentDetailResponse(
-                patent.patentId(),
-                patent.managementNumber(),
-                patent.applicationNumber(),
-                patent.registrationNumber(),
-                patent.title(),
-                patent.draftTitle(),
-                patent.businessArea(),
-                patent.technologyArea(),
-                patent.productName(),
-                patent.country(),
-                patent.coApplicants(),
-                patent.applicationDate(),
-                patent.registrationDate(),
-                patent.expectedExpirationDate(),
-                patent.departmentId(),
-                patent.departmentName(),
-                patent.lifecycleStatus(),
-                ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED,
-                patent.feeDueDate(),
-                patent.reviewReason(),
-                patent.currentRecommendation(),
-                decision,
-                patent.legalActionResult(),
-                patent.summary(),
-                patent.aiEvaluationReport(),
-                patent.finalDecisionRecord(),
-                new BusinessOpinionResponse(decision, reason, submittedAt),
-                true);
-    }
-
-    private PatentDetailResponse withFinalDecision(
-            PatentDetailResponse patent,
-            FinalDecisionRequest request,
-            OffsetDateTime decidedAt
-    ) {
-        LocalDate newDueDate = request.legalActionResult() == LegalActionResult.MAINTAINED
-                ? annualFeeScheduleService.advanceAfterMaintenance(
-                        patent.country(), patent.feeDueDate(), patent.expectedExpirationDate())
-                : patent.feeDueDate();
-        return new PatentDetailResponse(
-                patent.patentId(),
-                patent.managementNumber(),
-                patent.applicationNumber(),
-                patent.registrationNumber(),
-                patent.title(),
-                patent.draftTitle(),
-                patent.businessArea(),
-                patent.technologyArea(),
-                patent.productName(),
-                patent.country(),
-                patent.coApplicants(),
-                patent.applicationDate(),
-                patent.registrationDate(),
-                patent.expectedExpirationDate(),
-                patent.departmentId(),
-                patent.departmentName(),
-                lifecycleStatusByLegalAction(request.legalActionResult()),
-                ReviewWorkflowStatus.NOT_IN_REVIEW,
-                newDueDate,
-                patent.reviewReason(),
-                patent.currentRecommendation(),
-                patent.businessOpinionDecision(),
-                request.legalActionResult(),
-                patent.summary(),
-                patent.aiEvaluationReport(),
-                new FinalDecisionRecordResponse(
-                        patent.finalDecisionRecord().decisionId() == null
-                                ? patent.patentId() + "-DEC-01"
-                                : patent.finalDecisionRecord().decisionId(),
-                        request.reason(),
-                        decidedAt),
-                patent.businessOpinion(),
-                false);
-    }
-
-    private PatentDetailResponse withClearedFinalDecision(PatentDetailResponse patent) {
-        return new PatentDetailResponse(
-                patent.patentId(),
-                patent.managementNumber(),
-                patent.applicationNumber(),
-                patent.registrationNumber(),
-                patent.title(),
-                patent.draftTitle(),
-                patent.businessArea(),
-                patent.technologyArea(),
-                patent.productName(),
-                patent.country(),
-                patent.coApplicants(),
-                patent.applicationDate(),
-                patent.registrationDate(),
-                patent.expectedExpirationDate(),
-                patent.departmentId(),
-                patent.departmentName(),
-                patent.lifecycleStatus(),
-                ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED,
-                patent.feeDueDate(),
-                patent.reviewReason(),
-                patent.currentRecommendation(),
-                patent.businessOpinionDecision(),
-                null,
-                patent.summary(),
-                patent.aiEvaluationReport(),
-                new FinalDecisionRecordResponse(null, null, null),
-                patent.businessOpinion(),
-                true);
-    }
-
-    private PatentDetailResponse withPatchedFinalDecision(
-            PatentDetailResponse patent,
-            PatchFinalDecisionRequest request,
-            OffsetDateTime decidedAt
-    ) {
-        LegalActionResult legalActionResult = request.legalActionResult() != null
-                ? request.legalActionResult() : patent.legalActionResult();
-        LocalDate newDueDate = request.legalActionResult() == LegalActionResult.MAINTAINED
-                && patent.legalActionResult() != LegalActionResult.MAINTAINED
-                ? annualFeeScheduleService.advanceAfterMaintenance(
-                        patent.country(), patent.feeDueDate(), patent.expectedExpirationDate())
-                : patent.feeDueDate();
-        String reason = request.reason() != null && !request.reason().isBlank()
-                ? request.reason()
-                : patent.finalDecisionRecord().reason();
-        return new PatentDetailResponse(
-                patent.patentId(),
-                patent.managementNumber(),
-                patent.applicationNumber(),
-                patent.registrationNumber(),
-                patent.title(),
-                patent.draftTitle(),
-                patent.businessArea(),
-                patent.technologyArea(),
-                patent.productName(),
-                patent.country(),
-                patent.coApplicants(),
-                patent.applicationDate(),
-                patent.registrationDate(),
-                patent.expectedExpirationDate(),
-                patent.departmentId(),
-                patent.departmentName(),
-                legalActionResult != null ? lifecycleStatusByLegalAction(legalActionResult) : patent.lifecycleStatus(),
-                ReviewWorkflowStatus.NOT_IN_REVIEW,
-                newDueDate,
-                patent.reviewReason(),
-                patent.currentRecommendation(),
-                patent.businessOpinionDecision(),
-                legalActionResult,
-                patent.summary(),
-                patent.aiEvaluationReport(),
-                new FinalDecisionRecordResponse(
-                        patent.finalDecisionRecord().decisionId() == null
-                                ? patent.patentId() + "-DEC-01"
-                                : patent.finalDecisionRecord().decisionId(),
-                        reason,
-                        decidedAt),
-                patent.businessOpinion(),
-                false);
-    }
-
-    private boolean canRecordFinalDecision(ReviewWorkflowStatus status) {
-        return status == ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED
-                || status == ReviewWorkflowStatus.NOT_IN_REVIEW;
-    }
-
-    private PatentSummaryResponse summary() {
-        return new PatentSummaryResponse(
-                "특허 내용을 비전문가도 이해할 수 있도록 요약한 테스트 데이터입니다.",
-                "기존 업무 검토 과정의 반복 작업을 줄이는 문제를 다룹니다.",
-                List.of("문서 요약", "근거 추출", "평가 기준 매핑"),
-                "청구항의 주요 권리 범위를 요약한 테스트 데이터입니다.",
-                List.of("시장 규모 자료", "실제 제품 적용 여부"));
-    }
-
     private PatentSummaryResponse summaryFromMetadata(String title, String technologyArea, String productName) {
         return new PatentSummaryResponse(
                 "%s 관련 특허의 공식 metadata 기반 mock 요약입니다.".formatted(title),
@@ -1389,7 +738,7 @@ public class PatentReviewService {
         return "없음";
     }
 
-    private String departmentId(String businessArea) {
+    String departmentId(String businessArea) {
         return switch (valueOrDefault(businessArea, "")) {
             case "AI", "Data" -> "DEPT-RND";
             case "Blockchain" -> "DEPT-PLATFORM";
@@ -1400,7 +749,7 @@ public class PatentReviewService {
         };
     }
 
-    private String departmentName(String businessArea) {
+    String departmentName(String businessArea) {
         return switch (valueOrDefault(businessArea, "")) {
             case "AI", "Data" -> "R&D본부";
             case "Blockchain" -> "플랫폼사업부";
@@ -1570,19 +919,8 @@ public class PatentReviewService {
         return null;
     }
 
-    private LocalDate valueOrDefault(LocalDate value, LocalDate defaultValue) {
-        if (value == null) {
-            return defaultValue;
-        }
-        return value;
-    }
-
     private boolean lowerEquals(String value, String lowerKeyword) {
         return value != null && value.toLowerCase(Locale.ROOT).equals(lowerKeyword);
-    }
-
-    private boolean lowerContains(String value, String token) {
-        return value != null && value.toLowerCase(Locale.ROOT).contains(token);
     }
 
     private PatentDetailResponse applyPersistedState(PatentDetailResponse patent) {
@@ -1804,6 +1142,4 @@ public class PatentReviewService {
         PatentDetailResponse update(PatentDetailResponse patent);
     }
 
-    private record ScoredContextSuggestion(PatentDetailResponse patent, int score) {
-    }
 }
