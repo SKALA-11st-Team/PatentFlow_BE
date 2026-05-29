@@ -351,6 +351,7 @@ class PatentControllerTest {
                         """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.mode").value("CREATED"))
+                .andExpect(jsonPath("$.data.patentId").value("PAT-2026-0186"))
                 .andReturn()
                 .getResponse()
                 .getContentAsString();

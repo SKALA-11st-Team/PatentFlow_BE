@@ -570,11 +570,7 @@ public class PatentReviewService {
     }
 
     private String nextPatentId() {
-        int nextSequence = patentMetadataRepository.findAll().stream()
-                .map(PatentMetadataEntity::getPatentId)
-                .mapToInt(this::sequenceFromPatentId)
-                .max()
-                .orElse(0) + 1;
+        int nextSequence = patentMetadataRepository.findMaxPatentSequence() + 1;
         return "PAT-2026-%04d".formatted(nextSequence);
     }
 
