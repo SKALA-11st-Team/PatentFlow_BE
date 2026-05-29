@@ -138,12 +138,12 @@ Table departments {
 
 Table users {
   id varchar(64) [pk, note: "USER-{UUID12}"]
-  username varchar(256) [not null, unique, note: "Email address used as login ID"]
+  email varchar(256) [not null, unique, note: "로그인 ID — 이메일 형식 필수"]
+  username varchar(128) [note: "실제 이름 (예: 이소율)"]
   password varchar(256) [not null, note: "BCrypt hash"]
   role varchar(32) [not null, note: "ADMIN | BUSINESS"]
   department_id varchar(64) [note: "Null for ADMIN; DEPT-* for BUSINESS — FK to departments.department_id"]
-  display_name varchar(128)
-  created_at timestamp
+  created_at timestamptz
 }
 
 Table auth_sessions {
