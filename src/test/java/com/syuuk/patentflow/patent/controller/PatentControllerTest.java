@@ -51,13 +51,13 @@ class PatentControllerTest {
     }
 
     @Test
-    void getPatentsCapsPageSizeAtTwenty() throws Exception {
+    void getPatentsCapsPageSizeAtOneHundred() throws Exception {
         mockMvc.perform(get("/api/v1/patents")
                 .param("page", "1")
                 .param("size", "200"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data", hasSize(20)))
-                .andExpect(jsonPath("$.page.size").value(20));
+                .andExpect(jsonPath("$.data", hasSize(100)))
+                .andExpect(jsonPath("$.page.size").value(100));
     }
 
     @Test

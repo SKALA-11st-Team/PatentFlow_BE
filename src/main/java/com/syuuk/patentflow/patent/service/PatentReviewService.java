@@ -141,7 +141,7 @@ public class PatentReviewService {
             ReviewWorkflowStatus reviewWorkflowStatus,
             String sort) {
         int normalizedPage = Math.max(page, 1);
-        int normalizedSize = Math.min(Math.max(size, 1), 20);
+        int normalizedSize = Math.min(Math.max(size, 1), 100);
 
         PageRequest pageRequest = PageRequest.of(normalizedPage - 1, normalizedSize, parseSort(sort));
 
@@ -185,11 +185,15 @@ public class PatentReviewService {
 
         Page<PatentReviewHistoryEntity> historyPage = reviewHistoryRepository.findAll(spec, pageRequest);
 
+        Map<String, PatentMetadataEntity> metadataByPatentId = patentMetadataRepository.findAllById(
+                        historyPage.getContent().stream()
+                                .map(PatentReviewHistoryEntity::getPatentId)
+                                .toList())
+                .stream()
+                .collect(Collectors.toMap(PatentMetadataEntity::getPatentId, metadata -> metadata));
+
         List<PatentListItemResponse> items = historyPage.getContent().stream()
-                .map(history -> {
-                    PatentMetadataEntity metadata = patentMetadataRepository.findById(history.getPatentId()).orElse(null);
-                    return toListItemFromHistory(history, metadata);
-                })
+                .map(history -> toListItemFromHistory(history, metadataByPatentId.get(history.getPatentId())))
                 .toList();
 
         return PageResponse.ok(
