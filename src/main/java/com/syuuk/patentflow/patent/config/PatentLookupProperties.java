@@ -11,6 +11,9 @@ public record PatentLookupProperties(
 
     public record Kipris(
             String baseUrl,
+            String servicePath,
+            String bibliographyOperation,
+            String applicationSearchOperation,
             String serviceKey,
             List<String> serviceKeys
     ) {

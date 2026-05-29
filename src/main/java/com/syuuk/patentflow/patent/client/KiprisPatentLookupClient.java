@@ -67,28 +67,29 @@ public class KiprisPatentLookupClient implements ExternalPatentLookupClient {
                 continue;
             }
             try {
-                HttpRequest request = HttpRequest.newBuilder()
-                        .GET()
-                        .timeout(TIMEOUT)
-                        .uri(URI.create("%s?applicationNumber=%s&ServiceKey=%s".formatted(
-                                kipris.baseUrl(),
-                                encode(applicationNumber),
-                                encode(serviceKey))))
-                        .build();
-                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-                String body = response.body();
-                if (response.statusCode() < 200 || response.statusCode() >= 300 || body == null || body.isBlank()) {
-                    if (isQuotaExhausted(body)) {
-                        exhaustedKeys.put(serviceKey, currentMonth);
-                        continue;
-                    }
-                    return Optional.empty();
-                }
-                if (isQuotaExhausted(body)) {
+                KiprisResponse detailResponse = request(kipris, kipris.bibliographyOperation(), applicationNumber, serviceKey);
+                if (detailResponse.quotaExhausted()) {
                     exhaustedKeys.put(serviceKey, currentMonth);
                     continue;
                 }
-                return parseResponse(body, query);
+                if (!detailResponse.success()) {
+                    return Optional.empty();
+                }
+
+                Optional<PatentBibliographicInfoResponse> detailResult = parseResponse(detailResponse.body(), query);
+                if (detailResult.isPresent()) {
+                    return detailResult;
+                }
+
+                KiprisResponse searchResponse = request(kipris, kipris.applicationSearchOperation(), applicationNumber, serviceKey);
+                if (searchResponse.quotaExhausted()) {
+                    exhaustedKeys.put(serviceKey, currentMonth);
+                    continue;
+                }
+                if (!searchResponse.success()) {
+                    return Optional.empty();
+                }
+                return parseResponse(searchResponse.body(), query);
             } catch (Exception exception) {
                 return Optional.empty();
             }
@@ -98,6 +99,10 @@ public class KiprisPatentLookupClient implements ExternalPatentLookupClient {
 
     private Optional<PatentBibliographicInfoResponse> parseResponse(String xml, PatentLookupQuery query) {
         Document document = PatentLookupXmlParser.parse(xml);
+        String resultCode = PatentLookupXmlParser.text(document, "resultCode").orElse("");
+        if (!resultCode.isBlank() && !"00".equals(resultCode)) {
+            return Optional.empty();
+        }
         String title = PatentLookupXmlParser.text(
                 document,
                 "inventionTitle",
@@ -105,13 +110,13 @@ public class KiprisPatentLookupClient implements ExternalPatentLookupClient {
                 "title",
                 "astrtCont")
                 .orElse(null);
-        String applicationNumber = PatentLookupXmlParser.text(document, "applicationNumber", "applNo")
-                .orElse(query.applicationNumber());
-        String registrationNumber = PatentLookupXmlParser.text(document, "registrationNumber", "registerNumber", "regNo")
-                .orElse(query.registrationNumber());
-        if (title == null && applicationNumber == null && registrationNumber == null) {
+        Optional<String> parsedApplicationNumber = PatentLookupXmlParser.text(document, "applicationNumber", "applNo");
+        Optional<String> parsedRegistrationNumber = PatentLookupXmlParser.text(document, "registrationNumber", "registerNumber", "regNo");
+        if (title == null && parsedApplicationNumber.isEmpty() && parsedRegistrationNumber.isEmpty()) {
             return Optional.empty();
         }
+        String applicationNumber = parsedApplicationNumber.orElse(query.applicationNumber());
+        String registrationNumber = parsedRegistrationNumber.orElse(query.registrationNumber());
 
         return Optional.of(new PatentBibliographicInfoResponse(
                 query.keyword(),
@@ -137,6 +142,55 @@ public class KiprisPatentLookupClient implements ExternalPatentLookupClient {
         return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 
+    private KiprisResponse request(
+            PatentLookupProperties.Kipris kipris,
+            String operationName,
+            String applicationNumber,
+            String serviceKey
+    ) throws Exception {
+        HttpRequest request = HttpRequest.newBuilder()
+                .GET()
+                .timeout(TIMEOUT)
+                .uri(URI.create("%s?applicationNumber=%s&ServiceKey=%s".formatted(
+                        operationUrl(kipris, operationName),
+                        encode(applicationNumber),
+                        encode(serviceKey))))
+                .build();
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        String body = response.body();
+        boolean quotaExhausted = isQuotaExhausted(body);
+        boolean success = response.statusCode() >= 200
+                && response.statusCode() < 300
+                && body != null
+                && !body.isBlank()
+                && !quotaExhausted;
+        return new KiprisResponse(success, quotaExhausted, body);
+    }
+
+    private String operationUrl(PatentLookupProperties.Kipris kipris, String operationName) {
+        String baseUrl = trimTrailingSlash(kipris.baseUrl());
+        if (baseUrl.endsWith("/" + operationName)) {
+            return baseUrl;
+        }
+        if (baseUrl.contains("/kipo-api/") || baseUrl.contains("/openapi/rest/")) {
+            int lastSlashIndex = baseUrl.lastIndexOf('/');
+            String serviceUrl = lastSlashIndex > 0 ? baseUrl.substring(0, lastSlashIndex) : baseUrl;
+            return "%s/%s".formatted(serviceUrl, operationName);
+        }
+        return "%s/%s/%s".formatted(
+                baseUrl,
+                trimSlashes(kipris.servicePath()),
+                operationName);
+    }
+
+    private String trimTrailingSlash(String value) {
+        return value == null ? "" : value.replaceAll("/+$", "");
+    }
+
+    private String trimSlashes(String value) {
+        return value == null ? "" : value.replaceAll("^/+", "").replaceAll("/+$", "");
+    }
+
     private List<String> serviceKeys(PatentLookupProperties.Kipris kipris) {
         LinkedHashSet<String> keys = new LinkedHashSet<>();
         addKey(keys, kipris.serviceKey());
@@ -158,5 +212,8 @@ public class KiprisPatentLookupClient implements ExternalPatentLookupClient {
         }
         String normalizedBody = responseBody.toLowerCase();
         return QUOTA_EXHAUSTED_MARKERS.stream().anyMatch(normalizedBody::contains);
+    }
+
+    private record KiprisResponse(boolean success, boolean quotaExhausted, String body) {
     }
 }

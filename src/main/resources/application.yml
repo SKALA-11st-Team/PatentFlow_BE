@@ -64,7 +64,10 @@ patentflow:
     allowed-origins: ${PATENTFLOW_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
   lookup:
     kipris:
-      base-url: ${PATENTFLOW_KIPRIS_BASE_URL:http://plus.kipris.or.kr/kipo-api/kipi/patUtiModInfoSearchSevice/getBibliographyDetailInfoSearch}
+      base-url: ${PATENTFLOW_KIPRIS_BASE_URL:http://plus.kipris.or.kr}
+      service-path: ${PATENTFLOW_KIPRIS_SERVICE_PATH:/kipo-api/kipi/patUtiModInfoSearchSevice}
+      bibliography-operation: ${PATENTFLOW_KIPRIS_BIBLIOGRAPHY_OPERATION:getBibliographyDetailInfoSearch}
+      application-search-operation: ${PATENTFLOW_KIPRIS_APPLICATION_SEARCH_OPERATION:applicationNumberSearchInfo}
       service-key: ${PATENTFLOW_KIPRIS_SERVICE_KEY:}
       service-keys: ${PATENTFLOW_KIPRIS_SERVICE_KEYS:}
     google-patents:
