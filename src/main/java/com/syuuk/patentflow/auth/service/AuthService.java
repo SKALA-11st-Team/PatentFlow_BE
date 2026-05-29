@@ -19,6 +19,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AuthService {
@@ -49,6 +50,7 @@ public class AuthService {
         this.userRepository = userRepository;
     }
 
+    @Transactional
     public AuthResult login(LoginRequest request) {
         loginAttemptService.assertNotLocked(request.username());
         Authentication authentication;
@@ -64,12 +66,14 @@ public class AuthService {
         return issueTokens((UserDetailsImpl) userDetails);
     }
 
+    @Transactional
     public AuthResult refresh(String refreshToken) {
         AuthSessionService.UserSession session = authSessionService.consume(refreshToken);
         UserDetails userDetails = userDetailsService.loadUserByUsername(session.username());
         return issueTokens((UserDetailsImpl) userDetails);
     }
 
+    @Transactional(readOnly = true)
     public UserPrincipalResponse currentUser(Authentication authentication) {
         Object principal = authentication.getPrincipal();
         if (principal instanceof UserPrincipalResponse userPrincipal) {
@@ -81,6 +85,7 @@ public class AuthService {
         return toPrincipalResponse((UserDetails) principal);
     }
 
+    @Transactional
     public UserPrincipalResponse updateProfile(Authentication authentication, UpdateProfileRequest request) {
         UserPrincipalResponse current = currentUser(authentication);
         UserEntity user = userRepository.findById(current.userId())
@@ -90,11 +95,13 @@ public class AuthService {
         return toPrincipalResponse(new UserDetailsImpl(user));
     }
 
+    @Transactional
     public void logout(String accessToken, String refreshToken) {
         revokeAccessToken(accessToken);
         authSessionService.revoke(refreshToken);
     }
 
+    @Transactional
     public void revokeAccessToken(String accessToken) {
         String token = extractBearerToken(accessToken);
         if (token == null) {

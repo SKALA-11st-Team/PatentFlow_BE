@@ -63,6 +63,7 @@ import org.springframework.data.jpa.domain.Specification;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class PatentReviewService {
@@ -133,6 +134,7 @@ public class PatentReviewService {
      * @relatedUI UI-COM-02, UI-LEGAL-02
      * @description DB 기반 페이징 및 필터링을 제공한다.
      */
+    @Transactional(readOnly = true)
     public PageResponse<PatentListItemResponse> getPatents(
             int page,
             int size,
@@ -201,6 +203,7 @@ public class PatentReviewService {
                 new PageInfo(normalizedPage, normalizedSize, (int) historyPage.getTotalElements(), historyPage.getTotalPages()));
     }
 
+    @Transactional(readOnly = true)
     public List<PatentListItemResponse> getReviewTargets(
             String quarter,
             String country,
@@ -297,6 +300,7 @@ public class PatentReviewService {
         );
     }
 
+    @Transactional(readOnly = true)
     public PageResponse<PatentListItemResponse> getReviewRequests(
             int page,
             int size,
@@ -310,26 +314,32 @@ public class PatentReviewService {
      * @relatedUI UI-LEGAL-04
      * @description AI 특허 평가 레포트와 최종 판단을 분리해 특허 상세를 조회한다.
      */
+    @Transactional(readOnly = true)
     public PatentDetailResponse getPatentDetail(String patentId) {
         return findPatent(patentId);
     }
 
+    @Transactional(readOnly = true)
     public void ensurePatentExists(String patentId) {
         findPatent(patentId);
     }
 
+    @Transactional(readOnly = true)
     public Recommendation getCurrentRecommendation(String patentId) {
         return findPatent(patentId).currentRecommendation();
     }
 
+    @Transactional(readOnly = true)
     public Integer getAiTotalScore(String patentId) {
         return findPatent(patentId).aiEvaluationReport().totalScore();
     }
 
+    @Transactional(readOnly = true)
     public OffsetDateTime getAiReportCreatedAt(String patentId) {
         return findPatent(patentId).aiEvaluationReport().createdAt();
     }
 
+    @Transactional
     public PatentDetailResponse generateAiReport(String patentId) {
         PatentDetailResponse patent = findPatent(patentId);
         if (patent.reviewWorkflowStatus() != ReviewWorkflowStatus.REVIEW_QUARTER_STARTED) {
@@ -341,6 +351,7 @@ public class PatentReviewService {
         return updatePatent(patentId, p -> withAiReport(p, report, agentResponse.summary()));
     }
 
+    @Transactional(readOnly = true)
     public List<String> markMailReady(List<String> patentIds) {
         List<String> updated = new ArrayList<>();
         for (String patentId : patentIds) {
@@ -354,6 +365,7 @@ public class PatentReviewService {
         return updated;
     }
 
+    @Transactional
     public void recordBusinessOpinion(
             String patentId,
             BusinessOpinionDecision decision,
@@ -368,6 +380,7 @@ public class PatentReviewService {
      * @relatedUI UI-LEGAL-04, UI-BUS-05
      * @description 평가/판단 이력을 조회한다.
      */
+    @Transactional(readOnly = true)
     public List<PatentHistoryResponse> getPatentHistory(String patentId) {
         getPatentDetail(patentId);
         OffsetDateTime createdAt = OffsetDateTime.of(2026, 5, 6, 10, 0, 0, 0,
@@ -394,6 +407,7 @@ public class PatentReviewService {
      * @relatedUI UI-LEGAL-02, UI-LEGAL-03
      * @description 공식 metadata에서 관리번호/출원번호/등록번호 기반 외부 검색 결과를 제공한다.
      */
+    @Transactional(readOnly = true)
     public PatentBibliographicInfoResponse lookupBibliographicInfo(
             String managementNumber,
             String applicationNumber,
@@ -437,6 +451,7 @@ public class PatentReviewService {
      * @relatedUI UI-LEGAL-02, UI-LEGAL-03
      * @description 특허명/제품/기술 키워드를 공식 metadata와 비교해 회사 컨텍스트를 추천한다.
      */
+    @Transactional(readOnly = true)
     public PatentContextSuggestionResponse suggestContext(PatentContextSuggestionRequest request) {
         List<String> sourceTokens = tokenizeContextText(String.join(" ",
                 valueOrDefault(request.title(), ""),
@@ -466,6 +481,7 @@ public class PatentReviewService {
      * @relatedUI UI-LEGAL-05
      * @description 실제 발송 연동 전, 사업부 검토 요청 메일 발송 상태를 검토 상태에 반영한다.
      */
+    @Transactional
     public WorkflowBatchUpdateResult markMailingSent(List<String> patentIds) {
         List<String> updatedPatentIds = new ArrayList<>();
         List<String> skippedPatentIds = new ArrayList<>();
@@ -493,6 +509,7 @@ public class PatentReviewService {
      * @relatedUI UI-LEGAL-02, UI-LEGAL-03
      * @description 특허 기본 정보와 회사 컨텍스트를 DB에 등록한다.
      */
+    @Transactional
     public PatentUpsertResponse createPatent(PatentUpsertRequest request) {
         String patentId = nextPatentId();
         patentMetadataRepository.save(metadataEntityFromRequest(patentId, request));
@@ -506,6 +523,7 @@ public class PatentReviewService {
      * @relatedUI UI-LEGAL-02, UI-LEGAL-03
      * @description 특허 기본 정보와 회사 컨텍스트를 DB에서 수정한다.
      */
+    @Transactional
     public PatentUpsertResponse updatePatent(String patentId, PatentUpsertRequest request) {
         updatePatent(patentId, patent -> withUpsertRequest(patent, request));
         patentMetadataRepository.save(metadataEntityFromRequest(patentId, request));
@@ -521,6 +539,7 @@ public class PatentReviewService {
         return "PAT-2026-%04d".formatted(nextSequence);
     }
 
+    @Transactional
     public PatentDetailResponse assignDepartment(String patentId, String departmentId) {
         String departmentName = resolvedDepartmentName(departmentId);
         PatentDetailResponse updated = updatePatent(patentId, patent -> withDepartment(patent, departmentId, departmentName));
@@ -528,10 +547,12 @@ public class PatentReviewService {
         return updated;
     }
 
+    @Transactional(readOnly = true)
     public List<PatentListItemResponse> getAllPatents() {
         return loadPatentsFromDatabase().stream().map(this::toListItem).toList();
     }
 
+    @Transactional
     public List<String> createQuarterReviewTargets(String quarterKey, LocalDate startDate, LocalDate endDate) {
         List<String> reviewStarted = new ArrayList<>();
         patentMetadataRepository.findAll(Sort.by("patentId")).forEach(entity -> {
@@ -567,6 +588,7 @@ public class PatentReviewService {
         return reviewStarted;
     }
 
+    @Transactional
     public void bulkUpdateWorkflowStatus(List<String> patentIds, ReviewWorkflowStatus newStatus, String quarterKey) {
         if (patentIds == null || patentIds.isEmpty()) return;
         for (String patentId : patentIds) {
@@ -578,6 +600,7 @@ public class PatentReviewService {
         }
     }
 
+    @Transactional(readOnly = true)
     public List<PatentReviewHistoryItemResponse> getReviewHistory(String patentId) {
         ensurePatentExists(patentId);
         return reviewHistoryRepository.findByPatentIdOrderByCreatedAtDesc(patentId).stream()
@@ -586,6 +609,7 @@ public class PatentReviewService {
     }
 
 
+    @Transactional
     public FinalDecisionResponse patchFinalDecision(String patentId, PatchFinalDecisionRequest request) {
         OffsetDateTime decidedAt = OffsetDateTime.now(KST);
         PatentDetailResponse updated = updatePatent(patentId, patent -> {
@@ -601,6 +625,7 @@ public class PatentReviewService {
                 updated.reviewWorkflowStatus());
     }
 
+    @Transactional
     public FinalDecisionResponse recordFinalDecision(String patentId, FinalDecisionRequest request) {
         OffsetDateTime decidedAt = OffsetDateTime.now(KST);
         PatentDetailResponse updated = updatePatent(patentId, patent -> {

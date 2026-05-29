@@ -22,6 +22,7 @@ import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AdminUserService {
@@ -46,12 +47,14 @@ public class AdminUserService {
         this.systemSettingsService = systemSettingsService;
     }
 
+    @Transactional(readOnly = true)
     public List<UserResponse> getUsers() {
         return userRepository.findAll(Sort.by("createdAt")).stream()
                 .map(UserResponse::from)
                 .toList();
     }
 
+    @Transactional
     public UserResponse createUser(CreateUserRequest request) {
         if (userRepository.existsByUsername(request.username())) {
             throw new PatentFlowException(ErrorCode.INVALID_REQUEST,
@@ -67,6 +70,7 @@ public class AdminUserService {
         return UserResponse.from(user);
     }
 
+    @Transactional
     public UserResponse updateUser(String userId, CreateUserRequest request) {
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new PatentFlowException(ErrorCode.INVALID_REQUEST,
@@ -85,6 +89,7 @@ public class AdminUserService {
         return UserResponse.from(userRepository.save(user));
     }
 
+    @Transactional
     public void deleteUser(String userId) {
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new PatentFlowException(ErrorCode.INVALID_REQUEST,
@@ -95,6 +100,7 @@ public class AdminUserService {
         userRepository.delete(user);
     }
 
+    @Transactional
     public ResetPasswordResponse resetPassword(String userId) {
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new PatentFlowException(ErrorCode.INVALID_REQUEST,

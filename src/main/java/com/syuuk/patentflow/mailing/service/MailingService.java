@@ -35,6 +35,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class MailingService {
@@ -74,6 +75,7 @@ public class MailingService {
         this.departmentRepository = departmentRepository;
     }
 
+    @Transactional(readOnly = true)
     public List<DepartmentRecipientMappingResponse> getRecipientMappings(String departmentId) {
         List<DepartmentRecipientMappingResponse> userMappings = userRepository.findAll(Sort.by("departmentId", "createdAt")).stream()
                 .filter(u -> "BUSINESS".equals(u.getRole()) && u.getDepartmentId() != null)
@@ -101,6 +103,7 @@ public class MailingService {
                 .toList();
     }
 
+    @Transactional
     public DepartmentRecipientMappingResponse updateRecipientMapping(
             String departmentId,
             DepartmentRecipientMappingRequest request
@@ -196,6 +199,7 @@ public class MailingService {
         return sender;
     }
 
+    @Transactional(readOnly = true)
     public List<MailingHistoryItemResponse> getHistory(String patentId, String recipientEmail) {
         return mailingHistoryRepository.findAll(Sort.by(Sort.Direction.DESC, "sentAt")).stream()
                 .map(this::toHistoryResponse)

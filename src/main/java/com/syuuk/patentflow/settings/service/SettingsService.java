@@ -15,6 +15,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class SettingsService {
@@ -34,12 +35,14 @@ public class SettingsService {
         seedDefaultQuartersIfNeeded();
     }
 
+    @Transactional(readOnly = true)
     public List<QuarterSettingResponse> getQuarterSettings(int year) {
         return quarterSettingRepository.findByYearOrderByQuarterNumber(year).stream()
                 .map(q -> toResponse(q, countTargetPatents(q)))
                 .toList();
     }
 
+    @Transactional
     public QuarterSettingResponse updateQuarterSetting(String quarterKey, QuarterSettingRequest request) {
         QuarterSettingEntity quarter = findQuarter(quarterKey);
         if (request.startDate() != null || request.endDate() != null) {
@@ -64,6 +67,7 @@ public class SettingsService {
         return toResponse(quarter, countTargetPatents(quarter));
     }
 
+    @Transactional
     public List<QuarterSettingResponse> updateReviewSchedule(int year, int mailLeadMonths, LocalDate businessResponseDueDate) {
         try {
             systemSettingsService.updateMailLeadMonths(mailLeadMonths);
@@ -78,6 +82,7 @@ public class SettingsService {
         return getQuarterSettings(year);
     }
 
+    @Transactional(readOnly = true)
     public QuarterSettingResponse getActiveQuarter() {
         return quarterSettingRepository.findAll().stream()
                 .filter(QuarterSettingEntity::isActivated)
@@ -86,6 +91,7 @@ public class SettingsService {
                 .orElse(null);
     }
 
+    @Transactional
     public QuarterActivateResponse activateQuarter(String quarterKey) {
         QuarterSettingEntity quarter = findQuarter(quarterKey);
         if (quarter.getStartDate() == null || quarter.getEndDate() == null) {
@@ -121,6 +127,7 @@ public class SettingsService {
                 .count();
     }
 
+    @Transactional
     public QuarterSettingResponse endQuarter(String quarterKey) {
         QuarterSettingEntity quarter = findQuarter(quarterKey);
         if (!quarter.isActivated()) {

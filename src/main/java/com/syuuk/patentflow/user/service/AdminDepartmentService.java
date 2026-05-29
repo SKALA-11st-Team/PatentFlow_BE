@@ -13,6 +13,7 @@ import java.time.LocalDate;
 import java.util.List;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AdminDepartmentService {
@@ -30,6 +31,7 @@ public class AdminDepartmentService {
         this.userRepository = userRepository;
     }
 
+    @Transactional(readOnly = true)
     public List<DepartmentRecipientMappingResponse> getDepartments() {
         return mailingRecipientMappingRepository.findAll(Sort.by("departmentId")).stream()
                 .map(e -> new DepartmentRecipientMappingResponse(
@@ -42,6 +44,7 @@ public class AdminDepartmentService {
                 .toList();
     }
 
+    @Transactional
     public DepartmentRecipientMappingResponse createDepartment(CreateDepartmentRequest request) {
         if (mailingRecipientMappingRepository.existsById(request.departmentId())) {
             throw new PatentFlowException(ErrorCode.INVALID_REQUEST,
@@ -62,6 +65,7 @@ public class AdminDepartmentService {
                 LocalDate.now().toString());
     }
 
+    @Transactional
     public DepartmentRecipientMappingResponse updateDepartment(String departmentId, UpdateDepartmentRequest request) {
         DepartmentEntity entity = mailingRecipientMappingRepository.findById(departmentId)
                 .orElseThrow(() -> new PatentFlowException(ErrorCode.INVALID_REQUEST,
@@ -79,6 +83,7 @@ public class AdminDepartmentService {
                 updatedAt.toString());
     }
 
+    @Transactional
     public void deleteDepartment(String departmentId) {
         if (!mailingRecipientMappingRepository.existsById(departmentId)) {
             throw new PatentFlowException(ErrorCode.INVALID_REQUEST,

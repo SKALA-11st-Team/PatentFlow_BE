@@ -12,6 +12,7 @@ import com.syuuk.patentflow.common.repository.SystemSettingsRepository;
 import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class SystemSettingsService {
@@ -44,10 +45,12 @@ public class SystemSettingsService {
         this.repository = repository;
     }
 
+    @Transactional(readOnly = true)
     public String get(String key) {
         return repository.findById(key).map(SystemSettingsEntity::getValue).orElse(null);
     }
 
+    @Transactional
     public void set(String key, String value) {
         SystemSettingsEntity entity = repository.findById(key).orElse(new SystemSettingsEntity(key));
         entity.setValue(value);
@@ -62,12 +65,14 @@ public class SystemSettingsService {
         return get(KEY_GMAIL_APP_PASSWORD);
     }
 
+    @Transactional(readOnly = true)
     public MailSettingsResponse getMailSettings() {
         String username = getGmailUsername();
         String password = getGmailAppPassword();
         return new MailSettingsResponse(username, password != null && !password.isBlank());
     }
 
+    @Transactional
     public MailSettingsResponse saveMailSettings(MailSettingsRequest request) {
         if (request.gmailUsername() != null) {
             set(KEY_GMAIL_USERNAME, request.gmailUsername().trim());
@@ -92,6 +97,7 @@ public class SystemSettingsService {
         return DEFAULT_MAIL_LEAD_MONTHS;
     }
 
+    @Transactional
     public int updateMailLeadMonths(int mailLeadMonths) {
         if (mailLeadMonths < 0 || mailLeadMonths > 24) {
             throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "메일 발송 기준 개월 수는 0개월 이상 24개월 이하로 설정해야 합니다.");
@@ -100,6 +106,7 @@ public class SystemSettingsService {
         return mailLeadMonths;
     }
 
+    @Transactional(readOnly = true)
     public List<CountryExtensionResponse> getCountryExtensions() {
         return SUPPORTED_COUNTRIES.stream()
                 .map(c -> new CountryExtensionResponse(c, COUNTRY_LABELS.getOrDefault(c, c), getCountryExtensionMonths(c)))
@@ -114,18 +121,21 @@ public class SystemSettingsService {
         return DEFAULT_EXTENSION_MONTHS;
     }
 
+    @Transactional
     public CountryExtensionResponse updateCountryExtension(String country, CountryExtensionRequest request) {
         String upperCountry = country.toUpperCase();
         set(KEY_COUNTRY_EXT_PREFIX + upperCountry, String.valueOf(request.extensionMonths()));
         return new CountryExtensionResponse(upperCountry, COUNTRY_LABELS.getOrDefault(upperCountry, upperCountry), request.extensionMonths());
     }
 
+    @Transactional(readOnly = true)
     public List<ClassificationResponse> getClassifications() {
         return List.of(
                 new ClassificationResponse("BUSINESS", getClassificationValues("BUSINESS")),
                 new ClassificationResponse("TECHNOLOGY", getClassificationValues("TECHNOLOGY")));
     }
 
+    @Transactional
     public ClassificationResponse addClassification(String type, String value) {
         String normalizedType = normalizeClassificationType(type);
         String normalizedValue = normalizeClassificationValue(value);
@@ -138,6 +148,7 @@ public class SystemSettingsService {
         return new ClassificationResponse(normalizedType, values);
     }
 
+    @Transactional
     public ClassificationResponse renameClassification(String type, String currentValue, String nextValue) {
         String normalizedType = normalizeClassificationType(type);
         String normalizedCurrent = normalizeClassificationValue(currentValue);
@@ -154,6 +165,7 @@ public class SystemSettingsService {
         return new ClassificationResponse(normalizedType, values);
     }
 
+    @Transactional
     public ClassificationResponse deleteClassification(String type, String value) {
         String normalizedType = normalizeClassificationType(type);
         String normalizedValue = normalizeClassificationValue(value);
