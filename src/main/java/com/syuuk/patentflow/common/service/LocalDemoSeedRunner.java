@@ -71,7 +71,7 @@ public class LocalDemoSeedRunner implements ApplicationRunner {
     }
 
     private boolean needsDemoWorkflowSeed() {
-        return count("users", "username = 'bussiness@bussiness.com'") == 0
+        return count("users", "username = 'business@business.com'") == 0
                 || count("mailing_history", "mailing_id LIKE 'MAIL-DEMO-%'") == 0
                 || count("business_submissions", "submission_id LIKE '%-DEMO-SUB-%'") == 0;
     }
