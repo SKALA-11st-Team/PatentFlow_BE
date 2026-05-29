@@ -1,5 +1,6 @@
 package com.syuuk.patentflow.patent.config;
 
+import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "patentflow.lookup")
@@ -9,9 +10,9 @@ public record PatentLookupProperties(
 ) {
 
     public record Kipris(
-            boolean enabled,
             String baseUrl,
-            String serviceKey
+            String serviceKey,
+            List<String> serviceKeys
     ) {
     }
 

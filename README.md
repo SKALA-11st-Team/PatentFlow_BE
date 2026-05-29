@@ -111,11 +111,12 @@ applicationNumber=10-2024-0115774
 sourcePriority=KIPRIS,GOOGLE_PATENTS
 ```
 
-KIPRIS is disabled by default because it needs a KIPRISPlus service key.
+KIPRIS lookup runs when one or more KIPRISPlus service keys are configured. If a key reaches its monthly request limit, the backend skips that key for the current month and tries the next configured key. KIPRISPlus monthly request limits reset on the 1st day of each month.
 
 ```bash
-PATENTFLOW_KIPRIS_ENABLED=true
 PATENTFLOW_KIPRIS_SERVICE_KEY=...
+# or comma-separated multiple keys
+PATENTFLOW_KIPRIS_SERVICE_KEYS=key1,key2,key3
 ```
 
 Google Patents is implemented as a public page fallback, not an official JSON API. If external lookup fails or has missing fields, the API falls back to `docs/skax_patents_list.md` metadata where available.

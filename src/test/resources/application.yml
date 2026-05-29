@@ -17,9 +17,9 @@ patentflow:
     allowed-origins: http://localhost:5173,http://127.0.0.1:5173
   lookup:
     kipris:
-      enabled: false
       base-url: http://plus.kipris.or.kr/kipo-api/kipi/patUtiModInfoSearchSevice/getBibliographyDetailInfoSearch
       service-key:
+      service-keys:
     google-patents:
       enabled: false
       base-url: https://patents.google.com

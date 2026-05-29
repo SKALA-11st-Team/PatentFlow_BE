@@ -21,7 +21,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(properties = {
-        "patentflow.lookup.kipris.enabled=false",
         "patentflow.lookup.google-patents.enabled=false",
         "patentflow.auth.max-login-failures=2",
         "patentflow.auth.login-lock-seconds=300",

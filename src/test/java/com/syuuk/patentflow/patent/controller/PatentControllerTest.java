@@ -26,7 +26,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(properties = {
-        "patentflow.lookup.kipris.enabled=false",
         "patentflow.lookup.google-patents.enabled=false"
 })
 @AutoConfigureMockMvc(addFilters = false)

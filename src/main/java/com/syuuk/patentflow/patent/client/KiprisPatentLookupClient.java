@@ -9,7 +9,12 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.YearMonth;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Component;
 import org.w3c.dom.Document;
 
@@ -17,9 +22,21 @@ import org.w3c.dom.Document;
 public class KiprisPatentLookupClient implements ExternalPatentLookupClient {
 
     private static final Duration TIMEOUT = Duration.ofSeconds(5);
+    private static final List<String> QUOTA_EXHAUSTED_MARKERS = List.of(
+            "quota",
+            "limit",
+            "exceed",
+            "exceeded",
+            "too many",
+            "일일",
+            "월간",
+            "초과",
+            "한도",
+            "제한");
 
     private final PatentLookupProperties properties;
     private final HttpClient httpClient;
+    private final Map<String, YearMonth> exhaustedKeys = new ConcurrentHashMap<>();
 
     public KiprisPatentLookupClient(PatentLookupProperties properties) {
         this.properties = properties;
@@ -31,7 +48,8 @@ public class KiprisPatentLookupClient implements ExternalPatentLookupClient {
     @Override
     public Optional<PatentBibliographicInfoResponse> lookup(PatentLookupQuery query) {
         PatentLookupProperties.Kipris kipris = properties.kipris();
-        if (!kipris.enabled() || kipris.serviceKey() == null || kipris.serviceKey().isBlank()) {
+        List<String> serviceKeys = serviceKeys(kipris);
+        if (serviceKeys.isEmpty()) {
             return Optional.empty();
         }
 
@@ -43,23 +61,39 @@ public class KiprisPatentLookupClient implements ExternalPatentLookupClient {
             return Optional.empty();
         }
 
-        try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .GET()
-                    .timeout(TIMEOUT)
-                    .uri(URI.create("%s?applicationNumber=%s&ServiceKey=%s".formatted(
-                            kipris.baseUrl(),
-                            encode(applicationNumber),
-                            encode(kipris.serviceKey()))))
-                    .build();
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            if (response.statusCode() < 200 || response.statusCode() >= 300 || response.body().isBlank()) {
+        YearMonth currentMonth = YearMonth.now();
+        for (String serviceKey : serviceKeys) {
+            if (currentMonth.equals(exhaustedKeys.get(serviceKey))) {
+                continue;
+            }
+            try {
+                HttpRequest request = HttpRequest.newBuilder()
+                        .GET()
+                        .timeout(TIMEOUT)
+                        .uri(URI.create("%s?applicationNumber=%s&ServiceKey=%s".formatted(
+                                kipris.baseUrl(),
+                                encode(applicationNumber),
+                                encode(serviceKey))))
+                        .build();
+                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+                String body = response.body();
+                if (response.statusCode() < 200 || response.statusCode() >= 300 || body == null || body.isBlank()) {
+                    if (isQuotaExhausted(body)) {
+                        exhaustedKeys.put(serviceKey, currentMonth);
+                        continue;
+                    }
+                    return Optional.empty();
+                }
+                if (isQuotaExhausted(body)) {
+                    exhaustedKeys.put(serviceKey, currentMonth);
+                    continue;
+                }
+                return parseResponse(body, query);
+            } catch (Exception exception) {
                 return Optional.empty();
             }
-            return parseResponse(response.body(), query);
-        } catch (Exception exception) {
-            return Optional.empty();
         }
+        return Optional.empty();
     }
 
     private Optional<PatentBibliographicInfoResponse> parseResponse(String xml, PatentLookupQuery query) {
@@ -101,5 +135,28 @@ public class KiprisPatentLookupClient implements ExternalPatentLookupClient {
 
     private String encode(String value) {
         return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
+    private List<String> serviceKeys(PatentLookupProperties.Kipris kipris) {
+        LinkedHashSet<String> keys = new LinkedHashSet<>();
+        addKey(keys, kipris.serviceKey());
+        if (kipris.serviceKeys() != null) {
+            kipris.serviceKeys().forEach(key -> addKey(keys, key));
+        }
+        return List.copyOf(keys);
+    }
+
+    private void addKey(LinkedHashSet<String> keys, String key) {
+        if (key != null && !key.isBlank()) {
+            keys.add(key.trim());
+        }
+    }
+
+    private boolean isQuotaExhausted(String responseBody) {
+        if (responseBody == null || responseBody.isBlank()) {
+            return false;
+        }
+        String normalizedBody = responseBody.toLowerCase();
+        return QUOTA_EXHAUSTED_MARKERS.stream().anyMatch(normalizedBody::contains);
     }
 }
