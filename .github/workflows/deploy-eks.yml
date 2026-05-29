@@ -255,6 +255,7 @@ jobs:
             --from-literal=GMAIL_USERNAME="${{ secrets.GMAIL_USERNAME }}" \
             --from-literal=GMAIL_APP_PASSWORD="${{ secrets.GMAIL_APP_PASSWORD }}" \
             --from-literal=PATENTFLOW_KIPRIS_SERVICE_KEY="${{ secrets.PATENTFLOW_KIPRIS_SERVICE_KEY }}" \
+            --from-literal=PATENTFLOW_KIPRIS_SERVICE_KEYS="${{ secrets.PATENTFLOW_KIPRIS_SERVICE_KEYS }}" \
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Apply app config
