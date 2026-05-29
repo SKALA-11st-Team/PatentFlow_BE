@@ -32,7 +32,8 @@ public class LegalController {
         int pendingReview = countByStatus(all, ReviewWorkflowStatus.MAIL_READY);
         int waitingBusiness = countByStatus(all, ReviewWorkflowStatus.WAITING_BUSINESS_RESPONSE);
         int businessReceived = countByStatus(all, ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED);
-        int pendingLegal = countByStatus(all, ReviewWorkflowStatus.LEGAL_ACTION_RECORDED);
+        // LEGAL_ACTION_RECORDED 상태 제거로 legalActionResult 유무로 최종 처리 완료 건수를 집계
+        int pendingLegal = (int) all.stream().filter(p -> p.legalActionResult() != null).count();
         return ApiResponse.ok(new LegalDashboardSummaryResponse(
                 total, pendingReview, waitingBusiness, businessReceived, pendingLegal));
     }

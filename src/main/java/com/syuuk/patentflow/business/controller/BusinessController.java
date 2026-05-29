@@ -66,8 +66,9 @@ public class BusinessController {
                 .toList();
         int total = all.size();
         int pendingReview = countByStatus(all, ReviewWorkflowStatus.WAITING_BUSINESS_RESPONSE);
+        // 회신 완료 + 최종 결정 완료(legalActionResult != null)를 합산해 '검토됨' 건수로 집계
         int reviewed = countByStatus(all, ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED)
-                + countByStatus(all, ReviewWorkflowStatus.LEGAL_ACTION_RECORDED);
+                + (int) all.stream().filter(p -> p.legalActionResult() != null).count();
         int maintained = (int) all.stream()
                 .filter(p -> p.businessOpinionDecision() == BusinessOpinionDecision.MAINTAIN)
                 .count();
