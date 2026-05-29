@@ -3,7 +3,7 @@
 -- It is intentionally loaded only by LocalDemoSeedRunner for local/demo profiles.
 
 INSERT INTO users (id, username, password, role, department_id, display_name, created_at) VALUES
-    ('USER-business-demo', 'business', '$2a$10$8Cs9O/CKSYzHkTU4/5WBguCSVaE0fWcP8w3pizKrhkoGNOT7nl78e', 'BUSINESS', 'DEPT-ICT', '사업부 데모 담당자', CURRENT_TIMESTAMP)
+    ('USER-business-demo', 'bussiness@bussiness.com', '$2a$10$8Cs9O/CKSYzHkTU4/5WBguCSVaE0fWcP8w3pizKrhkoGNOT7nl78e', 'BUSINESS', 'DEPT-ICT', '사업부 데모 담당자', CURRENT_TIMESTAMP)
 ON CONFLICT (id) DO UPDATE SET
     username = EXCLUDED.username,
     password = EXCLUDED.password,
@@ -153,7 +153,7 @@ INSERT INTO mailing_history (
         '["security.cc@syuuk.test"]',
         3,
         '[{"patentId":"PAT-2026-0076","managementNumber":"P201603002-KR0","title":"AB 테스팅 기반 서비스 제공 방법 및 시스템"},{"patentId":"PAT-2026-0097","managementNumber":"P201501001-KR0","title":"목소리 특징 정보를 이용한 본인 인증 의뢰 및 대행 방법"},{"patentId":"PAT-2026-0127","managementNumber":"P201203001-KR0","title":"멀티 통신채널, 멀티 디바이스 및 멀티 난수에 의한 멀티 인증 시스템 및 방법"}]',
-        'business',
+        'bussiness@bussiness.com',
         '사업부 데모 담당자',
         'DEPT-ICT',
         TIMESTAMP WITH TIME ZONE '2026-05-14 13:10:00+09',
