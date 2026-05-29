@@ -68,7 +68,7 @@ public class AuthSessionService {
         // refresh_token은 1회성 — 사용 즉시 revoke해 재사용 공격(replay attack) 방지
         session.revoke(now);
         authSessionRepository.save(session);
-        return new UserSession(session.getUsername());
+        return new UserSession(session.getEmail());
     }
 
     @Transactional
@@ -108,5 +108,5 @@ public class AuthSessionService {
 
     public record RefreshSession(String refreshToken, Instant expiresAt) {}
 
-    public record UserSession(String username) {}
+    public record UserSession(String email) {}
 }

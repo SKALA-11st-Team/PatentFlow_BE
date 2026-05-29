@@ -149,7 +149,7 @@ Table users {
 Table auth_sessions {
   session_id varchar(64) [pk]
   user_id varchar(64) [not null, note: "FK to users.id"]
-  username varchar(256) [not null, note: "로그인 시점의 이메일 — users.username 스냅샷"]
+  email varchar(256) [not null, note: "세션 생성 시점의 로그인 ID(이메일) 스냅샷 — users.email과 동일"]
   refresh_token_hash varchar(128) [not null, unique, note: "Refresh token SHA-256 해시. 평문은 저장하지 않음"]
   created_at timestamptz [not null]
   expires_at timestamptz [not null, note: "만료 시각; 이 시각 이후 토큰 갱신 불가"]

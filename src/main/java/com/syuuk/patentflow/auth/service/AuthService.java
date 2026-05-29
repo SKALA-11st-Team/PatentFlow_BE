@@ -71,8 +71,7 @@ public class AuthService {
 
     public AuthResult refresh(String refreshToken) {
         AuthSessionService.UserSession session = authSessionService.consume(refreshToken);
-        // session.username()은 email — CustomUserDetailsService.loadUserByUsername이 email로 조회
-        UserDetails userDetails = userDetailsService.loadUserByUsername(session.username());
+        UserDetails userDetails = userDetailsService.loadUserByUsername(session.email());
         return issueTokens((UserDetailsImpl) userDetails);
     }
 

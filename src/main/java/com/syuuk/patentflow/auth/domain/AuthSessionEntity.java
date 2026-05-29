@@ -18,8 +18,9 @@ public class AuthSessionEntity {
     @Column(nullable = false, length = 64)
     private String userId;
 
+    // 세션 생성 시점의 로그인 ID(이메일) 스냅샷 — users.email과 같은 값
     @Column(nullable = false, length = 256)
-    private String username;
+    private String email;
 
     @Column(name = "refresh_token_hash", nullable = false, length = 128)
     private String refreshTokenHash;
@@ -41,49 +42,27 @@ public class AuthSessionEntity {
     public AuthSessionEntity(
             String sessionId,
             String userId,
-            String username,
+            String email,
             String refreshTokenHash,
             OffsetDateTime createdAt,
             OffsetDateTime expiresAt
     ) {
         this.sessionId = sessionId;
         this.userId = userId;
-        this.username = username;
+        this.email = email;
         this.refreshTokenHash = refreshTokenHash;
         this.createdAt = createdAt;
         this.expiresAt = expiresAt;
         this.lastUsedAt = createdAt;
     }
 
-    public String getSessionId() {
-        return sessionId;
-    }
+    public String getSessionId() { return sessionId; }
+    public String getUserId() { return userId; }
+    public String getEmail() { return email; }
+    public String getRefreshTokenHash() { return refreshTokenHash; }
+    public OffsetDateTime getExpiresAt() { return expiresAt; }
+    public OffsetDateTime getRevokedAt() { return revokedAt; }
 
-    public String getUserId() {
-        return userId;
-    }
-
-    public String getUsername() {
-        return username;
-    }
-
-    public String getRefreshTokenHash() {
-        return refreshTokenHash;
-    }
-
-    public OffsetDateTime getExpiresAt() {
-        return expiresAt;
-    }
-
-    public OffsetDateTime getRevokedAt() {
-        return revokedAt;
-    }
-
-    public void markUsed(OffsetDateTime usedAt) {
-        this.lastUsedAt = usedAt;
-    }
-
-    public void revoke(OffsetDateTime revokedAt) {
-        this.revokedAt = revokedAt;
-    }
+    public void markUsed(OffsetDateTime usedAt) { this.lastUsedAt = usedAt; }
+    public void revoke(OffsetDateTime revokedAt) { this.revokedAt = revokedAt; }
 }
