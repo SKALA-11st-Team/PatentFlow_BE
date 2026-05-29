@@ -12,8 +12,8 @@ ON CONFLICT (department_id) DO UPDATE SET
     department_name = EXCLUDED.department_name,
     updated_at = EXCLUDED.updated_at;
 
-INSERT INTO users (id, username, password, role, department_id, display_name, created_at) VALUES
-    ('USER-admin', 'admin', '$2a$10$./V2Hi1S3qoucv7eCn3UPevz.heOde1x3SehhcAJCss8OXimprQFC', 'ADMIN', NULL, '특허관리자', CURRENT_TIMESTAMP),
+INSERT INTO users (id, email, password, role, department_id, username, created_at) VALUES
+    ('USER-admin', 'admin@syuuk.test', '$2a$10$./V2Hi1S3qoucv7eCn3UPevz.heOde1x3SehhcAJCss8OXimprQFC', 'ADMIN', NULL, '특허관리자', CURRENT_TIMESTAMP),
     ('USER-rnd-manager', 'rnd.manager@syuuk.test', '$2a$10$8Cs9O/CKSYzHkTU4/5WBguCSVaE0fWcP8w3pizKrhkoGNOT7nl78e', 'BUSINESS', 'DEPT-RND', 'R&D 담당자', CURRENT_TIMESTAMP),
     ('USER-platform-manager', 'platform.manager@syuuk.test', '$2a$10$8Cs9O/CKSYzHkTU4/5WBguCSVaE0fWcP8w3pizKrhkoGNOT7nl78e', 'BUSINESS', 'DEPT-PLATFORM', '플랫폼 담당자', CURRENT_TIMESTAMP),
     ('USER-esg-manager', 'esg.manager@syuuk.test', '$2a$10$8Cs9O/CKSYzHkTU4/5WBguCSVaE0fWcP8w3pizKrhkoGNOT7nl78e', 'BUSINESS', 'DEPT-ESG', 'ESG 담당자', CURRENT_TIMESTAMP),
@@ -21,11 +21,11 @@ INSERT INTO users (id, username, password, role, department_id, display_name, cr
     ('USER-mfg-manager', 'mfg.manager@syuuk.test', '$2a$10$8Cs9O/CKSYzHkTU4/5WBguCSVaE0fWcP8w3pizKrhkoGNOT7nl78e', 'BUSINESS', 'DEPT-MFG', '제조 담당자', CURRENT_TIMESTAMP),
     ('USER-biz-manager', 'biz.manager@syuuk.test', '$2a$10$8Cs9O/CKSYzHkTU4/5WBguCSVaE0fWcP8w3pizKrhkoGNOT7nl78e', 'BUSINESS', 'DEPT-BIZ', '사업기획 담당자', CURRENT_TIMESTAMP)
 ON CONFLICT (id) DO UPDATE SET
-    username = EXCLUDED.username,
+    email = EXCLUDED.email,
     password = EXCLUDED.password,
     role = EXCLUDED.role,
     department_id = EXCLUDED.department_id,
-    display_name = EXCLUDED.display_name;
+    username = EXCLUDED.username;
 
 INSERT INTO system_settings (setting_key, setting_value, updated_at) VALUES
     ('country.extension.KR', '12', CURRENT_TIMESTAMP),
@@ -38,8 +38,9 @@ ON CONFLICT (setting_key) DO UPDATE SET
     updated_at = EXCLUDED.updated_at;
 
 
--- Q1은 납부 기간(3월)이 지났으므로 ended=true, Q2는 현재 진행 중, Q3/Q4는 아직 미활성화.
--- submission_deadline = 활성화일(검토 시작일) + 회신기한(기본 1개월): Q1=2026-02-01, Q2=2026-05-01
+-- Q1은 납부 기간(3월)이 지났으므로 ended=true.
+-- Q2 이후는 미활성 상태로 둔다. 검토 시작일이 지나면 백엔드 스케줄러가 활성화하며 검토 이력을 생성한다.
+-- submission_deadline = 활성화일(검토 시작일) + 회신기한(기본 1개월)
 -- mail_lead_months_snapshot = 활성화 시점의 메일 발송 기준 개월 수 스냅샷 (기본 2)
 INSERT INTO quarter_settings (
     quarter_key,
@@ -55,7 +56,7 @@ INSERT INTO quarter_settings (
     mail_lead_months_snapshot
 ) VALUES
     ('2026-Q1', 2026, 1, DATE '2026-01-01', DATE '2026-03-31', true, TIMESTAMP WITH TIME ZONE '2026-01-01 09:00:00+09', true, TIMESTAMP WITH TIME ZONE '2026-03-31 18:00:00+09', DATE '2026-02-01', 2),
-    ('2026-Q2', 2026, 2, DATE '2026-04-01', DATE '2026-06-30', true, TIMESTAMP WITH TIME ZONE '2026-04-01 09:00:00+09', false, NULL, DATE '2026-05-01', 2),
+    ('2026-Q2', 2026, 2, DATE '2026-04-01', DATE '2026-06-30', false, NULL, false, NULL, NULL, NULL),
     ('2026-Q3', 2026, 3, DATE '2026-07-01', DATE '2026-09-30', false, NULL, false, NULL, NULL, NULL),
     ('2026-Q4', 2026, 4, DATE '2026-10-01', DATE '2026-12-31', false, NULL, false, NULL, NULL, NULL)
 ON CONFLICT (quarter_key) DO UPDATE SET
@@ -70,47 +71,6 @@ ON CONFLICT (quarter_key) DO UPDATE SET
     submission_deadline = EXCLUDED.submission_deadline,
     mail_lead_months_snapshot = EXCLUDED.mail_lead_months_snapshot;
 
-INSERT INTO patent_review_history (
-    id,
-    patent_id,
-    quarter_key,
-    review_workflow_status,
-    ai_recommendation,
-    annual_fee_due_date,
-    department_id,
-    department_name,
-    created_at,
-    updated_at
-)
-SELECT
-    p.patent_id || '|2026-Q2',
-    p.patent_id,
-    '2026-Q2',
-    CASE
-        WHEN p.fee_due_date BETWEEN DATE '2026-04-01' AND DATE '2026-06-30' THEN 'REVIEW_QUARTER_STARTED'
-        ELSE 'NOT_IN_REVIEW_QUARTER'
-    END,
-    'HOLD',
-    p.fee_due_date,
-    CASE p.business_area
-        WHEN 'AI' THEN 'DEPT-RND'
-        WHEN 'Data' THEN 'DEPT-RND'
-        WHEN 'Blockchain' THEN 'DEPT-PLATFORM'
-        WHEN 'ESG' THEN 'DEPT-ESG'
-        WHEN '통신' THEN 'DEPT-ICT'
-        WHEN '제조' THEN 'DEPT-MFG'
-        ELSE 'DEPT-BIZ'
-    END,
-    CASE p.business_area
-        WHEN 'AI' THEN 'R&D본부'
-        WHEN 'Data' THEN 'R&D본부'
-        WHEN 'Blockchain' THEN '플랫폼사업부'
-        WHEN 'ESG' THEN 'ESG사업부'
-        WHEN '통신' THEN 'ICT사업부'
-        WHEN '제조' THEN '제조사업부'
-        ELSE '사업기획팀'
-    END,
-    CURRENT_TIMESTAMP,
-    CURRENT_TIMESTAMP
-FROM patents p
-ON CONFLICT (patent_id, quarter_key) DO NOTHING;
+-- patent_review_history는 seed에서 미리 만들지 않는다.
+-- 분기 활성화 시 백엔드가 patents.patent_status = ACTIVE 인 특허를 대상으로
+-- REVIEW_QUARTER_STARTED 이력을 생성하고 patents.is_in_review=true로 전환한다.

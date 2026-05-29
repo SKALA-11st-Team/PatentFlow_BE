@@ -227,3 +227,15 @@ ON CONFLICT (patent_id) DO UPDATE SET
     expected_expiration_date = EXCLUDED.expected_expiration_date,
     fee_due_date = EXCLUDED.fee_due_date,
     updated_at = EXCLUDED.updated_at;
+
+-- 최초 로딩 기준:
+-- 1) 기본적으로 모든 특허는 ACTIVE로 시작한다.
+-- 2) 단, 이미 납부 기한이 지난 특허는 ABANDONED로 저장한다.
+-- 3) 검토 시작 여부는 분기 활성화 로직이 patents.is_in_review=true로 전환한다.
+UPDATE patents
+SET patent_status = CASE
+        WHEN fee_due_date IS NOT NULL AND fee_due_date < CURRENT_DATE THEN 'ABANDONED'
+        ELSE 'ACTIVE'
+    END,
+    is_in_review = false,
+    updated_at = CURRENT_TIMESTAMP;
