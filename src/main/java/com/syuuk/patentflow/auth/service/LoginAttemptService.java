@@ -17,23 +17,23 @@ public class LoginAttemptService {
         this.properties = properties;
     }
 
-    public void assertNotLocked(String username) {
-        AttemptState state = attempts.get(key(username));
+    public void assertNotLocked(String email) {
+        AttemptState state = attempts.get(key(email));
         if (state == null || state.lockedUntil == null) {
             return;
         }
         if (state.lockedUntil.isAfter(Instant.now())) {
             throw new PatentFlowException(ErrorCode.LOGIN_LOCKED);
         }
-        attempts.remove(key(username));
+        attempts.remove(key(email));
     }
 
-    public void recordSuccess(String username) {
-        attempts.remove(key(username));
+    public void recordSuccess(String email) {
+        attempts.remove(key(email));
     }
 
-    public void recordFailure(String username) {
-        String key = key(username);
+    public void recordFailure(String email) {
+        String key = key(email);
         attempts.compute(key, (ignored, current) -> {
             AttemptState next = current == null ? new AttemptState() : current;
             next.failures += 1;
@@ -44,8 +44,8 @@ public class LoginAttemptService {
         });
     }
 
-    private String key(String username) {
-        return username == null ? "" : username.trim().toLowerCase();
+    private String key(String email) {
+        return email == null ? "" : email.trim().toLowerCase();
     }
 
     private static class AttemptState {

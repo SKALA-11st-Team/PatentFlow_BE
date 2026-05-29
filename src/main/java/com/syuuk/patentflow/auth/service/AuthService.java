@@ -55,16 +55,16 @@ public class AuthService {
     }
 
     public AuthResult login(LoginRequest request) {
-        loginAttemptService.assertNotLocked(request.username());
+        loginAttemptService.assertNotLocked(request.email());
         Authentication authentication;
         try {
             authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(request.username(), request.password()));
+                    new UsernamePasswordAuthenticationToken(request.email(), request.password()));
         } catch (BadCredentialsException exception) {
-            loginAttemptService.recordFailure(request.username());
+            loginAttemptService.recordFailure(request.email());
             throw exception;
         }
-        loginAttemptService.recordSuccess(request.username());
+        loginAttemptService.recordSuccess(request.email());
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();
         return issueTokens((UserDetailsImpl) userDetails);
     }
