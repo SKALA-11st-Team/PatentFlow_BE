@@ -2,10 +2,7 @@ package com.syuuk.patentflow.patent.controller;
 
 import com.syuuk.patentflow.common.response.ApiResponse;
 import com.syuuk.patentflow.patent.dto.LegalDashboardSummaryResponse;
-import com.syuuk.patentflow.patent.dto.PatentListItemResponse;
-import com.syuuk.patentflow.patent.dto.ReviewWorkflowStatus;
-import com.syuuk.patentflow.patent.service.PatentReviewService;
-import java.util.List;
+import com.syuuk.patentflow.patent.service.DashboardSummaryService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -14,10 +11,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/legal")
 public class LegalController {
 
-    private final PatentReviewService patentReviewService;
+    private final DashboardSummaryService dashboardSummaryService;
 
-    public LegalController(PatentReviewService patentReviewService) {
-        this.patentReviewService = patentReviewService;
+    public LegalController(DashboardSummaryService dashboardSummaryService) {
+        this.dashboardSummaryService = dashboardSummaryService;
     }
 
     /**
@@ -27,17 +24,6 @@ public class LegalController {
      */
     @GetMapping("/dashboard/summary")
     public ApiResponse<LegalDashboardSummaryResponse> getDashboardSummary() {
-        List<PatentListItemResponse> all = patentReviewService.getAllPatents();
-        int total = all.size();
-        int pendingReview = countByStatus(all, ReviewWorkflowStatus.MAIL_READY);
-        int waitingBusiness = countByStatus(all, ReviewWorkflowStatus.WAITING_BUSINESS_RESPONSE);
-        int businessReceived = countByStatus(all, ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED);
-        int pendingLegal = countByStatus(all, ReviewWorkflowStatus.LEGAL_ACTION_RECORDED);
-        return ApiResponse.ok(new LegalDashboardSummaryResponse(
-                total, pendingReview, waitingBusiness, businessReceived, pendingLegal));
-    }
-
-    private int countByStatus(List<PatentListItemResponse> patents, ReviewWorkflowStatus status) {
-        return (int) patents.stream().filter(p -> p.reviewWorkflowStatus() == status).count();
+        return ApiResponse.ok(dashboardSummaryService.getLegalSummary());
     }
 }

@@ -10,6 +10,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDate;
@@ -17,6 +18,13 @@ import java.time.OffsetDateTime;
 
 @Entity
 @Table(name = "patent_review_history",
+        indexes = {
+                @Index(name = "idx_review_history_patent_created", columnList = "patent_id, created_at"),
+                @Index(name = "idx_review_history_status", columnList = "review_workflow_status"),
+                @Index(name = "idx_review_history_department", columnList = "department_id"),
+                @Index(name = "idx_review_history_department_status", columnList = "department_id, review_workflow_status"),
+                @Index(name = "idx_review_history_department_opinion", columnList = "department_id, business_opinion_decision")
+        },
         uniqueConstraints = @UniqueConstraint(columnNames = {"patent_id", "quarter_key"}))
 public class PatentReviewHistoryEntity extends BaseEntity {
 

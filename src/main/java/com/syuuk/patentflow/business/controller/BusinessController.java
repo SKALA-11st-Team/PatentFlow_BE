@@ -11,10 +11,10 @@ import com.syuuk.patentflow.common.error.ErrorCode;
 import com.syuuk.patentflow.common.error.PatentFlowException;
 import com.syuuk.patentflow.common.response.ApiResponse;
 import com.syuuk.patentflow.common.response.PageResponse;
-import com.syuuk.patentflow.patent.dto.BusinessOpinionDecision;
 import com.syuuk.patentflow.patent.dto.PatentDetailResponse;
 import com.syuuk.patentflow.patent.dto.PatentListItemResponse;
 import com.syuuk.patentflow.patent.dto.ReviewWorkflowStatus;
+import com.syuuk.patentflow.patent.service.DashboardSummaryService;
 import com.syuuk.patentflow.patent.service.PatentReviewService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -32,15 +32,18 @@ public class BusinessController {
     private final BusinessFixtureService businessFixtureService;
     private final PatentReviewService patentReviewService;
     private final AuthService authService;
+    private final DashboardSummaryService dashboardSummaryService;
 
     public BusinessController(
             BusinessFixtureService businessFixtureService,
             PatentReviewService patentReviewService,
-            AuthService authService
+            AuthService authService,
+            DashboardSummaryService dashboardSummaryService
     ) {
         this.businessFixtureService = businessFixtureService;
         this.patentReviewService = patentReviewService;
         this.authService = authService;
+        this.dashboardSummaryService = dashboardSummaryService;
     }
 
     /**
@@ -61,20 +64,7 @@ public class BusinessController {
     @GetMapping("/api/v1/business/dashboard/summary")
     public ApiResponse<BusinessDashboardSummaryResponse> getDashboardSummary(Authentication authentication) {
         String departmentId = getDepartmentId(authentication);
-        List<PatentListItemResponse> all = patentReviewService.getAllPatents().stream()
-                .filter(p -> departmentId.equals(p.departmentId()))
-                .toList();
-        int total = all.size();
-        int pendingReview = countByStatus(all, ReviewWorkflowStatus.WAITING_BUSINESS_RESPONSE);
-        int reviewed = countByStatus(all, ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED)
-                + countByStatus(all, ReviewWorkflowStatus.LEGAL_ACTION_RECORDED);
-        int maintained = (int) all.stream()
-                .filter(p -> p.businessOpinionDecision() == BusinessOpinionDecision.MAINTAIN)
-                .count();
-        int abandoned = (int) all.stream()
-                .filter(p -> p.businessOpinionDecision() == BusinessOpinionDecision.ABANDON)
-                .count();
-        return ApiResponse.ok(new BusinessDashboardSummaryResponse(total, pendingReview, reviewed, maintained, abandoned));
+        return ApiResponse.ok(dashboardSummaryService.getBusinessSummary(departmentId));
     }
 
     /**
@@ -191,7 +181,4 @@ public class BusinessController {
         }
     }
 
-    private int countByStatus(List<PatentListItemResponse> patents, ReviewWorkflowStatus status) {
-        return (int) patents.stream().filter(p -> p.reviewWorkflowStatus() == status).count();
-    }
 }
