@@ -28,6 +28,9 @@ public record UserPrincipalResponse(
     }
 
     private static String email(String username) {
+        if (username.contains("@")) {
+            return username;
+        }
         return switch (username) {
             case "admin" -> "admin@syuuk.test";
             case "business" -> "business@syuuk.test";

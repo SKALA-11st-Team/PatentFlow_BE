@@ -13,7 +13,7 @@ ON CONFLICT (department_id) DO UPDATE SET
     updated_at = EXCLUDED.updated_at;
 
 INSERT INTO users (id, username, password, role, department_id, display_name, created_at) VALUES
-    ('USER-admin', 'admin', '$2a$10$./V2Hi1S3qoucv7eCn3UPevz.heOde1x3SehhcAJCss8OXimprQFC', 'ADMIN', NULL, '특허관리자', CURRENT_TIMESTAMP),
+    ('USER-admin', 'admin@syuuk.test', '$2a$10$./V2Hi1S3qoucv7eCn3UPevz.heOde1x3SehhcAJCss8OXimprQFC', 'ADMIN', NULL, '특허관리자', CURRENT_TIMESTAMP),
     ('USER-rnd-manager', 'rnd.manager@syuuk.test', '$2a$10$8Cs9O/CKSYzHkTU4/5WBguCSVaE0fWcP8w3pizKrhkoGNOT7nl78e', 'BUSINESS', 'DEPT-RND', 'R&D 담당자', CURRENT_TIMESTAMP),
     ('USER-platform-manager', 'platform.manager@syuuk.test', '$2a$10$8Cs9O/CKSYzHkTU4/5WBguCSVaE0fWcP8w3pizKrhkoGNOT7nl78e', 'BUSINESS', 'DEPT-PLATFORM', '플랫폼 담당자', CURRENT_TIMESTAMP),
     ('USER-esg-manager', 'esg.manager@syuuk.test', '$2a$10$8Cs9O/CKSYzHkTU4/5WBguCSVaE0fWcP8w3pizKrhkoGNOT7nl78e', 'BUSINESS', 'DEPT-ESG', 'ESG 담당자', CURRENT_TIMESTAMP),

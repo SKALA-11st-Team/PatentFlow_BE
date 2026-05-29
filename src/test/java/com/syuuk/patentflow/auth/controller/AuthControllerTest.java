@@ -24,8 +24,8 @@ import org.springframework.test.web.servlet.MockMvc;
         "patentflow.lookup.google-patents.enabled=false",
         "patentflow.auth.max-login-failures=2",
         "patentflow.auth.login-lock-seconds=300",
-        "patentflow.bootstrap.admin.username=admin",
-        "patentflow.bootstrap.admin.password=admin1234"
+        "patentflow.bootstrap.admin.username=admin@syuuk.test",
+        "patentflow.bootstrap.admin.password=test-admin-password"
 })
 @AutoConfigureMockMvc
 class AuthControllerTest {
@@ -46,24 +46,24 @@ class AuthControllerTest {
         mockMvc.perform(get("/api/v1/auth/me")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.username").value("admin"))
+                .andExpect(jsonPath("$.data.username").value("admin@syuuk.test"))
                 .andExpect(jsonPath("$.data.displayName").value("특허관리자"))
                 .andExpect(jsonPath("$.data.roles[0]").value("ROLE_ADMIN"));
     }
 
     @Test
     void loginSetsHttpOnlyCookiesAndCookieAuthenticatesCurrentUser() throws Exception {
-        LoginCapture login = loginCapture("admin", "admin1234");
+        LoginCapture login = loginCapture("admin@syuuk.test", "test-admin-password");
 
         mockMvc.perform(get("/api/v1/auth/me")
                 .cookie(login.accessCookie()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.username").value("admin"));
+                .andExpect(jsonPath("$.data.username").value("admin@syuuk.test"));
     }
 
     @Test
     void refreshRotatesSessionCookieAndIssuesNewAccessCookie() throws Exception {
-        LoginCapture login = loginCapture("admin", "admin1234");
+        LoginCapture login = loginCapture("admin@syuuk.test", "test-admin-password");
 
         mockMvc.perform(post("/api/v1/auth/refresh")
                 .cookie(login.refreshCookie()))
@@ -100,7 +100,7 @@ class AuthControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {
-                          "username": "admin",
+                          "username": "admin@syuuk.test",
                           "password": "wrong-password"
                         }
                         """))
@@ -225,7 +225,7 @@ class AuthControllerTest {
     }
 
     private String loginAsAdmin() throws Exception {
-        return login("admin", "admin1234");
+        return login("admin@syuuk.test", "test-admin-password");
     }
 
     private String login(String username, String password) throws Exception {
