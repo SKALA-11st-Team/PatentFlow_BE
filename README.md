@@ -125,7 +125,8 @@ KIPRISPlus URLs follow the OpenAPI operation pattern `base-url + service-path + 
 PATENTFLOW_KIPRIS_BASE_URL=http://plus.kipris.or.kr
 PATENTFLOW_KIPRIS_SERVICE_PATH=/kipo-api/kipi/patUtiModInfoSearchSevice
 PATENTFLOW_KIPRIS_BIBLIOGRAPHY_OPERATION=getBibliographyDetailInfoSearch
-PATENTFLOW_KIPRIS_APPLICATION_SEARCH_OPERATION=applicationNumberSearchInfo
+# Optional wrapper-only fallback operation. Leave blank for direct KIPRISPlus source calls.
+PATENTFLOW_KIPRIS_APPLICATION_SEARCH_OPERATION=
 ```
 
 Google Patents is implemented as a public page fallback, not an official JSON API. If external lookup fails or has missing fields, the API falls back to `docs/skax_patents_list.md` metadata where available.

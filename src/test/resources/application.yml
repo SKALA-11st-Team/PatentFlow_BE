@@ -20,7 +20,7 @@ patentflow:
       base-url: http://plus.kipris.or.kr
       service-path: /kipo-api/kipi/patUtiModInfoSearchSevice
       bibliography-operation: getBibliographyDetailInfoSearch
-      application-search-operation: applicationNumberSearchInfo
+      application-search-operation:
       service-key:
       service-keys:
     google-patents:

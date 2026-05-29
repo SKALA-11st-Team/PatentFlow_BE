@@ -80,6 +80,9 @@ public class KiprisPatentLookupClient implements ExternalPatentLookupClient {
                 if (detailResult.isPresent()) {
                     return detailResult;
                 }
+                if (kipris.applicationSearchOperation() == null || kipris.applicationSearchOperation().isBlank()) {
+                    return Optional.empty();
+                }
 
                 KiprisResponse searchResponse = request(kipris, kipris.applicationSearchOperation(), applicationNumber, serviceKey);
                 if (searchResponse.quotaExhausted()) {
