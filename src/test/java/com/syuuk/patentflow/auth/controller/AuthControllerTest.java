@@ -95,6 +95,25 @@ class AuthControllerTest {
     }
 
     @Test
+    void operationalEndpointsExposeOnlyHealthPublicly() throws Exception {
+        mockMvc.perform(get("/actuator/health"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/actuator/info"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void swaggerEndpointsRequireAdminAuthentication() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/v3/api-docs")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + loginAsAdmin()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void loginRejectsInvalidPassword() throws Exception {
         mockMvc.perform(post("/api/v1/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
