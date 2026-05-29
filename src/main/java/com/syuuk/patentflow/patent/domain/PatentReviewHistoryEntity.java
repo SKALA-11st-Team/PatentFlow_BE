@@ -84,8 +84,34 @@ public class PatentReviewHistoryEntity extends BaseEntity {
     @Column(name = "business_opinion_reason", length = 2000)
     private String businessOpinionReason;
 
+    @Column(name = "business_opinion_submitted_by", length = 128)
+    private String businessOpinionSubmittedBy;  // 의견 제출자 이름
+
     @Column(name = "business_opinion_submitted_at")
     private OffsetDateTime businessOpinionSubmittedAt;
+
+    // 사업부 체크리스트 결과 — 항목별 점수 합산
+    @Column(name = "business_checklist_total")
+    private Integer businessChecklistTotal;
+
+    // 사업부 정성 평가 점수
+    @Column(name = "business_qualitative_score")
+    private Integer businessQualitativeScore;
+
+    // 체크리스트 항목별 점수 JSON 직렬화 저장
+    @Column(name = "business_checklist_scores_json", columnDefinition = "TEXT")
+    private String businessChecklistScoresJson;
+
+    // 체크리스트 제출 시점의 AI 레포트 스냅샷 — 사업부가 참고한 AI 정보 이력 보존
+    @Column(name = "business_ai_report_created_at")
+    private OffsetDateTime businessAiReportCreatedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "business_ai_recommendation", length = 64)
+    private Recommendation businessAiRecommendation;
+
+    @Column(name = "business_ai_total_score")
+    private Integer businessAiTotalScore;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "legal_action_result", length = 64)
@@ -266,12 +292,68 @@ public class PatentReviewHistoryEntity extends BaseEntity {
         this.businessOpinionReason = businessOpinionReason;
     }
 
+    public String getBusinessOpinionSubmittedBy() {
+        return businessOpinionSubmittedBy;
+    }
+
+    public void setBusinessOpinionSubmittedBy(String businessOpinionSubmittedBy) {
+        this.businessOpinionSubmittedBy = businessOpinionSubmittedBy;
+    }
+
     public OffsetDateTime getBusinessOpinionSubmittedAt() {
         return businessOpinionSubmittedAt;
     }
 
     public void setBusinessOpinionSubmittedAt(OffsetDateTime businessOpinionSubmittedAt) {
         this.businessOpinionSubmittedAt = businessOpinionSubmittedAt;
+    }
+
+    public Integer getBusinessChecklistTotal() {
+        return businessChecklistTotal;
+    }
+
+    public void setBusinessChecklistTotal(Integer businessChecklistTotal) {
+        this.businessChecklistTotal = businessChecklistTotal;
+    }
+
+    public Integer getBusinessQualitativeScore() {
+        return businessQualitativeScore;
+    }
+
+    public void setBusinessQualitativeScore(Integer businessQualitativeScore) {
+        this.businessQualitativeScore = businessQualitativeScore;
+    }
+
+    public String getBusinessChecklistScoresJson() {
+        return businessChecklistScoresJson;
+    }
+
+    public void setBusinessChecklistScoresJson(String businessChecklistScoresJson) {
+        this.businessChecklistScoresJson = businessChecklistScoresJson;
+    }
+
+    public OffsetDateTime getBusinessAiReportCreatedAt() {
+        return businessAiReportCreatedAt;
+    }
+
+    public void setBusinessAiReportCreatedAt(OffsetDateTime businessAiReportCreatedAt) {
+        this.businessAiReportCreatedAt = businessAiReportCreatedAt;
+    }
+
+    public Recommendation getBusinessAiRecommendation() {
+        return businessAiRecommendation;
+    }
+
+    public void setBusinessAiRecommendation(Recommendation businessAiRecommendation) {
+        this.businessAiRecommendation = businessAiRecommendation;
+    }
+
+    public Integer getBusinessAiTotalScore() {
+        return businessAiTotalScore;
+    }
+
+    public void setBusinessAiTotalScore(Integer businessAiTotalScore) {
+        this.businessAiTotalScore = businessAiTotalScore;
     }
 
     public LegalActionResult getLegalActionResult() {
