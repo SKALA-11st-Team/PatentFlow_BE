@@ -25,7 +25,8 @@ import org.springframework.test.web.servlet.MockMvc;
         "patentflow.lookup.google-patents.enabled=false",
         "patentflow.auth.max-login-failures=2",
         "patentflow.auth.login-lock-seconds=300",
-        "patentflow.bootstrap.admin.username=admin",
+        // bootstrap 환경변수명이 .email로 변경됨 (users.email = 로그인 ID)
+        "patentflow.bootstrap.admin.email=admin@test.com",
         "patentflow.bootstrap.admin.password=admin1234"
 })
 @AutoConfigureMockMvc
@@ -47,24 +48,25 @@ class AuthControllerTest {
         mockMvc.perform(get("/api/v1/auth/me")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.username").value("admin"))
-                .andExpect(jsonPath("$.data.displayName").value("특허관리자"))
+                // email = 로그인 ID, username = 실제 이름
+                .andExpect(jsonPath("$.data.email").value("admin@test.com"))
+                .andExpect(jsonPath("$.data.username").value("특허관리자"))
                 .andExpect(jsonPath("$.data.roles[0]").value("ROLE_ADMIN"));
     }
 
     @Test
     void loginSetsHttpOnlyCookiesAndCookieAuthenticatesCurrentUser() throws Exception {
-        LoginCapture login = loginCapture("admin", "admin1234");
+        LoginCapture login = loginCapture("admin@test.com", "admin1234");
 
         mockMvc.perform(get("/api/v1/auth/me")
                 .cookie(login.accessCookie()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.username").value("admin"));
+                .andExpect(jsonPath("$.data.email").value("admin@test.com"));
     }
 
     @Test
     void refreshRotatesSessionCookieAndIssuesNewAccessCookie() throws Exception {
-        LoginCapture login = loginCapture("admin", "admin1234");
+        LoginCapture login = loginCapture("admin@test.com", "admin1234");
 
         mockMvc.perform(post("/api/v1/auth/refresh")
                 .cookie(login.refreshCookie()))
@@ -79,6 +81,7 @@ class AuthControllerTest {
                     org.assertj.core.api.Assertions.assertThat(refreshCookie.isHttpOnly()).isTrue();
                 });
 
+        // refresh_token은 1회성 — 재사용 시 UNAUTHORIZED
         mockMvc.perform(post("/api/v1/auth/refresh")
                 .cookie(login.refreshCookie()))
                 .andExpect(status().isUnauthorized());
@@ -101,7 +104,7 @@ class AuthControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {
-                          "username": "admin",
+                          "username": "admin@test.com",
                           "password": "wrong-password"
                         }
                         """))
@@ -126,7 +129,7 @@ class AuthControllerTest {
     @Test
     void businessUserCannotAccessAdminApi() throws Exception {
         ensureBusinessUser();
-        String token = login("business-user", "business1234");
+        String token = login("business@test.com", "business1234");
 
         mockMvc.perform(get("/api/v1/admin/users")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
@@ -136,7 +139,7 @@ class AuthControllerTest {
     @Test
     void businessUserCannotReadOrMutateAdminNotifications() throws Exception {
         ensureBusinessUser();
-        String token = login("business-user", "business1234");
+        String token = login("business@test.com", "business1234");
 
         mockMvc.perform(get("/api/v1/notifications")
                 .param("role", "ADMIN")
@@ -171,7 +174,7 @@ class AuthControllerTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
                             {
-                              "username": "lock-user",
+                              "username": "lock@test.com",
                               "password": "wrong-password"
                             }
                             """))
@@ -182,7 +185,7 @@ class AuthControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {
-                          "username": "lock-user",
+                          "username": "lock@test.com",
                           "password": "lock1234"
                         }
                         """))
@@ -193,7 +196,7 @@ class AuthControllerTest {
     @Test
     void businessUserCanAccessOnlyAssignedDepartmentPatentResources() throws Exception {
         ensureBusinessUser();
-        String token = login("business-user", "business1234");
+        String token = login("business@test.com", "business1234");
 
         mockMvc.perform(get("/api/v1/business/patents/PAT-2026-0001")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
@@ -212,9 +215,10 @@ class AuthControllerTest {
     @Test
     void businessPatentAccessUsesCurrentUserDepartmentWhenJwtDepartmentIsStale() throws Exception {
         ensureStaleDepartmentUser();
-        String token = login("stale-dept-user", "business1234");
+        String token = login("stale@test.com", "business1234");
 
-        UserEntity user = userRepository.findByUsername("stale-dept-user").orElseThrow();
+        // JWT 발급 후 DB에서 사업부를 변경 → 다음 요청 시 DB 최신값 반영 여부 확인
+        UserEntity user = userRepository.findByEmail("stale@test.com").orElseThrow();
         user.setDepartmentId("DEPT-ICT");
         userRepository.save(user);
 
@@ -226,7 +230,7 @@ class AuthControllerTest {
     }
 
     private String loginAsAdmin() throws Exception {
-        return login("admin", "admin1234");
+        return login("admin@test.com", "admin1234");
     }
 
     private String login(String username, String password) throws Exception {
@@ -245,7 +249,8 @@ class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.accessToken").isNotEmpty())
                 .andExpect(jsonPath("$.data.tokenType").value("Bearer"))
-                .andExpect(jsonPath("$.data.user.username").value(username))
+                // 로그인 응답의 user.email = 로그인 ID
+                .andExpect(jsonPath("$.data.user.email").value(username))
                 .andReturn()
                 .getResponse();
 
@@ -257,12 +262,13 @@ class AuthControllerTest {
     }
 
     private void ensureBusinessUser() {
-        if (userRepository.existsByUsername("business-user")) {
+        if (userRepository.existsByEmail("business@test.com")) {
             return;
         }
+        // UserEntity(id, email, password, role, departmentId, username=이름)
         userRepository.save(new UserEntity(
                 "USER-business-test",
-                "business-user",
+                "business@test.com",
                 passwordEncoder.encode("business1234"),
                 "BUSINESS",
                 "DEPT-RND",
@@ -270,14 +276,14 @@ class AuthControllerTest {
     }
 
     private void ensureStaleDepartmentUser() {
-        userRepository.findByUsername("stale-dept-user").ifPresentOrElse(
+        userRepository.findByEmail("stale@test.com").ifPresentOrElse(
                 user -> {
                     user.setDepartmentId("DEPT-RND");
                     userRepository.save(user);
                 },
                 () -> userRepository.save(new UserEntity(
                         "USER-stale-dept-test",
-                        "stale-dept-user",
+                        "stale@test.com",
                         passwordEncoder.encode("business1234"),
                         "BUSINESS",
                         "DEPT-RND",
@@ -285,12 +291,12 @@ class AuthControllerTest {
     }
 
     private void ensureLockTestUser() {
-        if (userRepository.existsByUsername("lock-user")) {
+        if (userRepository.existsByEmail("lock@test.com")) {
             return;
         }
         userRepository.save(new UserEntity(
                 "USER-lock-test",
-                "lock-user",
+                "lock@test.com",
                 passwordEncoder.encode("lock1234"),
                 "ADMIN",
                 null,
