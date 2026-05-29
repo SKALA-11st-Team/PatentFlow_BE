@@ -12,6 +12,7 @@ import com.syuuk.patentflow.settings.dto.ReviewPeriodTemplateRequest;
 import com.syuuk.patentflow.settings.dto.ReviewPeriodTemplateResponse;
 import com.syuuk.patentflow.settings.repository.QuarterSettingRepository;
 import com.syuuk.patentflow.settings.repository.ReviewPeriodTemplateRepository;
+import com.syuuk.patentflow.patent.service.AiReportBatchService;
 import com.syuuk.patentflow.patent.service.PatentReviewService;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -27,16 +28,19 @@ public class SettingsService {
     private final QuarterSettingRepository quarterSettingRepository;
     private final ReviewPeriodTemplateRepository periodTemplateRepository;
     private final PatentReviewService patentReviewService;
+    private final AiReportBatchService aiReportBatchService;
     private final SystemSettingsService systemSettingsService;
 
     public SettingsService(
             QuarterSettingRepository quarterSettingRepository,
             ReviewPeriodTemplateRepository periodTemplateRepository,
             PatentReviewService patentReviewService,
+            AiReportBatchService aiReportBatchService,
             SystemSettingsService systemSettingsService) {
         this.quarterSettingRepository = quarterSettingRepository;
         this.periodTemplateRepository = periodTemplateRepository;
         this.patentReviewService = patentReviewService;
+        this.aiReportBatchService = aiReportBatchService;
         this.systemSettingsService = systemSettingsService;
         seedDefaultTemplatesIfNeeded();
     }
@@ -115,12 +119,14 @@ public class SettingsService {
         return buildActivateResponse(quarter);
     }
 
-    // 스케줄러 전용 — 이미 활성화된 경우 조용히 스킵
-    public void activateQuarterIfNeeded(String quarterKey) {
+    // 스케줄러 전용 — 이미 활성화된 경우 조용히 스킵하고 false 반환
+    public boolean activateQuarterIfNeeded(String quarterKey) {
         QuarterSettingEntity quarter = findOrCreateQuarter(quarterKey);
         if (!quarter.isActivated()) {
             doActivate(quarter);
+            return true;
         }
+        return false;
     }
 
     private void doActivate(QuarterSettingEntity quarter) {
@@ -138,13 +144,20 @@ public class SettingsService {
         quarter.setActivated(true);
         quarter.setActivatedAt(OffsetDateTime.now(KST));
         quarterSettingRepository.save(quarter);
-        patentReviewService.createQuarterReviewTargets(
+        // 검토 시작일에 도달한 분기에 대해, 해당 납부 기간에 속한 ACTIVE 특허만 검토 대상으로 만든다.
+        List<String> reviewStartedIds = patentReviewService.createQuarterReviewTargets(
                 quarter.getQuarterKey(), quarter.getStartDate(), quarter.getEndDate());
+        // 대상 특허가 있으면 백그라운드에서 AI 레포트 배치 생성을 시작한다.
+        // @Async이므로 이 메서드는 즉시 반환되고, 실제 생성은 별도 스레드에서 순차 진행된다.
+        if (!reviewStartedIds.isEmpty()) {
+            aiReportBatchService.generateReportsForQuarter(reviewStartedIds, quarter.getQuarterKey());
+        }
     }
 
     private QuarterActivateResponse buildActivateResponse(QuarterSettingEntity quarter) {
         List<String> targets = patentReviewService.getAllPatents().stream()
                 .filter(p -> p.feeDueDate() != null
+                        && p.lifecycleStatus() == com.syuuk.patentflow.patent.dto.PatentLifecycleStatus.ACTIVE
                         && !p.feeDueDate().isBefore(quarter.getStartDate())
                         && !p.feeDueDate().isAfter(quarter.getEndDate()))
                 .map(p -> p.patentId())
@@ -184,6 +197,7 @@ public class SettingsService {
         if (startDate == null || endDate == null) return 0;
         return (int) patentReviewService.getAllPatents().stream()
                 .filter(p -> p.feeDueDate() != null
+                        && p.lifecycleStatus() == com.syuuk.patentflow.patent.dto.PatentLifecycleStatus.ACTIVE
                         && !p.feeDueDate().isBefore(startDate)
                         && !p.feeDueDate().isAfter(endDate))
                 .count();
