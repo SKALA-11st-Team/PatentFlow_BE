@@ -4,7 +4,8 @@
 
 INSERT INTO users (id, username, password, role, department_id, display_name, created_at) VALUES
     ('USER-business-demo', 'business', '$2a$10$8Cs9O/CKSYzHkTU4/5WBguCSVaE0fWcP8w3pizKrhkoGNOT7nl78e', 'BUSINESS', 'DEPT-ICT', '사업부 데모 담당자', CURRENT_TIMESTAMP)
-ON CONFLICT (username) DO UPDATE SET
+ON CONFLICT (id) DO UPDATE SET
+    username = EXCLUDED.username,
     password = EXCLUDED.password,
     role = EXCLUDED.role,
     department_id = EXCLUDED.department_id,
