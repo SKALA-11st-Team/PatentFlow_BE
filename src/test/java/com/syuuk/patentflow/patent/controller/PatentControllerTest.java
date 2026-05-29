@@ -80,7 +80,10 @@ class PatentControllerTest {
         mockMvc.perform(get("/api/v1/patents/PAT-2026-0001/history"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data", hasSize(2)))
-                .andExpect(jsonPath("$.data[0].type").value("AI_EVALUATION_CREATED"));
+                .andExpect(jsonPath("$.data[0].historyId").value("PAT-2026-0001|DEMO-SEED-WORKFLOW"))
+                .andExpect(jsonPath("$.data[0].type").value("WORKFLOW_STATUS_UPDATED"))
+                .andExpect(jsonPath("$.data[1].historyId").value("PAT-2026-0001|DEMO-SEED-AI"))
+                .andExpect(jsonPath("$.data[1].type").value("AI_EVALUATION_CREATED"));
     }
 
     @Test

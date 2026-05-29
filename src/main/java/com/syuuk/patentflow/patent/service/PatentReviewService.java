@@ -383,23 +383,62 @@ public class PatentReviewService {
     @Transactional(readOnly = true)
     public List<PatentHistoryResponse> getPatentHistory(String patentId) {
         getPatentDetail(patentId);
-        OffsetDateTime createdAt = OffsetDateTime.of(2026, 5, 6, 10, 0, 0, 0,
-                ZoneId.of("Asia/Seoul").getRules().getOffset(java.time.Instant.now()));
-        return List.of(
-                new PatentHistoryResponse(
-                        "HIST-2026-0001",
-                        "AI_EVALUATION_CREATED",
-                        "AI 평가 레포트 생성",
-                        "1차 AI 특허 평가 레포트가 생성되었습니다.",
-                        "AI Evaluation Service",
-                        createdAt),
-                new PatentHistoryResponse(
-                        "HIST-2026-0002",
-                        "HUMAN_DECISION_UPDATED",
-                        "최종 판단 기록",
-                        "관리자 최종 판단 대기 상태로 이력이 기록되었습니다.",
-                        "관리자",
-                        createdAt.plusHours(1)));
+        return reviewHistoryRepository.findByPatentIdOrderByCreatedAtDesc(patentId).stream()
+                .flatMap(history -> patentHistoryResponses(history).stream())
+                .sorted(Comparator.comparing(PatentHistoryResponse::createdAt,
+                        Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
+    }
+
+    private List<PatentHistoryResponse> patentHistoryResponses(PatentReviewHistoryEntity history) {
+        List<PatentHistoryResponse> responses = new ArrayList<>();
+        OffsetDateTime createdAt = history.getCreatedAt() == null
+                ? null
+                : history.getCreatedAt().atZone(KST).toOffsetDateTime();
+
+        responses.add(new PatentHistoryResponse(
+                history.getId() + "-WORKFLOW",
+                "WORKFLOW_STATUS_UPDATED",
+                "검토 상태 기록",
+                "%s 분기 상태가 %s로 기록되었습니다.".formatted(
+                        history.getQuarterKey(),
+                        history.getReviewWorkflowStatus() == null ? "미정" : history.getReviewWorkflowStatus().name()),
+                "PatentFlow",
+                createdAt));
+
+        if (history.getAiReportCreatedAt() != null) {
+            responses.add(new PatentHistoryResponse(
+                    history.getId() + "-AI",
+                    "AI_EVALUATION_CREATED",
+                    "AI 평가 레포트 생성",
+                    "%s 분기 AI 특허 평가 레포트가 생성되었습니다.".formatted(history.getQuarterKey()),
+                    "AI Evaluation Service",
+                    history.getAiReportCreatedAt()));
+        }
+
+        if (history.getBusinessOpinionDecision() != null || history.getBusinessOpinionSubmittedAt() != null) {
+            responses.add(new PatentHistoryResponse(
+                    history.getId() + "-BUSINESS",
+                    "BUSINESS_OPINION_SUBMITTED",
+                    "사업부 의견 제출",
+                    "사업부가 %s 의견을 제출했습니다.".formatted(
+                            history.getBusinessOpinionDecision() == null ? "검토" : history.getBusinessOpinionDecision().name()),
+                    valueOrDefault(history.getDepartmentName(), "사업부"),
+                    history.getBusinessOpinionSubmittedAt() != null ? history.getBusinessOpinionSubmittedAt() : createdAt));
+        }
+
+        if (history.getLegalActionResult() != null || history.getFinalDecisionDecidedAt() != null) {
+            responses.add(new PatentHistoryResponse(
+                    history.getId() + "-FINAL",
+                    "FINAL_DECISION_RECORDED",
+                    "최종 판단 기록",
+                    "관리자가 %s 결과를 기록했습니다.".formatted(
+                            history.getLegalActionResult() == null ? "최종 판단" : history.getLegalActionResult().name()),
+                    "관리자",
+                    history.getFinalDecisionDecidedAt() != null ? history.getFinalDecisionDecidedAt() : createdAt));
+        }
+
+        return responses;
     }
 
     /**
