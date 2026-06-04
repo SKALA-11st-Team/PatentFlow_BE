@@ -166,6 +166,7 @@ class AuthControllerTest {
                 .andExpect(status().isUnauthorized());
 
         mockMvc.perform(patch("/api/v1/notifications/NOTIF-001/read-state")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {
