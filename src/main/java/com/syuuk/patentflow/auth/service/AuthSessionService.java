@@ -43,10 +43,12 @@ public class AuthSessionService {
                 UUID.randomUUID().toString(),
                 userDetails.getUser().getId(),
                 userDetails.getUsername(),
+                // refresh_token 원문은 저장하지 않고 해시만 보관 — DB 유출 시 토큰 재사용 방지
                 hash(refreshToken),
                 now,
                 expiresAt);
         authSessionRepository.save(session);
+        // 만료 후 하루가 지난 세션을 정리 — 즉시 삭제하지 않고 하루 버퍼를 두어 클럭 오차 대응
         authSessionRepository.deleteByExpiresAtBefore(now.minusDays(1));
         return new RefreshSession(refreshToken, expiresAt.toInstant());
     }
@@ -63,9 +65,10 @@ public class AuthSessionService {
             throw new PatentFlowException(ErrorCode.UNAUTHORIZED);
         }
         session.markUsed(now);
+        // refresh_token은 1회성 — 사용 즉시 revoke해 재사용 공격(replay attack) 방지
         session.revoke(now);
         authSessionRepository.save(session);
-        return new UserSession(session.getUsername());
+        return new UserSession(session.getEmail());
     }
 
     @Transactional
@@ -81,6 +84,18 @@ public class AuthSessionService {
                 });
     }
 
+    // 비밀번호 변경 후 해당 사용자의 모든 세션을 무효화해 재로그인을 강제한다.
+    @Transactional
+    public void revokeAll(String userId) {
+        OffsetDateTime now = OffsetDateTime.now(KST);
+        authSessionRepository.findByUserId(userId).forEach(session -> {
+            if (session.getRevokedAt() == null) {
+                session.revoke(now);
+                authSessionRepository.save(session);
+            }
+        });
+    }
+
     private String hash(String token) {
         byte[] digest;
         try {
@@ -93,5 +108,5 @@ public class AuthSessionService {
 
     public record RefreshSession(String refreshToken, Instant expiresAt) {}
 
-    public record UserSession(String username) {}
+    public record UserSession(String email) {}
 }

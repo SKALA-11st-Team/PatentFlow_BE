@@ -19,9 +19,10 @@ public class UserDetailsImpl implements UserDetails {
         return user;
     }
 
+    // Spring Security의 username = 로그인 ID → email 반환
     @Override
     public String getUsername() {
-        return user.getUsername();
+        return user.getEmail();
     }
 
     @Override

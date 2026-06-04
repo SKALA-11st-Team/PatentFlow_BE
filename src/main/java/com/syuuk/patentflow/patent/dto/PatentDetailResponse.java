@@ -29,6 +29,7 @@ public record PatentDetailResponse(
         PatentSummaryResponse summary,
         AiEvaluationReportResponse aiEvaluationReport,
         FinalDecisionRecordResponse finalDecisionRecord,
-        BusinessOpinionResponse businessOpinion
+        BusinessOpinionResponse businessOpinion,
+        boolean inReview  // 현재 분기 검토 대상 여부 (patents.is_in_review 반영)
 ) {
 }

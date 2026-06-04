@@ -29,7 +29,7 @@ public class DashboardSummaryService {
         int pendingReview = countLatest(ReviewWorkflowStatus.MAIL_READY);
         int waitingBusiness = countLatest(ReviewWorkflowStatus.WAITING_BUSINESS_RESPONSE);
         int businessReceived = countLatest(ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED);
-        int pendingLegal = countLatest(ReviewWorkflowStatus.LEGAL_ACTION_RECORDED);
+        int pendingLegal = Math.toIntExact(reviewHistoryRepository.countLatestByLegalActionResultIsNotNull());
         return new LegalDashboardSummaryResponse(total, pendingReview, waitingBusiness, businessReceived, pendingLegal);
     }
 
@@ -41,7 +41,8 @@ public class DashboardSummaryService {
                 ReviewWorkflowStatus.WAITING_BUSINESS_RESPONSE));
         int reviewed = Math.toIntExact(reviewHistoryRepository.countLatestByDepartmentIdAndReviewWorkflowStatusIn(
                 departmentId,
-                List.of(ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED, ReviewWorkflowStatus.LEGAL_ACTION_RECORDED)));
+                List.of(ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED)))
+                + Math.toIntExact(reviewHistoryRepository.countLatestByDepartmentIdAndLegalActionResultIsNotNull(departmentId));
         int maintained = Math.toIntExact(reviewHistoryRepository.countLatestByDepartmentIdAndBusinessOpinionDecision(
                 departmentId,
                 BusinessOpinionDecision.MAINTAIN));

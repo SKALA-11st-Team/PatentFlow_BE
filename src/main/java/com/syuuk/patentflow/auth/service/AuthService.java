@@ -1,5 +1,6 @@
 package com.syuuk.patentflow.auth.service;
 
+import com.syuuk.patentflow.auth.dto.ChangePasswordRequest;
 import com.syuuk.patentflow.auth.dto.LoginRequest;
 import com.syuuk.patentflow.auth.dto.LoginResponse;
 import com.syuuk.patentflow.auth.dto.UpdateProfileRequest;
@@ -14,6 +15,7 @@ import java.time.Instant;
 import java.util.List;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -31,6 +33,7 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final LoginAttemptService loginAttemptService;
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
     public AuthService(
             AuthenticationManager authenticationManager,
@@ -39,7 +42,8 @@ public class AuthService {
             CustomUserDetailsService userDetailsService,
             JwtTokenProvider jwtTokenProvider,
             LoginAttemptService loginAttemptService,
-            UserRepository userRepository
+            UserRepository userRepository,
+            PasswordEncoder passwordEncoder
     ) {
         this.authenticationManager = authenticationManager;
         this.authSessionService = authSessionService;
@@ -48,20 +52,21 @@ public class AuthService {
         this.jwtTokenProvider = jwtTokenProvider;
         this.loginAttemptService = loginAttemptService;
         this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Transactional
     public AuthResult login(LoginRequest request) {
-        loginAttemptService.assertNotLocked(request.username());
+        loginAttemptService.assertNotLocked(request.email());
         Authentication authentication;
         try {
             authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(request.username(), request.password()));
+                    new UsernamePasswordAuthenticationToken(request.email(), request.password()));
         } catch (BadCredentialsException exception) {
-            loginAttemptService.recordFailure(request.username());
+            loginAttemptService.recordFailure(request.email());
             throw exception;
         }
-        loginAttemptService.recordSuccess(request.username());
+        loginAttemptService.recordSuccess(request.email());
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();
         return issueTokens((UserDetailsImpl) userDetails);
     }
@@ -69,7 +74,7 @@ public class AuthService {
     @Transactional
     public AuthResult refresh(String refreshToken) {
         AuthSessionService.UserSession session = authSessionService.consume(refreshToken);
-        UserDetails userDetails = userDetailsService.loadUserByUsername(session.username());
+        UserDetails userDetails = userDetailsService.loadUserByUsername(session.email());
         return issueTokens((UserDetailsImpl) userDetails);
     }
 
@@ -77,8 +82,9 @@ public class AuthService {
     public UserPrincipalResponse currentUser(Authentication authentication) {
         Object principal = authentication.getPrincipal();
         if (principal instanceof UserPrincipalResponse userPrincipal) {
+            // JWT 파싱된 principal로 DB를 재조회해 최신 프로필(username, 부서 등)을 반환
             return userRepository.findById(userPrincipal.userId())
-                    .or(() -> userRepository.findByUsername(userPrincipal.username()))
+                    .or(() -> userRepository.findByEmail(userPrincipal.email()))
                     .map(user -> toPrincipalResponse(new UserDetailsImpl(user)))
                     .orElse(userPrincipal);
         }
@@ -90,9 +96,23 @@ public class AuthService {
         UserPrincipalResponse current = currentUser(authentication);
         UserEntity user = userRepository.findById(current.userId())
                 .orElseThrow(() -> new PatentFlowException(ErrorCode.USER_NOT_FOUND));
-        user.setDisplayName(request.displayName());
+        user.setUsername(request.username());
         userRepository.save(user);
         return toPrincipalResponse(new UserDetailsImpl(user));
+    }
+
+    @Transactional
+    public void changePassword(Authentication authentication, ChangePasswordRequest request) {
+        UserPrincipalResponse current = currentUser(authentication);
+        UserEntity user = userRepository.findById(current.userId())
+                .orElseThrow(() -> new PatentFlowException(ErrorCode.USER_NOT_FOUND));
+        if (!passwordEncoder.matches(request.currentPassword(), user.getPassword())) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "현재 비밀번호가 올바르지 않습니다.");
+        }
+        user.setPassword(passwordEncoder.encode(request.newPassword()));
+        userRepository.save(user);
+        // 비밀번호 변경 후 기존 세션 전체 무효화 — 재로그인 필요
+        authSessionService.revokeAll(current.userId());
     }
 
     @Transactional
@@ -140,14 +160,14 @@ public class AuthService {
 
         if (userDetails instanceof UserDetailsImpl impl) {
             UserEntity u = impl.getUser();
-            String role = u.getRole();
             return new UserPrincipalResponse(
-                    u.getUsername(), u.getDisplayName(), roles,
-                    u.getId(), u.getDisplayName(), u.getUsername(),
-                    role, u.getDepartmentId(), u.getDepartmentName());
+                    u.getEmail(), u.getUsername(), roles,
+                    u.getId(), u.getRole(),
+                    u.getDepartmentId(), u.getDepartmentName());
         }
-
-        return new UserPrincipalResponse(userDetails.getUsername(), userDetails.getUsername(), roles);
+        // fallback — email = Spring Security username (login ID)
+        String email = userDetails.getUsername();
+        return new UserPrincipalResponse(email, email, roles, email, "BUSINESS", null, null);
     }
 
     public record AuthResult(

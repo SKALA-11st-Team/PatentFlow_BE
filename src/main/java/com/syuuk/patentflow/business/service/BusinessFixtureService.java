@@ -2,23 +2,22 @@ package com.syuuk.patentflow.business.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.syuuk.patentflow.business.domain.BusinessSubmissionEntity;
 import com.syuuk.patentflow.business.dto.BusinessChecklistItemResponse;
 import com.syuuk.patentflow.business.dto.BusinessChecklistResponseDto;
 import com.syuuk.patentflow.business.dto.BusinessChecklistScoreOptionResponse;
 import com.syuuk.patentflow.business.dto.BusinessChecklistSubmissionRequest;
 import com.syuuk.patentflow.business.dto.BusinessSubmissionChecklistScoreResponse;
 import com.syuuk.patentflow.business.dto.BusinessSubmissionVersionResponse;
-import com.syuuk.patentflow.business.repository.BusinessSubmissionRepository;
+import com.syuuk.patentflow.patent.domain.PatentReviewHistoryEntity;
 import com.syuuk.patentflow.patent.dto.BusinessOpinionDecision;
 import com.syuuk.patentflow.patent.dto.PatentDetailResponse;
 import com.syuuk.patentflow.patent.dto.Recommendation;
 import com.syuuk.patentflow.notification.service.NotificationService;
+import com.syuuk.patentflow.patent.repository.PatentReviewHistoryRepository;
 import com.syuuk.patentflow.patent.service.PatentReviewService;
 import com.syuuk.patentflow.settings.repository.QuarterSettingRepository;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
-import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,20 +28,20 @@ public class BusinessFixtureService {
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     private final PatentReviewService patentReviewService;
-    private final BusinessSubmissionRepository businessSubmissionRepository;
+    private final PatentReviewHistoryRepository reviewHistoryRepository;
     private final ObjectMapper objectMapper;
     private final NotificationService notificationService;
     private final QuarterSettingRepository quarterSettingRepository;
 
     public BusinessFixtureService(
             PatentReviewService patentReviewService,
-            BusinessSubmissionRepository businessSubmissionRepository,
+            PatentReviewHistoryRepository reviewHistoryRepository,
             ObjectMapper objectMapper,
             NotificationService notificationService,
             QuarterSettingRepository quarterSettingRepository
     ) {
         this.patentReviewService = patentReviewService;
-        this.businessSubmissionRepository = businessSubmissionRepository;
+        this.reviewHistoryRepository = reviewHistoryRepository;
         this.objectMapper = objectMapper;
         this.notificationService = notificationService;
         this.quarterSettingRepository = quarterSettingRepository;
@@ -101,24 +100,18 @@ public class BusinessFixtureService {
     @Transactional
     public List<BusinessSubmissionVersionResponse> getSubmissions(String patentId) {
         PatentDetailResponse patent = patentReviewService.getPatentDetail(patentId);
-        List<BusinessSubmissionVersionResponse> persistedSubmissions = businessSubmissionRepository
-                .findByPatentIdOrderByVersionAsc(patentId)
-                .stream()
-                .map(this::toResponse)
-                .toList();
-        if (!persistedSubmissions.isEmpty()) {
-            return persistedSubmissions;
+        List<PatentReviewHistoryEntity> histories = reviewHistoryRepository.findByPatentIdOrderByCreatedAtDesc(patentId);
+        for (PatentReviewHistoryEntity history : histories) {
+            if (history.getBusinessOpinionDecision() != null && history.getBusinessOpinionSubmittedAt() != null) {
+                return List.of(toResponse(history));
+            }
         }
 
         if (patent.businessOpinion().decision() == null || patent.businessOpinion().submittedAt() == null) {
             return List.of();
         }
 
-        List<BusinessSubmissionVersionResponse> seededSubmissions = new ArrayList<>();
-        BusinessSubmissionVersionResponse seededSubmission = toSeedVersion(patent);
-        businessSubmissionRepository.save(toEntity(patentId, null, seededSubmission));
-        seededSubmissions.add(seededSubmission);
-        return seededSubmissions;
+        return List.of(toSeedVersion(patent));
     }
 
     /**
@@ -132,17 +125,19 @@ public class BusinessFixtureService {
         String quarterKey = quarterSettingRepository.findAll().stream()
                 .filter(q -> q.isActivated() && !q.isEnded())
                 .findFirst()
+                .or(() -> quarterSettingRepository.findAll().stream().filter(q -> q.isActivated()).findFirst())
                 .map(q -> q.getQuarterKey())
                 .orElse(null);
-        int version = (int) businessSubmissionRepository.countByPatentId(patentId) + 1;
         OffsetDateTime submittedAt = OffsetDateTime.now(KST);
-        BusinessSubmissionVersionResponse submission = toVersion(patentId, request, version, submittedAt);
-        businessSubmissionRepository.save(toEntity(patentId, quarterKey, submission));
+        BusinessSubmissionVersionResponse submission = toVersion(patentId, request, submittedAt);
         patentReviewService.recordBusinessOpinion(
                 patentId,
                 request.finalOpinion(),
                 valueOrDefault(request.finalReason(), defaultReason(request.finalOpinion())),
                 submittedAt);
+        PatentReviewHistoryEntity history = findBusinessSubmissionState(patentId, quarterKey);
+        applySubmission(history, submission);
+        reviewHistoryRepository.save(history);
         PatentDetailResponse patent = patentReviewService.getPatentDetail(patentId);
         String deptName = patent.departmentName() != null ? patent.departmentName() : "사업부";
         notificationService.addNotification(
@@ -153,38 +148,45 @@ public class BusinessFixtureService {
         return submission;
     }
 
-    private BusinessSubmissionVersionResponse toResponse(BusinessSubmissionEntity entity) {
+    private BusinessSubmissionVersionResponse toResponse(PatentReviewHistoryEntity entity) {
         return new BusinessSubmissionVersionResponse(
-                entity.getSubmissionId(),
-                entity.getVersion(),
-                BusinessOpinionDecision.valueOf(entity.getDecision()),
-                entity.getReason(),
-                entity.getSubmittedBy(),
-                entity.getSubmittedAt(),
-                entity.getAiReportCreatedAt(),
-                Recommendation.valueOf(entity.getAiRecommendation()),
-                entity.getAiTotalScore(),
-                entity.getChecklistTotal(),
-                readChecklistScores(entity.getChecklistScoresJson()),
-                entity.getQualitativeScore());
+                submissionId(entity.getPatentId()),
+                1,
+                entity.getBusinessOpinionDecision(),
+                entity.getBusinessOpinionReason(),
+                entity.getBusinessOpinionSubmittedBy(),
+                entity.getBusinessOpinionSubmittedAt(),
+                entity.getBusinessAiReportCreatedAt(),
+                entity.getBusinessAiRecommendation(),
+                valueOrZero(entity.getBusinessAiTotalScore()),
+                valueOrZero(entity.getBusinessChecklistTotal()),
+                readChecklistScores(entity.getBusinessChecklistScoresJson()),
+                valueOrZero(entity.getBusinessQualitativeScore()));
     }
 
-    private BusinessSubmissionEntity toEntity(String patentId, String quarterKey, BusinessSubmissionVersionResponse submission) {
-        return new BusinessSubmissionEntity(
-                submission.submissionId(),
-                patentId,
-                quarterKey,
-                submission.version(),
-                submission.decision().name(),
-                submission.reason(),
-                submission.submittedBy(),
-                submission.submittedAt(),
-                submission.aiReportCreatedAt(),
-                submission.aiRecommendation().name(),
-                submission.aiTotalScore(),
-                submission.checklistTotal(),
-                submission.qualitativeScore(),
-                writeChecklistScores(submission.checklistScores()));
+    private void applySubmission(PatentReviewHistoryEntity history, BusinessSubmissionVersionResponse submission) {
+        history.setBusinessOpinionDecision(submission.decision());
+        history.setBusinessOpinionReason(submission.reason());
+        history.setBusinessOpinionSubmittedBy(submission.submittedBy());
+        history.setBusinessOpinionSubmittedAt(submission.submittedAt());
+        history.setBusinessAiReportCreatedAt(submission.aiReportCreatedAt());
+        history.setBusinessAiRecommendation(submission.aiRecommendation());
+        history.setBusinessAiTotalScore(submission.aiTotalScore());
+        history.setBusinessChecklistTotal(submission.checklistTotal());
+        history.setBusinessQualitativeScore(submission.qualitativeScore());
+        history.setBusinessChecklistScoresJson(writeChecklistScores(submission.checklistScores()));
+    }
+
+    private PatentReviewHistoryEntity findBusinessSubmissionState(String patentId, String quarterKey) {
+        if (quarterKey != null) {
+            return reviewHistoryRepository.findByPatentIdAndQuarterKey(patentId, quarterKey)
+                    .orElseGet(() -> new PatentReviewHistoryEntity(patentId, quarterKey));
+        }
+        List<PatentReviewHistoryEntity> histories = reviewHistoryRepository.findByPatentIdOrderByCreatedAtDesc(patentId);
+        if (!histories.isEmpty()) {
+            return histories.get(0);
+        }
+        return new PatentReviewHistoryEntity(patentId, "UNQUARTERED");
     }
 
     private List<BusinessSubmissionChecklistScoreResponse> readChecklistScores(String value) {
@@ -210,7 +212,6 @@ public class BusinessFixtureService {
     private BusinessSubmissionVersionResponse toVersion(
             String patentId,
             BusinessChecklistSubmissionRequest request,
-            int version,
             OffsetDateTime submittedAt
     ) {
         List<BusinessSubmissionChecklistScoreResponse> checklistScores = request.responses().stream()
@@ -226,8 +227,8 @@ public class BusinessFixtureService {
         Integer aiTotalScore = patentReviewService.getAiTotalScore(patentId);
 
         return new BusinessSubmissionVersionResponse(
-                "%s-SUB-%02d".formatted(patentId, version),
-                version,
+                submissionId(patentId),
+                1,
                 request.finalOpinion(),
                 valueOrDefault(request.finalReason(), defaultReason(request.finalOpinion())),
                 valueOrDefault(request.evaluatorName(), "사업부 담당자"),
@@ -268,6 +269,14 @@ public class BusinessFixtureService {
                 checklistTotal,
                 checklistScores,
                 qualitativeScore);
+    }
+
+    private String submissionId(String patentId) {
+        return "%s-SUB-01".formatted(patentId);
+    }
+
+    private int valueOrZero(Integer value) {
+        return value == null ? 0 : value;
     }
 
     private BusinessChecklistItemResponse checklistItem(
