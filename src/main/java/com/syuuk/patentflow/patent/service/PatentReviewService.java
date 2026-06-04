@@ -35,7 +35,13 @@ import com.syuuk.patentflow.mailing.domain.DepartmentEntity;
 import com.syuuk.patentflow.mailing.repository.DepartmentRepository;
 import com.syuuk.patentflow.patent.repository.PatentMetadataRepository;
 import com.syuuk.patentflow.patent.repository.PatentReviewHistoryRepository;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -45,12 +51,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class PatentReviewService {
@@ -111,6 +121,7 @@ public class PatentReviewService {
      * @relatedUI UI-COM-02, UI-LEGAL-02
      * @description DB 기반 페이징 및 필터링을 제공한다.
      */
+    @Transactional
     public PageResponse<PatentListItemResponse> getPatents(
             int page,
             int size,
@@ -121,25 +132,127 @@ public class PatentReviewService {
         int normalizedPage = Math.max(page, 1);
         int normalizedSize = Math.min(Math.max(size, 1), 100);
 
-        List<PatentListItemResponse> filtered = getAllPatents().stream()
-                .filter(item -> departmentId == null || departmentId.isBlank()
-                     
-                || departmentId.equals(item.departmentId()))
-                .filter(item -> reviewWorkflowStatus == null
-                        || item.reviewWorkflowStatus() == reviewWorkflowStatus)
-                .filter(item -> matchesKeyword(item, keyword))
-                .sorted(sortComparator(sort))
-                .toList();
+        // 과기 ACTIVE 특허를 ABANDONED로 일괄 보정 — 기존 단건 로딩 부수효과를 페이징 경로에서도 유지한다.
+        correctOverdueActivePatents();
 
-        int totalItems = filtered.size();
-        int fromIndex = Math.min((normalizedPage - 1) * normalizedSize, totalItems);
-        int toIndex = Math.min(fromIndex + normalizedSize, totalItems);
-        List<PatentListItemResponse> items = filtered.subList(fromIndex, toIndex);
-        int totalPages = totalItems == 0 ? 0 : (int) Math.ceil((double) totalItems / normalizedSize);
+        Pageable pageable = PageRequest.of(normalizedPage - 1, normalizedSize, listSort(sort));
+        Page<PatentMetadataEntity> entityPage = patentMetadataRepository.findAll(
+                patentListSpecification(keyword, departmentId, reviewWorkflowStatus), pageable);
+
+        Map<String, PatentReviewHistoryEntity> latestHistory = loadLatestHistory(entityPage.getContent());
+        List<PatentListItemResponse> items = entityPage.getContent().stream()
+                .map(entity -> toListItem(
+                        patentFromMetadataEntity(entity, latestHistory.get(entity.getPatentId())),
+                        entity.getCurrentQuarterKey()))
+                .toList();
 
         return PageResponse.ok(
                 items,
-                new PageInfo(normalizedPage, normalizedSize, totalItems, totalPages));
+                new PageInfo(normalizedPage, normalizedSize,
+                        entityPage.getTotalElements(), entityPage.getTotalPages()));
+    }
+
+    /**
+     * 목록 검색/필터를 DB 레벨에서 처리하는 Specification.
+     * keyword는 metadata 컬럼(title/관리·출원·등록번호)으로, departmentId·reviewWorkflowStatus는
+     * 특허별 최신 이력 행을 가리키는 EXISTS 서브쿼리로 필터링한다.
+     */
+    private Specification<PatentMetadataEntity> patentListSpecification(
+            String keyword, String departmentId, ReviewWorkflowStatus reviewWorkflowStatus) {
+        return (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            if (keyword != null && !keyword.isBlank()) {
+                String like = "%" + keyword.trim().toLowerCase(Locale.ROOT) + "%";
+                predicates.add(cb.or(
+                        cb.like(cb.lower(cb.coalesce(root.get("title"), "")), like),
+                        cb.like(cb.lower(cb.coalesce(root.get("managementNumber"), "")), like),
+                        cb.like(cb.lower(cb.coalesce(root.get("applicationNumber"), "")), like),
+                        cb.like(cb.lower(cb.coalesce(root.get("registrationNumber"), "")), like)));
+            }
+            if (departmentId != null && !departmentId.isBlank()) {
+                predicates.add(latestHistoryMatches(root, query, cb, "departmentId", departmentId));
+            }
+            if (reviewWorkflowStatus != null) {
+                predicates.add(latestHistoryMatches(root, query, cb, "reviewWorkflowStatus", reviewWorkflowStatus));
+            }
+
+            return predicates.isEmpty() ? cb.conjunction() : cb.and(predicates.toArray(new Predicate[0]));
+        };
+    }
+
+    /**
+     * 특허의 최신 이력 행에서 지정한 필드가 주어진 값과 일치하는지 EXISTS 서브쿼리로 검사한다.
+     */
+    private Predicate latestHistoryMatches(
+            Root<PatentMetadataEntity> root, CriteriaQuery<?> query, CriteriaBuilder cb,
+            String field, Object value) {
+        Subquery<String> sub = query.subquery(String.class);
+        Root<PatentReviewHistoryEntity> history = sub.from(PatentReviewHistoryEntity.class);
+
+        Subquery<LocalDateTime> latest = sub.subquery(LocalDateTime.class);
+        Root<PatentReviewHistoryEntity> latestHistory = latest.from(PatentReviewHistoryEntity.class);
+        latest.select(cb.greatest(latestHistory.<LocalDateTime>get("createdAt")))
+                .where(cb.equal(latestHistory.get("patentId"), history.get("patentId")));
+
+        sub.select(history.get("patentId"))
+                .where(cb.and(
+                        cb.equal(history.get("patentId"), root.get("patentId")),
+                        cb.equal(history.get(field), value),
+                        cb.equal(history.get("createdAt"), latest)));
+
+        return cb.exists(sub);
+    }
+
+    /**
+     * 정렬 파라미터를 metadata 컬럼 기준 Sort로 변환한다. 기본값은 연차료 납부 기준일 오름차순.
+     */
+    private Sort listSort(String sort) {
+        if (sort == null || sort.isBlank()) {
+            return Sort.by(Sort.Direction.ASC, "feeDueDate");
+        }
+        String[] parts = sort.split(",");
+        String property = switch (parts[0]) {
+            case "title" -> "title";
+            case "managementNumber" -> "managementNumber";
+            default -> "feeDueDate";
+        };
+        Sort.Direction direction = (parts.length > 1 && "desc".equalsIgnoreCase(parts[1]))
+                ? Sort.Direction.DESC : Sort.Direction.ASC;
+        return Sort.by(direction, property);
+    }
+
+    /**
+     * 연차료 납부 기준일이 지난 보유 중 특허를 포기 상태로 일괄 보정한다.
+     */
+    private void correctOverdueActivePatents() {
+        List<PatentMetadataEntity> overdue = patentMetadataRepository
+                .findByPatentStatusAndFeeDueDateBefore(PatentLifecycleStatus.ACTIVE, LocalDate.now(KST));
+        if (overdue.isEmpty()) {
+            return;
+        }
+        overdue.forEach(entity -> {
+            entity.setPatentStatus(PatentLifecycleStatus.ABANDONED);
+            entity.setInReview(false);
+            entity.setCurrentQuarterKey(null);
+        });
+        patentMetadataRepository.saveAll(overdue);
+    }
+
+    /**
+     * 주어진 특허들의 최신 이력 행을 한 번의 쿼리로 적재해 patentId로 매핑한다.
+     */
+    private Map<String, PatentReviewHistoryEntity> loadLatestHistory(List<PatentMetadataEntity> entities) {
+        if (entities.isEmpty()) {
+            return Map.of();
+        }
+        List<String> patentIds = entities.stream().map(PatentMetadataEntity::getPatentId).toList();
+        return reviewHistoryRepository.findLatestByPatentIds(patentIds).stream()
+                .collect(Collectors.toMap(
+                        PatentReviewHistoryEntity::getPatentId,
+                        history -> history,
+                        (existing, ignored) -> existing,
+                        HashMap::new));
     }
 
     public List<PatentListItemResponse> getReviewTargets(
@@ -428,8 +541,12 @@ public class PatentReviewService {
     }
 
     public List<PatentListItemResponse> getAllPatents() {
-        return patentMetadataRepository.findAll(Sort.by("patentId")).stream()
-                .map(entity -> toListItem(patentFromMetadataEntity(entity), entity.getCurrentQuarterKey()))
+        List<PatentMetadataEntity> entities = patentMetadataRepository.findAll(Sort.by("patentId"));
+        Map<String, PatentReviewHistoryEntity> latestHistory = loadLatestHistory(entities);
+        return entities.stream()
+                .map(entity -> toListItem(
+                        patentFromMetadataEntity(entity, latestHistory.get(entity.getPatentId())),
+                        entity.getCurrentQuarterKey()))
                 .toList();
     }
 
@@ -460,16 +577,14 @@ public class PatentReviewService {
     }
 
     PatentDetailResponse findPatent(String patentId) {
-        return loadPatentsFromDatabase().stream()
-                .filter(patent -> patent.patentId().equals(patentId))
-                .findFirst()
+        return patentMetadataRepository.findById(patentId)
+                .map(this::patentFromMetadataEntity)
                 .orElseThrow(() -> new PatentFlowException(ErrorCode.PATENT_NOT_FOUND));
     }
 
     PatentDetailResponse findPatentOrNull(String patentId) {
-        return loadPatentsFromDatabase().stream()
-                .filter(patent -> patent.patentId().equals(patentId))
-                .findFirst()
+        return patentMetadataRepository.findById(patentId)
+                .map(this::patentFromMetadataEntity)
                 .orElse(null);
     }
 
@@ -522,8 +637,10 @@ public class PatentReviewService {
     }
 
     private List<PatentDetailResponse> loadPatentsFromDatabase() {
-        return patentMetadataRepository.findAll(Sort.by("patentId")).stream()
-                .map(this::patentFromMetadataEntity)
+        List<PatentMetadataEntity> entities = patentMetadataRepository.findAll(Sort.by("patentId"));
+        Map<String, PatentReviewHistoryEntity> latestHistory = loadLatestHistory(entities);
+        return entities.stream()
+                .map(entity -> patentFromMetadataEntity(entity, latestHistory.get(entity.getPatentId())))
                 .toList();
     }
 
@@ -638,6 +755,10 @@ public class PatentReviewService {
     }
 
     private PatentDetailResponse patentFromMetadataEntity(PatentMetadataEntity entity) {
+        return patentFromMetadataEntity(entity, latestHistoryOrNull(entity.getPatentId()));
+    }
+
+    private PatentDetailResponse patentFromMetadataEntity(PatentMetadataEntity entity, PatentReviewHistoryEntity latestOrNull) {
         PatentLifecycleStatus ls = entity.getPatentStatus();
         LocalDate expectedExpirationDate = entity.getExpectedExpirationDate();
         LocalDate baseFeeDate = entity.getFeeDueDate() != null
@@ -684,7 +805,7 @@ public class PatentReviewService {
                 new FinalDecisionRecordResponse(null, null, null),
                 new BusinessOpinionResponse(null, null, null),
                 entity.isInReview());
-        return applyPersistedState(basePatent);
+        return applyPersistedState(basePatent, latestOrNull);
     }
 
     private PatentDetailResponse newPatentFromRequest(String patentId, PatentUpsertRequest request) {
@@ -1017,37 +1138,6 @@ public class PatentReviewService {
         return "https://patents.google.com/patent/" + normalizedCountry + normalizedNumber + "/ko";
     }
 
-    private boolean matchesKeyword(PatentListItemResponse item, String keyword) {
-        if (keyword == null || keyword.isBlank()) {
-            return true;
-        }
-        String lowerKeyword = keyword.toLowerCase(Locale.ROOT);
-        return List.of(item.title(), item.managementNumber(), item.applicationNumber(), item.registrationNumber())
-                .stream()
-                .filter(Objects::nonNull)
-                .map(value -> value.toLowerCase(Locale.ROOT))
-                .anyMatch(value -> value.contains(lowerKeyword));
-    }
-
-    private Comparator<PatentListItemResponse> sortComparator(String sort) {
-        Comparator<PatentListItemResponse> comparator = Comparator.comparing(
-                PatentListItemResponse::feeDueDate,
-                Comparator.nullsLast(Comparator.naturalOrder()));
-        if (sort == null || sort.isBlank()) {
-            return comparator;
-        }
-        String[] parts = sort.split(",");
-        if ("title".equals(parts[0])) {
-            comparator = Comparator.comparing(PatentListItemResponse::title);
-        } else if ("managementNumber".equals(parts[0])) {
-            comparator = Comparator.comparing(PatentListItemResponse::managementNumber);
-        }
-        if (parts.length > 1 && "desc".equalsIgnoreCase(parts[1])) {
-            return comparator.reversed();
-        }
-        return comparator;
-    }
-
     private String valueOrDefault(String value, String defaultValue) {
         if (value == null || value.isBlank()) {
             return defaultValue;
@@ -1069,11 +1159,19 @@ public class PatentReviewService {
         return value != null && value.toLowerCase(Locale.ROOT).equals(lowerKeyword);
     }
 
+    private PatentReviewHistoryEntity latestHistoryOrNull(String patentId) {
+        return reviewHistoryRepository.findByPatentIdOrderByCreatedAtDesc(patentId).stream()
+                .findFirst()
+                .orElse(null);
+    }
+
     private PatentDetailResponse applyPersistedState(PatentDetailResponse patent) {
-        List<PatentReviewHistoryEntity> history =
-                reviewHistoryRepository.findByPatentIdOrderByCreatedAtDesc(patent.patentId());
-        if (!history.isEmpty()) {
-            return applyHistoryState(patent, history.get(0));
+        return applyPersistedState(patent, latestHistoryOrNull(patent.patentId()));
+    }
+
+    private PatentDetailResponse applyPersistedState(PatentDetailResponse patent, PatentReviewHistoryEntity latestOrNull) {
+        if (latestOrNull != null) {
+            return applyHistoryState(patent, latestOrNull);
         }
         return patent;
     }
