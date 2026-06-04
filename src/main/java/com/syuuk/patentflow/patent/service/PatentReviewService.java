@@ -464,7 +464,12 @@ public class PatentReviewService {
                 .anyMatch(profile -> "local".equals(profile) || "demo".equals(profile));
     }
 
-    // loadPatentsFromDatabase removed for performance optimization
+    // DB seed 기반 데모에서도 최신 patent_metadata 상태를 기준으로 목록을 다시 구성한다.
+    private List<PatentDetailResponse> loadPatentsFromDatabase() {
+        return patentMetadataRepository.findAll(Sort.by("patentId")).stream()
+                .map(this::patentFromMetadataEntity)
+                .toList();
+    }
 
     private List<PatentMetadataEntity> loadPatentMetadataFromDocument() {
         try {
@@ -545,7 +550,8 @@ public class PatentReviewService {
             ls = PatentLifecycleStatus.ABANDONED;
             entity.setPatentStatus(PatentLifecycleStatus.ABANDONED);
             entity.setInReview(false);
-            entity.setCurrentQuarterKey(null);
+            // 이번 분기 cohort 집계가 완료/포기 처리 후에도 유지되도록 currentQuarterKey는 보존한다.
+            // entity.setCurrentQuarterKey(null);
             patentMetadataRepository.save(entity);
         }
 
@@ -1125,7 +1131,8 @@ public class PatentReviewService {
             entity.setPatentStatus(patent.lifecycleStatus());
             entity.setInReview(patent.inReview());
             if (!patent.inReview()) {
-                entity.setCurrentQuarterKey(null);
+                // 이번 분기 cohort 집계가 완료/포기 처리 후에도 유지되도록 currentQuarterKey는 보존한다.
+                // entity.setCurrentQuarterKey(null);
             }
             patentMetadataRepository.save(entity);
         });
