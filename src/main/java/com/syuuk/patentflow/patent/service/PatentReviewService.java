@@ -127,7 +127,7 @@ public class PatentReviewService {
             source = reviewHistoryRepository.findByDelayedTrue().stream()
                     .flatMap(history -> {
                         PatentMetadataEntity metadata = patentMetadataRepository.findById(history.getPatentId()).orElse(null);
-                        if (!isPreviousDelayedHistory(history, metadata)) {
+                        if (isPreviousDelayedHistory(history, metadata)) {
                             return Stream.empty();
                         }
                         return Stream.of(toListItemFromHistory(history, metadata));

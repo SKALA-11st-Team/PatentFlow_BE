@@ -137,12 +137,11 @@ public class SettingsService {
         int responseDeadlineMonths = systemSettingsService.getResponseDeadlineMonths();
         int responseDeadlineDays = systemSettingsService.getResponseDeadlineDays();
         int mailLeadMonths = systemSettingsService.getMailLeadMonths();
-        // submissionDeadline = 검토 시작일(오늘) + N개월 + M일
-        // 사업부 입장에서 "검토 요청을 받은 날부터 N개월 안에 회신"이 자연스럽고,
-        // 분기 시작일 기준 역산보다 실제 업무 흐름과 일치한다.
-        LocalDate activationDate = LocalDate.now(KST);
+        // submissionDeadline = 원래 의도된 검토 시작일(분기 시작일 - mailLeadMonths) + N개월 + M일
+        // 지연 활성화 시에도 마감일이 고정되도록 시스템 날짜 대신 분기 기준일로 계산한다.
+        LocalDate intendedReviewStartDate = quarter.getStartDate().minusMonths(mailLeadMonths);
         quarter.setSubmissionDeadline(
-                activationDate.plusMonths(responseDeadlineMonths).plusDays(responseDeadlineDays));
+                intendedReviewStartDate.plusMonths(responseDeadlineMonths).plusDays(responseDeadlineDays));
         // 활성화 시점의 mailLeadMonths를 스냅샷으로 저장 — 이후 설정 변경 시에도 이력은 고정
         quarter.setMailLeadMonthsSnapshot(mailLeadMonths);
         quarter.setActivated(true);
