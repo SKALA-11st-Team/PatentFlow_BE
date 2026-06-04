@@ -120,6 +120,10 @@ public class MailingHistoryEntity {
         return status;
     }
 
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
     public String getSubject() {
         return subject;
     }

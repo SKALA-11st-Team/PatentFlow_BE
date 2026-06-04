@@ -61,5 +61,14 @@ public class MailingController {
         return ApiResponse.ok(mailingService.getHistory(patentId, recipientEmail));
     }
 
+    /**
+     * @relatedFR FR-LEGAL-14
+     * @relatedUI UI-LEGAL-05
+     * @description 주소 오류/반송 확인 시 메일 이력을 재발송 필요로 표시하고 포함 특허를 메일 발송 대기로 되돌린다.
+     */
+    @PostMapping("/history/{mailingId}/retry-required")
+    public ApiResponse<MailingSendResponse> markRetryRequired(@PathVariable String mailingId) {
+        return ApiResponse.ok(mailingService.markRetryRequired(mailingId));
+    }
 
 }

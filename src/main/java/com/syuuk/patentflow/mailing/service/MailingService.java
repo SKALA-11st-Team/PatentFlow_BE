@@ -13,10 +13,10 @@ import com.syuuk.patentflow.mailing.dto.DepartmentRecipientMappingResponse;
 import com.syuuk.patentflow.mailing.dto.MailingHistoryItemResponse;
 import com.syuuk.patentflow.mailing.dto.MailingSendRequest;
 import com.syuuk.patentflow.mailing.dto.MailingSendResponse;
-import com.syuuk.patentflow.mailing.domain.DepartmentEntity;
-import com.syuuk.patentflow.mailing.repository.DepartmentRepository;
+import com.syuuk.patentflow.department.domain.DepartmentEntity;
+import com.syuuk.patentflow.department.repository.DepartmentRepository;
 import com.syuuk.patentflow.mailing.repository.MailingHistoryRepository;
-import com.syuuk.patentflow.patent.service.PatentReviewService;
+import com.syuuk.patentflow.patent.service.PatentWorkflowService;
 import com.syuuk.patentflow.user.domain.UserEntity;
 import com.syuuk.patentflow.user.repository.UserRepository;
 import jakarta.mail.MessagingException;
@@ -27,6 +27,7 @@ import jakarta.mail.internet.MimeMessage;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import org.slf4j.Logger;
@@ -36,6 +37,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class MailingService {
@@ -45,6 +47,7 @@ public class MailingService {
     private static final String STATUS_SENT = "SENT";
     private static final String STATUS_FAILED = "FAILED";
     private static final String STATUS_RECORDED = "RECORDED";
+    private static final String STATUS_RETRY_REQUIRED = "RETRY_REQUIRED";
 
     @Value("${spring.mail.username:}")
     private String envGmailUsername;
@@ -53,7 +56,7 @@ public class MailingService {
     private String envGmailAppPassword;
 
     private final MailingHistoryRepository mailingHistoryRepository;
-    private final PatentReviewService patentReviewService;
+    private final PatentWorkflowService patentWorkflowService;
     private final ObjectMapper objectMapper;
     private final UserRepository userRepository;
     private final SystemSettingsService systemSettingsService;
@@ -62,7 +65,7 @@ public class MailingService {
 
     public MailingService(
             MailingHistoryRepository mailingHistoryRepository,
-            PatentReviewService patentReviewService,
+            PatentWorkflowService patentWorkflowService,
             ObjectMapper objectMapper,
             UserRepository userRepository,
             SystemSettingsService systemSettingsService,
@@ -70,7 +73,7 @@ public class MailingService {
             MailOAuth2Service mailOAuth2Service
     ) {
         this.mailingHistoryRepository = mailingHistoryRepository;
-        this.patentReviewService = patentReviewService;
+        this.patentWorkflowService = patentWorkflowService;
         this.objectMapper = objectMapper;
         this.userRepository = userRepository;
         this.systemSettingsService = systemSettingsService;
@@ -114,6 +117,7 @@ public class MailingService {
         return getRecipientMappings(departmentId).get(0);
     }
 
+    @Transactional
     public MailingSendResponse send(MailingSendRequest request) {
         // OAuth2 연동 우선 → 앱 비밀번호(레거시) → 미발송 기록
         boolean oauth2Connected = mailOAuth2Service.isConnected();
@@ -123,6 +127,8 @@ public class MailingService {
                 && appPassword != null && !appPassword.isBlank();
 
         String mailingBatchId = "MAIL-BATCH-" + System.currentTimeMillis();
+        List<BusinessReviewMailSendDraft> completedDrafts = new ArrayList<>();
+        List<String> failedRecipientEmails = new ArrayList<>();
 
         if (oauth2Connected) {
             String senderEmail = systemSettingsService.getGmailOAuth2ConnectedEmail();
@@ -131,9 +137,10 @@ public class MailingService {
                 try {
                     sendEmailOAuth2(senderEmail, accessToken, draft);
                     saveHistory(mailingBatchId, draft, STATUS_SENT);
+                    completedDrafts.add(draft);
                 } catch (PatentFlowException exception) {
                     saveHistory(mailingBatchId, draft, STATUS_FAILED);
-                    throw exception;
+                    failedRecipientEmails.add(draft.recipientEmail());
                 }
             });
         } else if (appPasswordConfigured) {
@@ -141,30 +148,37 @@ public class MailingService {
                 try {
                     sendEmail(username, appPassword, draft);
                     saveHistory(mailingBatchId, draft, STATUS_SENT);
+                    completedDrafts.add(draft);
                 } catch (PatentFlowException exception) {
                     saveHistory(mailingBatchId, draft, STATUS_FAILED);
-                    throw exception;
+                    failedRecipientEmails.add(draft.recipientEmail());
                 }
             });
         } else {
             // OAuth2·앱비밀번호 모두 미연동 — 실제 발송 없이 이력만 기록(RECORDED) 해 워크플로우는 유지
             log.info("Gmail credentials are not configured; recording mailing workflow without SMTP delivery.");
-            request.drafts().forEach(draft -> saveHistory(mailingBatchId, draft, STATUS_RECORDED));
+            request.drafts().forEach(draft -> {
+                saveHistory(mailingBatchId, draft, STATUS_RECORDED);
+                completedDrafts.add(draft);
+            });
         }
 
-        // 발송 성공 후 상태 변경 및 이력 저장
-        List<String> patentIds = request.drafts().stream()
+        // 실제 발송 성공 또는 미설정 기록 완료된 건만 다음 workflow로 전환한다.
+        List<String> patentIds = completedDrafts.stream()
                 .flatMap(draft -> draft.patents().stream())
                 .map(BusinessReviewMailPatentSummary::patentId)
                 .distinct()
                 .toList();
-        PatentReviewService.WorkflowBatchUpdateResult updateResult = patentReviewService.markMailingSent(patentIds);
+        PatentWorkflowService.WorkflowBatchUpdateResult updateResult = patentWorkflowService.markMailingSent(patentIds);
 
         return new MailingSendResponse(
                 mailingBatchId,
                 updateResult.updatedPatentIds().size(),
+                completedDrafts.size(),
+                failedRecipientEmails.size(),
                 updateResult.updatedPatentIds(),
-                updateResult.skippedPatentIds());
+                updateResult.skippedPatentIds(),
+                failedRecipientEmails);
     }
 
     // OAuth2 XOAUTH2 방식 — access_token을 비밀번호로 사용해 Gmail SMTP 인증
@@ -249,6 +263,31 @@ public class MailingService {
                 .filter(history -> patentId == null || patentId.isBlank()
                         || history.patents().stream().anyMatch(patent -> patent.patentId().equals(patentId)))
                 .toList();
+    }
+
+    @Transactional
+    public MailingSendResponse markRetryRequired(String mailingId) {
+        MailingHistoryEntity history = mailingHistoryRepository.findById(mailingId)
+                .orElseThrow(() -> new PatentFlowException(ErrorCode.INVALID_REQUEST,
+                        "메일 발송 이력을 찾을 수 없습니다: " + mailingId));
+        List<String> patentIds = readPatentSummaries(history.getPatentsJson()).stream()
+                .map(BusinessReviewMailPatentSummary::patentId)
+                .distinct()
+                .toList();
+        PatentWorkflowService.WorkflowBatchUpdateResult updateResult =
+                patentWorkflowService.markMailingRetryRequired(patentIds);
+
+        history.setStatus(STATUS_RETRY_REQUIRED);
+        mailingHistoryRepository.save(history);
+
+        return new MailingSendResponse(
+                mailingId,
+                updateResult.updatedPatentIds().size(),
+                0,
+                0,
+                updateResult.updatedPatentIds(),
+                updateResult.skippedPatentIds(),
+                List.of());
     }
 
     private void saveHistory(String mailingBatchId, BusinessReviewMailSendDraft draft, String status) {

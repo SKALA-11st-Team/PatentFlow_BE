@@ -98,12 +98,12 @@ public class MailOAuth2Service {
 
     public MailOAuth2StatusResponse getStatus() {
         String email = systemSettingsService.getGmailOAuth2ConnectedEmail();
-        boolean connected = systemSettingsService.getGmailOAuth2RefreshToken() != null;
+        boolean connected = hasRefreshToken();
         return new MailOAuth2StatusResponse(connected, connected ? email : null);
     }
 
     public boolean isConnected() {
-        return systemSettingsService.getGmailOAuth2RefreshToken() != null;
+        return hasRefreshToken();
     }
 
     public void disconnect() {
@@ -117,6 +117,11 @@ public class MailOAuth2Service {
 
     private static final ParameterizedTypeReference<Map<String, Object>> MAP_TYPE =
             new ParameterizedTypeReference<>() {};
+
+    private boolean hasRefreshToken() {
+        String refreshToken = systemSettingsService.getGmailOAuth2RefreshToken();
+        return refreshToken != null && !refreshToken.isBlank();
+    }
 
     private Map<String, Object> requestTokens(String code) {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
