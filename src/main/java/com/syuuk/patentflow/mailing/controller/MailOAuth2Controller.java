@@ -1,0 +1,76 @@
+package com.syuuk.patentflow.mailing.controller;
+
+import com.syuuk.patentflow.common.response.ApiResponse;
+import com.syuuk.patentflow.mailing.config.MailOAuth2Properties;
+import com.syuuk.patentflow.mailing.dto.MailOAuth2StatusResponse;
+import com.syuuk.patentflow.mailing.service.MailOAuth2Service;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/v1/settings/mail/oauth2/google")
+public class MailOAuth2Controller {
+
+    private final MailOAuth2Service mailOAuth2Service;
+    private final MailOAuth2Properties properties;
+
+    public MailOAuth2Controller(MailOAuth2Service mailOAuth2Service, MailOAuth2Properties properties) {
+        this.mailOAuth2Service = mailOAuth2Service;
+        this.properties = properties;
+    }
+
+    // ── 연동 상태 조회 ────────────────────────────────────────
+
+    @GetMapping("/status")
+    public ApiResponse<MailOAuth2StatusResponse> getStatus() {
+        return ApiResponse.ok(mailOAuth2Service.getStatus());
+    }
+
+    // ── 인증 URL 반환 ─────────────────────────────────────────
+    // 브라우저가 직접 이동하면 JWT 헤더가 없어 401이 발생하므로
+    // FE가 JWT 인증으로 URL을 받아서 window.location.href로 이동한다.
+
+    @GetMapping("/authorize-url")
+    public ApiResponse<String> getAuthorizeUrl() {
+        return ApiResponse.ok(mailOAuth2Service.buildAuthorizationUrl());
+    }
+
+    // ── OAuth 콜백 ────────────────────────────────────────────
+    // 성공: refresh_token 저장 후 FE 설정 페이지로 리다이렉트
+    // 실패: error 파라미터를 포함해 FE로 리다이렉트
+
+    @GetMapping("/callback")
+    public void callback(
+            @RequestParam(required = false) String code,
+            @RequestParam(required = false) String error,
+            HttpServletResponse response) throws IOException {
+        String frontendUri = properties.getFrontendSettingsUri();
+        if (error != null) {
+            response.sendRedirect(frontendUri + "?oauth2_error=" + error);
+            return;
+        }
+        if (code == null || code.isBlank()) {
+            response.sendRedirect(frontendUri + "?oauth2_error=no_code");
+            return;
+        }
+        try {
+            mailOAuth2Service.exchangeCodeAndSave(code);
+            response.sendRedirect(frontendUri + "?oauth2_success=true");
+        } catch (Exception e) {
+            response.sendRedirect(frontendUri + "?oauth2_error=exchange_failed");
+        }
+    }
+
+    // ── 연동 해제 ─────────────────────────────────────────────
+
+    @DeleteMapping
+    public ApiResponse<MailOAuth2StatusResponse> disconnect() {
+        mailOAuth2Service.disconnect();
+        return ApiResponse.ok(new MailOAuth2StatusResponse(false, null));
+    }
+}

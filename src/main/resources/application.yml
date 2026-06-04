@@ -40,19 +40,28 @@ management:
       enabled: false
 
 patentflow:
+  oauth2:
+    google:
+      # Google Cloud Console에 등록한 OAuth2 앱 자격증명
+      # redirect-uri는 Google Cloud Console > 승인된 리디렉션 URI와 반드시 일치해야 함
+      client-id: ${GOOGLE_OAUTH2_CLIENT_ID:}
+      client-secret: ${GOOGLE_OAUTH2_CLIENT_SECRET:}
+      redirect-uri: ${GOOGLE_OAUTH2_REDIRECT_URI:http://localhost:8080/api/v1/settings/mail/oauth2/google/callback}
+      frontend-settings-uri: ${GOOGLE_OAUTH2_FRONTEND_URI:http://localhost:5173/admin/settings}
   bootstrap:
     admin:
-      username: ${PATENTFLOW_BOOTSTRAP_ADMIN_USERNAME:}
+      email: ${PATENTFLOW_BOOTSTRAP_ADMIN_EMAIL:}
       password: ${PATENTFLOW_BOOTSTRAP_ADMIN_PASSWORD:}
       display-name: ${PATENTFLOW_BOOTSTRAP_ADMIN_DISPLAY_NAME:특허관리자}
     business:
-      username: ${PATENTFLOW_BOOTSTRAP_BUSINESS_USERNAME:}
+      email: ${PATENTFLOW_BOOTSTRAP_BUSINESS_EMAIL:}
       password: ${PATENTFLOW_BOOTSTRAP_BUSINESS_PASSWORD:}
       department-id: ${PATENTFLOW_BOOTSTRAP_BUSINESS_DEPARTMENT_ID:DEPT-ICT}
       display-name: ${PATENTFLOW_BOOTSTRAP_BUSINESS_DISPLAY_NAME:사업부 데모 담당자}
   auth:
     jwt-secret: ${PATENTFLOW_JWT_SECRET:dev-patentflow-jwt-secret-change-me-please-32bytes}
     access-token-expiration-seconds: ${PATENTFLOW_JWT_EXPIRATION_SECONDS:3600}
+    # 1209600 = 14일 — 리프레시 토큰 기본 유효 기간
     refresh-token-expiration-seconds: ${PATENTFLOW_REFRESH_TOKEN_EXPIRATION_SECONDS:1209600}
     max-login-failures: ${PATENTFLOW_MAX_LOGIN_FAILURES:5}
     login-lock-seconds: ${PATENTFLOW_LOGIN_LOCK_SECONDS:300}

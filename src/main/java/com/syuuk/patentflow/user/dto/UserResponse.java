@@ -5,15 +5,15 @@ import java.time.OffsetDateTime;
 
 public record UserResponse(
         String id,
-        String username,
+        String email,          // 로그인 ID
+        String username,       // 실제 이름
         String role,
         String departmentId,
         String departmentName,
-        String displayName,
         OffsetDateTime createdAt
 ) {
     public static UserResponse from(UserEntity u) {
-        return new UserResponse(u.getId(), u.getUsername(), u.getRole(),
-                u.getDepartmentId(), u.getDepartmentName(), u.getDisplayName(), u.getCreatedAt());
+        return new UserResponse(u.getId(), u.getEmail(), u.getUsername(), u.getRole(),
+                u.getDepartmentId(), u.getDepartmentName(), u.getCreatedAt());
     }
 }

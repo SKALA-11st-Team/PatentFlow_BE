@@ -177,84 +177,53 @@ INSERT INTO mailing_history (
     )
 ON CONFLICT (mailing_id) DO NOTHING;
 
-INSERT INTO business_submissions (
-    submission_id,
+WITH demo_business_submissions (
     patent_id,
-    quarter_key,
-    version,
-    decision,
-    reason,
     submitted_by,
-    submitted_at,
-    ai_report_created_at,
-    ai_recommendation,
-    ai_total_score,
     checklist_total,
     qualitative_score,
     checklist_scores_json
-) VALUES
+) AS (
+    VALUES
     (
-        'PAT-2026-0097-DEMO-SUB-01',
         'PAT-2026-0097',
-        '2026-Q2',
-        1,
-        'ABANDON',
-        '현재 사업부 서비스 로드맵과 직접 연결되는 적용 계획이 없어 포기 의견을 제출합니다.',
         '사업부 데모 담당자',
-        TIMESTAMP WITH TIME ZONE '2026-05-17 14:30:00+09',
-        TIMESTAMP WITH TIME ZONE '2026-05-14 09:00:00+09',
-        'ABANDON',
-        49,
         5,
         -3,
         '[{"itemId":"TECH_COMPLETENESS","score":2,"memo":"관련 구현 계획이 없습니다."},{"itemId":"TECH_ORIGINALITY","score":2,"memo":"대체 인증 기술이 많습니다."},{"itemId":"MARKETABILITY","score":2,"memo":"현재 시장 적용 가능성이 낮습니다."},{"itemId":"EXPECTED_EFFECT","score":2,"memo":"비용 절감 효과가 제한적입니다."}]'
     ),
     (
-        'PAT-2026-0073-DEMO-SUB-01',
         'PAT-2026-0073',
-        '2026-Q2',
-        1,
-        'ABANDON',
-        '국내 특허를 우선 유지하고 해외 권리는 비용 대비 활용도가 낮아 포기 의견입니다.',
         '제조 담당자',
-        TIMESTAMP WITH TIME ZONE '2026-05-16 16:10:00+09',
-        TIMESTAMP WITH TIME ZONE '2026-05-14 09:00:00+09',
-        'ABANDON',
-        52,
         7,
         -3,
         '[{"itemId":"TECH_COMPLETENESS","score":3,"memo":"기술 자체는 활용 가능성이 있습니다."},{"itemId":"TECH_ORIGINALITY","score":2,"memo":"국내 권리로도 방어 가능합니다."},{"itemId":"MARKETABILITY","score":2,"memo":"중국 권리 활용 계획은 낮습니다."},{"itemId":"EXPECTED_EFFECT","score":3,"memo":"유지 효과는 제한적입니다."}]'
     ),
     (
-        'PAT-2026-0124-DEMO-SUB-01',
         'PAT-2026-0124',
-        '2026-Q2',
-        1,
-        'MAINTAIN',
-        '보안 운영 업무와 연결되어 유지 의견을 제출합니다.',
         '사업부 데모 담당자',
-        TIMESTAMP WITH TIME ZONE '2026-05-15 10:20:00+09',
-        TIMESTAMP WITH TIME ZONE '2026-05-14 09:00:00+09',
-        'MAINTAIN',
-        79,
         18,
         3,
         '[{"itemId":"TECH_COMPLETENESS","score":4,"memo":"운영 적용 가능성이 높습니다."},{"itemId":"TECH_ORIGINALITY","score":4,"memo":"보안 접근 흐름이 명확합니다."},{"itemId":"MARKETABILITY","score":3,"memo":"유사 보안 요구가 지속됩니다."},{"itemId":"EXPECTED_EFFECT","score":4,"memo":"운영 리스크 절감 효과가 있습니다."}]'
     ),
     (
-        'PAT-2026-0082-DEMO-SUB-01',
         'PAT-2026-0082',
-        '2026-Q2',
-        1,
-        'ABANDON',
-        '현 사업 전략과 직접 연결성이 낮아 포기 의견입니다.',
         '사업기획 담당자',
-        TIMESTAMP WITH TIME ZONE '2026-05-14 15:40:00+09',
-        TIMESTAMP WITH TIME ZONE '2026-05-14 09:00:00+09',
-        'ABANDON',
-        57,
         8,
         -3,
         '[{"itemId":"TECH_COMPLETENESS","score":3,"memo":"일반 프로젝트 관리 영역입니다."},{"itemId":"TECH_ORIGINALITY","score":2,"memo":"차별성은 제한적입니다."},{"itemId":"MARKETABILITY","score":3,"memo":"외부 이전 가능성은 있습니다."},{"itemId":"EXPECTED_EFFECT","score":3,"memo":"내부 직접 효과는 낮습니다."}]'
     )
-ON CONFLICT (submission_id) DO NOTHING;
+)
+UPDATE patent_review_history h
+SET
+    business_opinion_submitted_by = d.submitted_by,
+    business_checklist_total = d.checklist_total,
+    business_qualitative_score = d.qualitative_score,
+    business_checklist_scores_json = d.checklist_scores_json,
+    business_ai_report_created_at = h.ai_report_created_at,
+    business_ai_recommendation = h.ai_recommendation,
+    business_ai_total_score = h.ai_total_score,
+    updated_at = CURRENT_TIMESTAMP
+FROM demo_business_submissions d
+WHERE h.patent_id = d.patent_id
+  AND h.quarter_key = '2026-Q2';

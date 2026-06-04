@@ -67,6 +67,12 @@ public class PatentMetadataEntity extends BaseEntity {
     @Column(name = "fee_due_date")
     private LocalDate feeDueDate;
 
+    @Column(name = "is_in_review")
+    private boolean inReview;
+
+    @Column(name = "current_quarter_key", length = 16)
+    private String currentQuarterKey;
+
     protected PatentMetadataEntity() {
     }
 
@@ -106,6 +112,7 @@ public class PatentMetadataEntity extends BaseEntity {
         this.registrationNumber = registrationNumber;
         this.expectedExpirationDate = expectedExpirationDate;
         this.feeDueDate = feeDueDate;
+        this.inReview = false;
     }
 
     public String getPatentId() {
@@ -176,12 +183,28 @@ public class PatentMetadataEntity extends BaseEntity {
         return feeDueDate;
     }
 
+    public boolean isInReview() {
+        return inReview;
+    }
+
     public void setFeeDueDate(LocalDate feeDueDate) {
         this.feeDueDate = feeDueDate;
     }
 
     public void setPatentStatus(PatentLifecycleStatus patentStatus) {
         this.patentStatus = patentStatus;
+    }
+
+    public void setInReview(boolean inReview) {
+        this.inReview = inReview;
+    }
+
+    public String getCurrentQuarterKey() {
+        return currentQuarterKey;
+    }
+
+    public void setCurrentQuarterKey(String currentQuarterKey) {
+        this.currentQuarterKey = currentQuarterKey;
     }
 
 }

@@ -10,6 +10,9 @@ spring:
     open-in-view: false
 
 patentflow:
+  review:
+    scheduler:
+      enabled: false
   auth:
     jwt-secret: test-patentflow-jwt-secret-change-me-please-32bytes
     access-token-expiration-seconds: 3600
