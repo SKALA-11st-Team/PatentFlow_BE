@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service;
  * - @Async("aiReportBatchExecutor") 덕분에 스케줄러 스레드를 블로킹하지 않는다.
  * - 특허 1건당 에이전트 응답까지 최대 20분이 소요될 수 있으므로 순차 처리한다.
  * - 개별 특허 실패가 나머지 처리를 중단시키지 않도록 예외를 잡고 경고 로그만 남긴다.
- * - 생성 완료된 특허의 상태는 PatentReviewService.generateAiReportForBatch() 내부에서
+ * - 생성 완료된 특허의 상태는 PatentWorkflowService.generateAiReportForBatch() 내부에서
  *   REVIEW_QUARTER_STARTED → MAIL_READY 로 자동 전이된다.
  */
 @Service
@@ -20,10 +20,10 @@ public class AiReportBatchService {
 
     private static final Logger log = LoggerFactory.getLogger(AiReportBatchService.class);
 
-    private final PatentReviewService patentReviewService;
+    private final PatentWorkflowService patentWorkflowService;
 
-    public AiReportBatchService(PatentReviewService patentReviewService) {
-        this.patentReviewService = patentReviewService;
+    public AiReportBatchService(PatentWorkflowService patentWorkflowService) {
+        this.patentWorkflowService = patentWorkflowService;
     }
 
     @Async("aiReportBatchExecutor")
@@ -34,7 +34,7 @@ public class AiReportBatchService {
 
         for (String patentId : patentIds) {
             try {
-                patentReviewService.generateAiReportForBatch(patentId);
+                patentWorkflowService.generateAiReportForBatch(patentId);
                 success++;
                 log.info("[AiReportBatch] 레포트 생성 완료: {} ({}/{})", patentId, success + failed, patentIds.size());
             } catch (Exception e) {

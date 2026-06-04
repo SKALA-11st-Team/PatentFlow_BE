@@ -129,11 +129,25 @@ public class PatentReviewHistoryEntity extends BaseEntity {
     @Column(name = "annual_fee_due_date")
     private LocalDate annualFeeDueDate;
 
+    @Column(name = "response_due_date")
+    private LocalDate responseDueDate;
+
+    @Column(name = "response_due_date_extended_until")
+    private LocalDate responseDueDateExtendedUntil;
+
+    @Column(name = "urgent_requested_at")
+    private OffsetDateTime urgentRequestedAt;
+
     @Column(name = "department_id", length = 64)
     private String departmentId;
 
     @Column(name = "department_name", length = 128)
     private String departmentName;
+
+    // 납부 기간 시작일까지 검토 미완료 — true이면 지연 관리 페이지로 이관
+    // review_workflow_status는 지연 전 마지막 단계를 유지해 어느 단계에서 지연됐는지 파악 가능
+    @Column(name = "is_delayed", nullable = false)
+    private boolean delayed = false;
 
     protected PatentReviewHistoryEntity() {
     }
@@ -396,6 +410,30 @@ public class PatentReviewHistoryEntity extends BaseEntity {
         this.annualFeeDueDate = annualFeeDueDate;
     }
 
+    public LocalDate getResponseDueDate() {
+        return responseDueDate;
+    }
+
+    public void setResponseDueDate(LocalDate responseDueDate) {
+        this.responseDueDate = responseDueDate;
+    }
+
+    public LocalDate getResponseDueDateExtendedUntil() {
+        return responseDueDateExtendedUntil;
+    }
+
+    public void setResponseDueDateExtendedUntil(LocalDate responseDueDateExtendedUntil) {
+        this.responseDueDateExtendedUntil = responseDueDateExtendedUntil;
+    }
+
+    public OffsetDateTime getUrgentRequestedAt() {
+        return urgentRequestedAt;
+    }
+
+    public void setUrgentRequestedAt(OffsetDateTime urgentRequestedAt) {
+        this.urgentRequestedAt = urgentRequestedAt;
+    }
+
     public String getDepartmentId() {
         return departmentId;
     }
@@ -410,5 +448,13 @@ public class PatentReviewHistoryEntity extends BaseEntity {
 
     public void setDepartmentName(String departmentName) {
         this.departmentName = departmentName;
+    }
+
+    public boolean isDelayed() {
+        return delayed;
+    }
+
+    public void setDelayed(boolean delayed) {
+        this.delayed = delayed;
     }
 }

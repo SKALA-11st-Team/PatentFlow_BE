@@ -2,6 +2,8 @@ package com.syuuk.patentflow.patent.client;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.syuuk.patentflow.common.error.ErrorCode;
+import com.syuuk.patentflow.common.error.PatentFlowException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -58,25 +60,15 @@ public class AiReportAgentClient {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) {
                 log.warn("FastAPI evaluate returned {} for patent {}", response.statusCode(), patentId);
-                return fallback(patentId);
+                throw new PatentFlowException(ErrorCode.AI_REPORT_FAILED);
             }
             return objectMapper.readValue(response.body(), AgentEvaluateResponse.class);
+        } catch (PatentFlowException e) {
+            throw e;
         } catch (Exception e) {
             log.warn("FastAPI evaluate failed for patent {} (timeout={}): {}", patentId, timeout, e.getMessage());
-            return fallback(patentId);
+            throw new PatentFlowException(ErrorCode.AI_REPORT_FAILED);
         }
-    }
-
-    private AgentEvaluateResponse fallback(String patentId) {
-        return new AgentEvaluateResponse(
-                patentId,
-                List.of(),
-                "HOLD",
-                "AI 평가 서비스 연결 실패 - 기본 응답",
-                null,
-                null,
-                OffsetDateTime.now()
-        );
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

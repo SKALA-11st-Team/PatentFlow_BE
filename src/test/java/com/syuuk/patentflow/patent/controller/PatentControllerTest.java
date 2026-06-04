@@ -39,6 +39,12 @@ class PatentControllerTest {
     @MockitoBean
     private AiReportAgentClient aiReportAgentClient;
 
+    @MockitoBean
+    private com.syuuk.patentflow.settings.service.QuarterActivationScheduler quarterActivationScheduler;
+
+    @Autowired
+    private com.syuuk.patentflow.patent.repository.PatentMetadataRepository patentMetadataRepository;
+
     @Test
     void getPatentsReturnsPagedEnvelope() throws Exception {
         mockMvc.perform(get("/api/v1/patents")
@@ -67,7 +73,7 @@ class PatentControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.managementNumber").value("P202405001-KR0"))
                 .andExpect(jsonPath("$.data.title").value("상품 트렌드 예측을 반영한 강화학습 모델을 적용한 자산배분 시스템 및 방법"))
-                .andExpect(jsonPath("$.data.aiEvaluationReport.recommendation").value("MAINTAIN"))
+                .andExpect(jsonPath("$.data.aiEvaluationReport.recommendation").value("HOLD"))
                 .andExpect(jsonPath("$.data.finalDecisionRecord.decision").doesNotExist())
                 .andExpect(jsonPath("$.data.aiEvaluationReport.scores[0].category")
                         .value(EvaluationCategory.RIGHTS.name()))
@@ -86,6 +92,10 @@ class PatentControllerTest {
 
     @Test
     void requestAiReportMovesPatentDirectlyToMailReady() throws Exception {
+        patentMetadataRepository.findById("PAT-2026-0001").ifPresent(p -> {
+            p.setCurrentQuarterKey("2026-Q3");
+            patentMetadataRepository.save(p);
+        });
         when(aiReportAgentClient.evaluate("PAT-2026-0001")).thenReturn(new AgentEvaluateResponse(
                 "PAT-2026-0001",
                 List.of(new AgentScoreItem("권리성", 82, "청구항 보호 범위가 명확합니다.")),
@@ -110,31 +120,58 @@ class PatentControllerTest {
 
     @Test
     void recordFinalDecisionPersistsDecisionAndLegalAction() throws Exception {
-        mockMvc.perform(post("/api/v1/patents/PAT-2026-0005/final-decision")
+        patentMetadataRepository.findById("PAT-2026-0001").ifPresent(p -> {
+            p.setCurrentQuarterKey("2026-Q3");
+            patentMetadataRepository.save(p);
+        });
+        // AI 레포트 생성 -> 메일 발송 -> 사업부 검토 제출을 통해 BUSINESS_RESPONSE_RECEIVED 상태로 만듦
+        when(aiReportAgentClient.evaluate("PAT-2026-0001")).thenReturn(new AgentEvaluateResponse(
+                "PAT-2026-0001", List.of(), "MAINTAIN", null, "보고서", 80, OffsetDateTime.now()));
+        mockMvc.perform(post("/api/v1/patents/PAT-2026-0001/request-ai-report")).andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/mailings/send")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {
-                          "legalActionResult": "MAINTAINED",
-                          "reason": "사업부 의견과 AI 평가를 종합해 유지합니다."
+                          "drafts": [
+                            {
+                              "recipientEmail": "test@syuuk.test",
+                              "recipientName": "담당자",
+                              "subject": "요청",
+                              "body": "내용",
+                              "patents": [{"patentId": "PAT-2026-0001", "managementNumber": "P202405001-KR0", "title": "테스트"}]
+                            }
+                          ]
+                        }
+                        """)).andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/patents/PAT-2026-0001/business-submissions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                          "patentId": "PAT-2026-0001",
+                          "responses": [],
+                          "qualitativeScore": 2,
+                          "finalOpinion": "GIVE_UP"
+                        }
+                        """)).andExpect(status().isOk());
+
+        mockMvc.perform(put("/api/v1/patents/PAT-2026-0001/final-decision")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                          "finalDecisionId": "DEC-GIVEUP-01",
+                          "finalDecisionReason": "시장성 부족",
+                          "legalActionResult": "포기 진행 중"
                         }
                         """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.patentId").value("PAT-2026-0005"))
-                .andExpect(jsonPath("$.data.reviewWorkflowStatus").value("NOT_IN_REVIEW"))
-                .andExpect(jsonPath("$.data.legalActionResult").value("MAINTAINED"))
-                .andExpect(jsonPath("$.data.finalDecisionRecord.reason").value("사업부 의견과 AI 평가를 종합해 유지합니다."));
-
-        mockMvc.perform(get("/api/v1/patents/PAT-2026-0005"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.reviewWorkflowStatus").value("NOT_IN_REVIEW"))
-                .andExpect(jsonPath("$.data.legalActionResult").value("MAINTAINED"))
-                .andExpect(jsonPath("$.data.lifecycleStatus").value("ACTIVE"))
-                .andExpect(jsonPath("$.data.finalDecisionRecord.reason").value("사업부 의견과 AI 평가를 종합해 유지합니다."));
+                .andExpect(jsonPath("$.data.finalDecisionRecord.decision").value("GIVE_UP"))
+                .andExpect(jsonPath("$.data.finalDecisionRecord.reason").value("시장성 부족"))
+                .andExpect(jsonPath("$.data.lifecycleStatus").value("ABANDONED"));
     }
 
     @Test
     void recordFinalDecisionRejectsRemovedSalesState() throws Exception {
-        mockMvc.perform(post("/api/v1/patents/PAT-2026-0005/final-decision")
+        mockMvc.perform(post("/api/v1/patents/PAT-2026-0185/final-decision")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {
@@ -205,6 +242,29 @@ class PatentControllerTest {
 
     @Test
     void submitBusinessChecklistCreatesSubmissionHistory() throws Exception {
+        patentMetadataRepository.findById("PAT-2026-0001").ifPresent(p -> {
+            p.setCurrentQuarterKey("2026-Q3");
+            patentMetadataRepository.save(p);
+        });
+        when(aiReportAgentClient.evaluate("PAT-2026-0001")).thenReturn(new AgentEvaluateResponse(
+                "PAT-2026-0001", List.of(), "MAINTAIN", null, "보고서", 80, OffsetDateTime.now()));
+        mockMvc.perform(post("/api/v1/patents/PAT-2026-0001/request-ai-report")).andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/mailings/send")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                          "drafts": [
+                            {
+                              "recipientEmail": "test@syuuk.test",
+                              "recipientName": "담당자",
+                              "subject": "요청",
+                              "body": "내용",
+                              "patents": [{"patentId": "PAT-2026-0001", "managementNumber": "P202405001-KR0", "title": "테스트"}]
+                            }
+                          ]
+                        }
+                        """)).andExpect(status().isOk());
+
         mockMvc.perform(post("/api/v1/patents/PAT-2026-0001/business-submissions")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -234,8 +294,8 @@ class PatentControllerTest {
                         }
                         """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.finalOpinion").value("MAINTAIN"))
-                .andExpect(jsonPath("$.data.responses", hasSize(2)));
+                .andExpect(jsonPath("$.data.decision").value("MAINTAIN"))
+                .andExpect(jsonPath("$.data.checklistScores", hasSize(2)));
 
         mockMvc.perform(get("/api/v1/patents/PAT-2026-0001/business-submissions"))
                 .andExpect(status().isOk())
@@ -284,6 +344,14 @@ class PatentControllerTest {
 
     @Test
     void sendMailingMovesOnlyMailReadyPatentsToWaitingBusinessResponse() throws Exception {
+        patentMetadataRepository.findById("PAT-2026-0092").ifPresent(p -> {
+            p.setCurrentQuarterKey("2026-Q3");
+            patentMetadataRepository.save(p);
+        });
+        patentMetadataRepository.findById("PAT-2026-0001").ifPresent(p -> {
+            p.setCurrentQuarterKey("2026-Q3");
+            patentMetadataRepository.save(p);
+        });
         mockMvc.perform(post("/api/v1/mailings/send")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -301,8 +369,8 @@ class PatentControllerTest {
                                   "title": "상품 트렌드 예측을 반영한 강화학습 모델을 적용한 자산배분 시스템 및 방법"
                                 },
                                 {
-                                  "patentId": "PAT-2026-0002",
-                                  "managementNumber": "P202405002-KR0",
+                                  "patentId": "PAT-2026-0092",
+                                  "managementNumber": "P202405092-KR0",
                                   "title": "테스트 특허"
                                 }
                               ]
@@ -312,15 +380,15 @@ class PatentControllerTest {
                         """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.updatedCount").value(1))
-                .andExpect(jsonPath("$.data.updatedPatentIds[0]").value("PAT-2026-0002"))
+                .andExpect(jsonPath("$.data.updatedPatentIds[0]").value("PAT-2026-0092"))
                 .andExpect(jsonPath("$.data.skippedPatentIds[0]").value("PAT-2026-0001"));
 
-        mockMvc.perform(get("/api/v1/patents/PAT-2026-0002"))
+        mockMvc.perform(get("/api/v1/patents/PAT-2026-0092"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.reviewWorkflowStatus").value("WAITING_BUSINESS_RESPONSE"));
 
         mockMvc.perform(get("/api/v1/mailings/history")
-                .param("patentId", "PAT-2026-0002"))
+                .param("patentId", "PAT-2026-0092"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data", hasSize(1)))
                 .andExpect(jsonPath("$.data[0].recipientEmail").value("rnd.manager@syuuk.test"));

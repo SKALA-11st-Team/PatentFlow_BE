@@ -9,9 +9,7 @@ import com.syuuk.patentflow.common.response.PageResponse;
 import com.syuuk.patentflow.patent.domain.PatentMetadataEntity;
 import com.syuuk.patentflow.patent.domain.PatentReviewHistoryEntity;
 import com.syuuk.patentflow.patent.dto.AiEvaluationReportResponse;
-import com.syuuk.patentflow.patent.dto.BusinessOpinionDecision;
 import com.syuuk.patentflow.patent.dto.BusinessOpinionResponse;
-import com.syuuk.patentflow.patent.dto.FinalDecisionResponse;
 import com.syuuk.patentflow.patent.dto.FinalDecisionRecordResponse;
 import com.syuuk.patentflow.patent.dto.LegalActionResult;
 import com.syuuk.patentflow.patent.dto.PatentBibliographicInfoResponse;
@@ -27,21 +25,26 @@ import com.syuuk.patentflow.patent.dto.PatentUpsertRequest;
 import com.syuuk.patentflow.patent.dto.PatentUpsertResponse;
 import com.syuuk.patentflow.patent.dto.Recommendation;
 import com.syuuk.patentflow.patent.dto.ReviewWorkflowStatus;
-import com.syuuk.patentflow.mailing.domain.DepartmentEntity;
-import com.syuuk.patentflow.mailing.repository.DepartmentRepository;
+import com.syuuk.patentflow.department.domain.DepartmentEntity;
+import com.syuuk.patentflow.department.repository.DepartmentRepository;
 import com.syuuk.patentflow.patent.repository.PatentMetadataRepository;
 import com.syuuk.patentflow.patent.repository.PatentReviewHistoryRepository;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import com.syuuk.patentflow.patent.dto.EvaluationCategory;
+import com.syuuk.patentflow.patent.dto.EvaluationScoreResponse;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.springframework.data.domain.Sort;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
@@ -58,14 +61,8 @@ public class PatentReviewService {
     private final DepartmentRepository mailingRecipientMappingRepository;
     private final ObjectMapper objectMapper;
     private final Environment environment;
-    private final PatentWorkflowService workflowService;
     private final PatentLookupService lookupService;
     private Map<String, String> departmentNameCache;
-
-    public record WorkflowBatchUpdateResult(
-            List<String> updatedPatentIds,
-            List<String> skippedPatentIds
-    ) {}
 
     public PatentReviewService(
             PatentMetadataRepository patentMetadataRepository,
@@ -74,7 +71,6 @@ public class PatentReviewService {
             DepartmentRepository mailingRecipientMappingRepository,
             ObjectMapper objectMapper,
             Environment environment,
-            PatentWorkflowService workflowService,
             PatentLookupService lookupService
     ) {
         this.patentMetadataRepository = patentMetadataRepository;
@@ -83,7 +79,6 @@ public class PatentReviewService {
         this.mailingRecipientMappingRepository = mailingRecipientMappingRepository;
         this.objectMapper = objectMapper;
         this.environment = environment;
-        this.workflowService = workflowService;
         this.lookupService = lookupService;
         if (!usesSqlSeedRunner()) {
             seedDepartmentsIfNeeded();
@@ -106,19 +101,50 @@ public class PatentReviewService {
      * @description DB 기반 페이징 및 필터링을 제공한다.
      */
     public PageResponse<PatentListItemResponse> getPatents(
-            int page,
-            int size,
-            String keyword,
-            String departmentId,
-            ReviewWorkflowStatus reviewWorkflowStatus,
-            String sort) {
+            int page, int size, String keyword, String departmentId,
+            ReviewWorkflowStatus reviewWorkflowStatus, String sort) {
+        return getPatents(page, size, keyword, departmentId, reviewWorkflowStatus, sort, null, null);
+    }
+
+    public PageResponse<PatentListItemResponse> getPatents(
+            int page, int size, String keyword, String departmentId,
+            ReviewWorkflowStatus reviewWorkflowStatus, String sort, String quarterKey) {
+        return getPatents(page, size, keyword, departmentId, reviewWorkflowStatus, sort, quarterKey, null);
+    }
+
+    /**
+     * quarterKey: 특정 분기 history 직접 조회 (과거 분기 이력 페이지)
+     * isDelayed: true이면 is_delayed=true인 지연 특허만 반환
+     */
+    public PageResponse<PatentListItemResponse> getPatents(
+            int page, int size, String keyword, String departmentId,
+            ReviewWorkflowStatus reviewWorkflowStatus, String sort, String quarterKey, Boolean isDelayed) {
         int normalizedPage = Math.max(page, 1);
         int normalizedSize = Math.min(Math.max(size, 1), 20);
 
-        List<PatentListItemResponse> filtered = getAllPatents().stream()
+        List<PatentListItemResponse> source;
+        if (isDelayed != null && isDelayed) {
+            source = reviewHistoryRepository.findByDelayedTrue().stream()
+                    .flatMap(history -> {
+                        PatentMetadataEntity metadata = patentMetadataRepository.findById(history.getPatentId()).orElse(null);
+                        if (!isPreviousDelayedHistory(history, metadata)) {
+                            return Stream.empty();
+                        }
+                        return Stream.of(toListItemFromHistory(history, metadata));
+                    })
+                    .toList();
+        } else if (quarterKey != null && !quarterKey.isBlank()) {
+            source = reviewHistoryRepository.findByQuarterKey(quarterKey).stream()
+                    .map(history -> toListItemFromHistory(history,
+                            patentMetadataRepository.findById(history.getPatentId()).orElse(null)))
+                    .toList();
+        } else {
+            source = getAllPatents();
+        }
+
+        List<PatentListItemResponse> filtered = source.stream()
                 .filter(item -> departmentId == null || departmentId.isBlank()
-                     
-                || departmentId.equals(item.departmentId()))
+                        || departmentId.equals(item.departmentId()))
                 .filter(item -> reviewWorkflowStatus == null
                         || item.reviewWorkflowStatus() == reviewWorkflowStatus)
                 .filter(item -> matchesKeyword(item, keyword))
@@ -172,6 +198,12 @@ public class PatentReviewService {
         return "Q" + ((date.getMonthValue() - 1) / 3 + 1);
     }
 
+    private boolean isPreviousDelayedHistory(PatentReviewHistoryEntity history, PatentMetadataEntity metadata) {
+        return metadata == null
+                || metadata.getCurrentQuarterKey() == null
+                || !metadata.getCurrentQuarterKey().equals(history.getQuarterKey());
+    }
+
     private Sort parseSort(String sort) {
         if (sort == null || sort.isBlank()) {
             return Sort.by(Sort.Direction.ASC, "annualFeeDueDate");
@@ -203,7 +235,11 @@ public class PatentReviewService {
                     history.getBusinessOpinionDecision(), history.getLegalActionResult(),
                     null,
                     history.getReviewWorkflowStatus() != ReviewWorkflowStatus.NOT_IN_REVIEW,
-                    null
+                    history.getQuarterKey(),
+                    history.isDelayed(),
+                    history.getResponseDueDate(),
+                    history.getResponseDueDateExtendedUntil(),
+                    history.getUrgentRequestedAt()
             );
         }
         return new PatentListItemResponse(
@@ -232,7 +268,11 @@ public class PatentReviewService {
                 history.getLegalActionResult(),
                 originalPatentUrl(metadata.getCountry(), metadata.getApplicationNumber(), metadata.getRegistrationNumber()),
                 metadata.isInReview(),
-                metadata.getCurrentQuarterKey()
+                history.getQuarterKey(),
+                history.isDelayed(),
+                history.getResponseDueDate(),
+                history.getResponseDueDateExtendedUntil(),
+                history.getUrgentRequestedAt()
         );
     }
 
@@ -267,28 +307,6 @@ public class PatentReviewService {
 
     public OffsetDateTime getAiReportCreatedAt(String patentId) {
         return findPatent(patentId).aiEvaluationReport().createdAt();
-    }
-
-    public PatentDetailResponse generateAiReport(String patentId) {
-        return workflowService.generateAiReport(patentId);
-    }
-
-    // 배치 자동 생성 전용 — PatentWorkflowService.generateAiReportForBatch 참조
-    public PatentDetailResponse generateAiReportForBatch(String patentId) {
-        return workflowService.generateAiReportForBatch(patentId);
-    }
-
-    public List<String> markMailReady(List<String> patentIds) {
-        return workflowService.markMailReady(patentIds);
-    }
-
-    public void recordBusinessOpinion(
-            String patentId,
-            BusinessOpinionDecision decision,
-            String reason,
-            OffsetDateTime submittedAt
-    ) {
-        workflowService.recordBusinessOpinion(patentId, decision, reason, submittedAt);
     }
 
     /**
@@ -337,15 +355,6 @@ public class PatentReviewService {
     }
 
     /**
-     * @relatedFR FR-LEGAL-12, FR-LEGAL-13, FR-LEGAL-14
-     * @relatedUI UI-LEGAL-05
-     * @description 실제 발송 연동 전, 사업부 검토 요청 메일 발송 상태를 검토 상태에 반영한다.
-     */
-    public WorkflowBatchUpdateResult markMailingSent(List<String> patentIds) {
-        return workflowService.markMailingSent(patentIds);
-    }
-
-    /**
      * @relatedFR FR-LEGAL-03, FR-LEGAL-04
      * @relatedUI UI-LEGAL-02, UI-LEGAL-03
      * @description 특허 기본 정보와 회사 컨텍스트를 DB에 등록한다.
@@ -370,11 +379,8 @@ public class PatentReviewService {
     }
 
     private String nextPatentId() {
-        int nextSequence = patentMetadataRepository.findAll().stream()
-                .map(PatentMetadataEntity::getPatentId)
-                .mapToInt(this::sequenceFromPatentId)
-                .max()
-                .orElse(0) + 1;
+        Integer maxSeq = patentMetadataRepository.findMaxPatentSequence();
+        int nextSequence = (maxSeq != null ? maxSeq : 0) + 1;
         return "PAT-2026-%04d".formatted(nextSequence);
     }
 
@@ -386,19 +392,18 @@ public class PatentReviewService {
     }
 
     public List<PatentListItemResponse> getAllPatents() {
+        // [최적화] 각 특허마다 지연 여부를 조회하는 N+1 쿼리를 방지하기 위해,
+        // 전체 지연 특허 ID 목록을 한 번의 쿼리로 가져와 메모리에서 조인(In-memory Join) 처리
+        java.util.Set<String> delayedPatentIds = reviewHistoryRepository.findByDelayedTrue().stream()
+                .map(PatentReviewHistoryEntity::getPatentId)
+                .collect(java.util.stream.Collectors.toSet());
+
         return patentMetadataRepository.findAll(Sort.by("patentId")).stream()
-                .map(entity -> toListItem(patentFromMetadataEntity(entity), entity.getCurrentQuarterKey()))
+                .map(entity -> {
+                    boolean isDelayed = delayedPatentIds.contains(entity.getPatentId());
+                    return toListItem(patentFromMetadataEntity(entity), entity.getCurrentQuarterKey(), isDelayed);
+                })
                 .toList();
-    }
-
-    public List<String> createQuarterReviewTargets(
-            String quarterKey, LocalDate paymentPeriodStart, LocalDate paymentPeriodEnd
-    ) {
-        return workflowService.createQuarterReviewTargets(quarterKey, paymentPeriodStart, paymentPeriodEnd);
-    }
-
-    public void bulkUpdateWorkflowStatus(List<String> patentIds, ReviewWorkflowStatus newStatus, String quarterKey) {
-        workflowService.bulkUpdateWorkflowStatus(patentIds, newStatus, quarterKey);
     }
 
     public List<PatentReviewHistoryItemResponse> getReviewHistory(String patentId) {
@@ -408,26 +413,15 @@ public class PatentReviewService {
                 .toList();
     }
 
-
-    public FinalDecisionResponse patchFinalDecision(String patentId, PatchFinalDecisionRequest request) {
-        return workflowService.patchFinalDecision(patentId, request);
-    }
-
-    public FinalDecisionResponse recordFinalDecision(String patentId, FinalDecisionRequest request) {
-        return workflowService.recordFinalDecision(patentId, request);
-    }
-
     PatentDetailResponse findPatent(String patentId) {
-        return loadPatentsFromDatabase().stream()
-                .filter(patent -> patent.patentId().equals(patentId))
-                .findFirst()
+        return patentMetadataRepository.findById(patentId)
+                .map(this::patentFromMetadataEntity)
                 .orElseThrow(() -> new PatentFlowException(ErrorCode.PATENT_NOT_FOUND));
     }
 
     PatentDetailResponse findPatentOrNull(String patentId) {
-        return loadPatentsFromDatabase().stream()
-                .filter(patent -> patent.patentId().equals(patentId))
-                .findFirst()
+        return patentMetadataRepository.findById(patentId)
+                .map(this::patentFromMetadataEntity)
                 .orElse(null);
     }
 
@@ -470,11 +464,7 @@ public class PatentReviewService {
                 .anyMatch(profile -> "local".equals(profile) || "demo".equals(profile));
     }
 
-    private List<PatentDetailResponse> loadPatentsFromDatabase() {
-        return patentMetadataRepository.findAll(Sort.by("patentId")).stream()
-                .map(this::patentFromMetadataEntity)
-                .toList();
-    }
+    // loadPatentsFromDatabase removed for performance optimization
 
     private List<PatentMetadataEntity> loadPatentMetadataFromDocument() {
         try {
@@ -587,7 +577,12 @@ public class PatentReviewService {
                 aiEvaluationReport(Recommendation.HOLD),
                 new FinalDecisionRecordResponse(null, null, null),
                 new BusinessOpinionResponse(null, null, null),
-                entity.isInReview());
+                entity.isInReview(),
+                false,
+                null,
+                null,
+                null,
+                entity.getCurrentQuarterKey());
         return applyPersistedState(basePatent);
     }
 
@@ -622,7 +617,12 @@ public class PatentReviewService {
                 aiEvaluationReport(Recommendation.HOLD),
                 new FinalDecisionRecordResponse(null, null, null),
                 new BusinessOpinionResponse(null, null, null),
-                false);
+                false,
+                false,
+                null,
+                null,
+                null,
+                null);
     }
 
     private PatentMetadataEntity metadataEntityFromRequest(String patentId, PatentUpsertRequest request) {
@@ -677,7 +677,12 @@ public class PatentReviewService {
                 patent.aiEvaluationReport(),
                 patent.finalDecisionRecord(),
                 patent.businessOpinion(),
-                patent.inReview());
+                patent.inReview(),
+                patent.isDelayed(),
+                patent.responseDueDate(),
+                patent.responseDueDateExtendedUntil(),
+                patent.urgentRequestedAt(),
+                patent.currentQuarterKey());
     }
 
     private PatentDetailResponse withDepartment(PatentDetailResponse patent, String departmentId, String departmentName) {
@@ -709,7 +714,12 @@ public class PatentReviewService {
                 patent.aiEvaluationReport(),
                 patent.finalDecisionRecord(),
                 patent.businessOpinion(),
-                patent.inReview());
+                patent.inReview(),
+                patent.isDelayed(),
+                patent.responseDueDate(),
+                patent.responseDueDateExtendedUntil(),
+                patent.urgentRequestedAt(),
+                patent.currentQuarterKey());
     }
 
     private PatentSummaryResponse summaryFromMetadata(String title, String technologyArea, String productName) {
@@ -829,6 +839,12 @@ public class PatentReviewService {
     }
 
     private PatentListItemResponse toListItem(PatentDetailResponse detail, String currentQuarterKey) {
+        return toListItem(detail, currentQuarterKey, false);
+    }
+
+    private PatentListItemResponse toListItem(PatentDetailResponse detail, String currentQuarterKey, boolean isDelayed) {
+        PatentReviewHistoryEntity responseState = currentQuarterKey == null ? null
+                : reviewHistoryRepository.findByPatentIdAndQuarterKey(detail.patentId(), currentQuarterKey).orElse(null);
         return new PatentListItemResponse(
                 detail.patentId(),
                 detail.managementNumber(),
@@ -855,7 +871,11 @@ public class PatentReviewService {
                 detail.legalActionResult(),
                 originalPatentUrl(detail.country(), detail.applicationNumber(), detail.registrationNumber()),
                 detail.inReview(),
-                currentQuarterKey);
+                currentQuarterKey,
+                isDelayed,
+                responseState != null ? responseState.getResponseDueDate() : null,
+                responseState != null ? responseState.getResponseDueDateExtendedUntil() : null,
+                responseState != null ? responseState.getUrgentRequestedAt() : null);
     }
 
     private String originalPatentUrl(String country, String applicationNumber, String registrationNumber) {
@@ -972,7 +992,12 @@ public class PatentReviewService {
                         state.getBusinessOpinionDecision(),
                         state.getBusinessOpinionReason(),
                         state.getBusinessOpinionSubmittedAt()),
-                patent.inReview());
+                patent.inReview(),
+                state.isDelayed(),
+                state.getResponseDueDate(),
+                state.getResponseDueDateExtendedUntil(),
+                state.getUrgentRequestedAt(),
+                state.getQuarterKey());
     }
 
     private AiEvaluationReportResponse aiReportFromHistory(
@@ -1111,6 +1136,7 @@ public class PatentReviewService {
         return new PatentReviewHistoryItemResponse(
                 entity.getQuarterKey(),
                 nameOrNull(entity.getReviewWorkflowStatus()),
+                entity.isDelayed(),
                 nameOrNull(entity.getBusinessOpinionDecision()),
                 entity.getBusinessOpinionReason(),
                 entity.getBusinessOpinionSubmittedAt(),
@@ -1118,6 +1144,9 @@ public class PatentReviewService {
                 entity.getFinalDecisionId(),
                 entity.getFinalDecisionReason(),
                 entity.getFinalDecisionDecidedAt(),
+                entity.getResponseDueDate(),
+                entity.getResponseDueDateExtendedUntil(),
+                entity.getUrgentRequestedAt(),
                 entity.getCreatedAt() != null ? entity.getCreatedAt().atZone(KST).toOffsetDateTime() : null,
                 entity.getDepartmentId(),
                 entity.getDepartmentName());

@@ -1,6 +1,5 @@
 package com.syuuk.patentflow.patent.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.syuuk.patentflow.common.error.ErrorCode;
 import com.syuuk.patentflow.common.error.PatentFlowException;
 import com.syuuk.patentflow.patent.client.AiReportAgentClient;
@@ -8,6 +7,7 @@ import com.syuuk.patentflow.patent.client.AiReportAgentClient.AgentEvaluateRespo
 import com.syuuk.patentflow.patent.domain.PatentMetadataEntity;
 import com.syuuk.patentflow.patent.domain.PatentReviewHistoryEntity;
 import com.syuuk.patentflow.patent.dto.AiEvaluationReportResponse;
+import com.syuuk.patentflow.patent.dto.BatchAiReportResult;
 import com.syuuk.patentflow.patent.dto.BusinessOpinionDecision;
 import com.syuuk.patentflow.patent.dto.BusinessOpinionResponse;
 import com.syuuk.patentflow.patent.dto.EvaluationCategory;
@@ -19,19 +19,18 @@ import com.syuuk.patentflow.patent.dto.LegalActionResult;
 import com.syuuk.patentflow.patent.dto.PatchFinalDecisionRequest;
 import com.syuuk.patentflow.patent.dto.PatentDetailResponse;
 import com.syuuk.patentflow.patent.dto.PatentLifecycleStatus;
-import com.syuuk.patentflow.patent.dto.PatentListItemResponse;
 import com.syuuk.patentflow.patent.dto.PatentSummaryResponse;
 import com.syuuk.patentflow.patent.dto.Recommendation;
 import com.syuuk.patentflow.patent.dto.ReviewWorkflowStatus;
 import com.syuuk.patentflow.patent.repository.PatentMetadataRepository;
 import com.syuuk.patentflow.patent.repository.PatentReviewHistoryRepository;
+import com.syuuk.patentflow.settings.repository.QuarterSettingRepository;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
@@ -39,7 +38,7 @@ import org.springframework.stereotype.Service;
  * 특허 검토 워크플로우 상태 전이 서비스.
  *
  * - AI 레포트 생성, 메일 발송 처리, 사업부 의견 접수, 최종 결정 등 상태 변경 작업을 담당한다.
- * - PatentReviewService와 순환 의존성이 생기므로 @Lazy로 주입받는다.
+ * - PatentReviewService는 조회/상태 로딩, 이 서비스는 상태 전이를 맡아 의존 방향을 단방향으로 유지한다.
  * - with*() 메서드는 PatentDetailResponse를 순수하게 변환(immutable transform)하는 빌더 역할이다.
  */
 @Service
@@ -47,23 +46,27 @@ public class PatentWorkflowService {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
-    // @Lazy: PatentReviewService ↔ PatentWorkflowService 순환 의존성을 런타임 프록시로 해소
     private final PatentReviewService patentReviewService;
     private final PatentMetadataRepository patentMetadataRepository;
     private final PatentReviewHistoryRepository reviewHistoryRepository;
     private final AiReportAgentClient aiReportAgentClient;
     private final AiReportStorageService aiReportStorageService;
     private final AnnualFeeScheduleService annualFeeScheduleService;
-    private final ObjectMapper objectMapper;
+    private final QuarterSettingRepository quarterSettingRepository;
+
+    public record WorkflowBatchUpdateResult(
+            List<String> updatedPatentIds,
+            List<String> skippedPatentIds
+    ) {}
 
     public PatentWorkflowService(
-            @Lazy PatentReviewService patentReviewService,
+            PatentReviewService patentReviewService,
             PatentMetadataRepository patentMetadataRepository,
             PatentReviewHistoryRepository reviewHistoryRepository,
             AiReportAgentClient aiReportAgentClient,
             AiReportStorageService aiReportStorageService,
             AnnualFeeScheduleService annualFeeScheduleService,
-            ObjectMapper objectMapper
+            QuarterSettingRepository quarterSettingRepository
     ) {
         this.patentReviewService = patentReviewService;
         this.patentMetadataRepository = patentMetadataRepository;
@@ -71,7 +74,7 @@ public class PatentWorkflowService {
         this.aiReportAgentClient = aiReportAgentClient;
         this.aiReportStorageService = aiReportStorageService;
         this.annualFeeScheduleService = annualFeeScheduleService;
-        this.objectMapper = objectMapper;
+        this.quarterSettingRepository = quarterSettingRepository;
     }
 
     // ── AI 레포트 생성 ────────────────────────────────────────
@@ -79,6 +82,7 @@ public class PatentWorkflowService {
     public PatentDetailResponse generateAiReport(String patentId) {
         PatentDetailResponse patent = patentReviewService.findPatent(patentId);
         if (patent.reviewWorkflowStatus() != ReviewWorkflowStatus.REVIEW_QUARTER_STARTED) {
+            System.err.println("DEBUG: patentId=" + patentId + ", status=" + patent.reviewWorkflowStatus());
             throw new PatentFlowException(ErrorCode.INVALID_WORKFLOW_STATUS,
                     "AI 레포트는 검토 시작(REVIEW_QUARTER_STARTED) 상태에서만 생성할 수 있습니다.");
         }
@@ -99,6 +103,39 @@ public class PatentWorkflowService {
         return patentReviewService.updatePatentInternal(patentId, p -> withAiReport(p, report, agentResponse.summaryText()));
     }
 
+    public BatchAiReportResult generateAiReportsForWaiting(List<String> patentIds) {
+        List<String> generated = new ArrayList<>();
+        List<String> skipped = new ArrayList<>();
+        List<String> failed = new ArrayList<>();
+
+        if (patentIds == null || patentIds.isEmpty()) {
+            return new BatchAiReportResult(0, 0, 0, 0, List.of(), List.of(), List.of());
+        }
+
+        for (String patentId : new LinkedHashSet<>(patentIds)) {
+            PatentDetailResponse patent = patentReviewService.findPatentOrNull(patentId);
+            if (patent == null || patent.reviewWorkflowStatus() != ReviewWorkflowStatus.REVIEW_QUARTER_STARTED) {
+                skipped.add(patentId);
+                continue;
+            }
+            try {
+                generateAiReportForBatch(patentId);
+                generated.add(patentId);
+            } catch (Exception e) {
+                failed.add(patentId);
+            }
+        }
+
+        return new BatchAiReportResult(
+                new LinkedHashSet<>(patentIds).size(),
+                generated.size(),
+                skipped.size(),
+                failed.size(),
+                generated,
+                skipped,
+                failed);
+    }
+
     // ── 메일 발송 처리 ────────────────────────────────────────
 
     public List<String> markMailReady(List<String> patentIds) {
@@ -114,7 +151,7 @@ public class PatentWorkflowService {
         return updated;
     }
 
-    public PatentReviewService.WorkflowBatchUpdateResult markMailingSent(List<String> patentIds) {
+    public WorkflowBatchUpdateResult markMailingSent(List<String> patentIds) {
         List<String> updatedPatentIds = new ArrayList<>();
         List<String> skippedPatentIds = new ArrayList<>();
 
@@ -126,10 +163,75 @@ public class PatentWorkflowService {
             }
             PatentDetailResponse updated = patentReviewService.updatePatentInternal(
                     patentId, p -> withReviewWorkflowStatus(p, ReviewWorkflowStatus.WAITING_BUSINESS_RESPONSE));
+            setDefaultResponseDueDate(updated.patentId());
             updatedPatentIds.add(updated.patentId());
         }
 
-        return new PatentReviewService.WorkflowBatchUpdateResult(updatedPatentIds, skippedPatentIds);
+        return new WorkflowBatchUpdateResult(updatedPatentIds, skippedPatentIds);
+    }
+
+    public WorkflowBatchUpdateResult extendBusinessResponseDeadline(
+            List<ResponseDeadlineExtensionTarget> targets,
+            LocalDate responseDueDate
+    ) {
+        if (targets == null || targets.isEmpty() || responseDueDate == null) {
+            return new WorkflowBatchUpdateResult(List.of(), List.of());
+        }
+
+        List<String> updatedPatentIds = new ArrayList<>();
+        List<String> skippedPatentIds = new ArrayList<>();
+        OffsetDateTime now = OffsetDateTime.now(KST);
+
+        for (ResponseDeadlineExtensionTarget target : targets) {
+            if (target == null || target.patentId() == null || target.patentId().isBlank()
+                    || target.quarterKey() == null || target.quarterKey().isBlank()) {
+                continue;
+            }
+
+            PatentReviewHistoryEntity history = reviewHistoryRepository
+                    .findByPatentIdAndQuarterKey(target.patentId(), target.quarterKey())
+                    .orElse(null);
+            if (history == null || history.getBusinessOpinionDecision() != null
+                    || !canUrgentlyRequestBusinessResponse(history.getReviewWorkflowStatus())) {
+                skippedPatentIds.add(target.patentId());
+                continue;
+            }
+
+            history.setReviewWorkflowStatus(ReviewWorkflowStatus.WAITING_BUSINESS_RESPONSE);
+            if (history.getResponseDueDate() == null) {
+                history.setResponseDueDate(resolveQuarterResponseDueDate(target.quarterKey()));
+            }
+            history.setResponseDueDateExtendedUntil(responseDueDate);
+            history.setUrgentRequestedAt(now);
+            history.setDelayed(true);
+            reviewHistoryRepository.save(history);
+            updatedPatentIds.add(target.patentId());
+        }
+
+        return new WorkflowBatchUpdateResult(updatedPatentIds, skippedPatentIds);
+    }
+
+    private boolean canUrgentlyRequestBusinessResponse(ReviewWorkflowStatus status) {
+        return status == ReviewWorkflowStatus.MAIL_READY
+                || status == ReviewWorkflowStatus.WAITING_BUSINESS_RESPONSE;
+    }
+
+    public WorkflowBatchUpdateResult markMailingRetryRequired(List<String> patentIds) {
+        List<String> updatedPatentIds = new ArrayList<>();
+        List<String> skippedPatentIds = new ArrayList<>();
+
+        for (String patentId : new LinkedHashSet<>(patentIds)) {
+            PatentDetailResponse patent = patentReviewService.findPatentOrNull(patentId);
+            if (patent == null || patent.reviewWorkflowStatus() != ReviewWorkflowStatus.WAITING_BUSINESS_RESPONSE) {
+                skippedPatentIds.add(patentId);
+                continue;
+            }
+            PatentDetailResponse updated = patentReviewService.updatePatentInternal(
+                    patentId, p -> withReviewWorkflowStatus(p, ReviewWorkflowStatus.MAIL_READY));
+            updatedPatentIds.add(updated.patentId());
+        }
+
+        return new WorkflowBatchUpdateResult(updatedPatentIds, skippedPatentIds);
     }
 
     // ── 사업부 의견 / 최종 결정 ───────────────────────────────
@@ -166,6 +268,45 @@ public class PatentWorkflowService {
         });
         return new FinalDecisionResponse(updated.patentId(), updated.finalDecisionRecord(),
                 updated.legalActionResult(), updated.reviewWorkflowStatus());
+    }
+
+    public FinalDecisionResponse recordDelayedFinalDecision(String patentId, String quarterKey, FinalDecisionRequest request) {
+        PatentReviewHistoryEntity history = reviewHistoryRepository
+                .findByPatentIdAndQuarterKey(patentId, quarterKey)
+                .orElseThrow(() -> new PatentFlowException(ErrorCode.PATENT_NOT_FOUND));
+        if (!history.isDelayed()) {
+            throw new PatentFlowException(ErrorCode.INVALID_WORKFLOW_STATUS);
+        }
+
+        OffsetDateTime decidedAt = OffsetDateTime.now(KST);
+        history.setReviewWorkflowStatus(ReviewWorkflowStatus.NOT_IN_REVIEW);
+        history.setLegalActionResult(request.legalActionResult());
+        history.setFinalDecisionId(history.getFinalDecisionId() == null
+                ? patentId + "-" + quarterKey + "-DEC-01"
+                : history.getFinalDecisionId());
+        history.setFinalDecisionReason(request.reason());
+        history.setFinalDecisionDecidedAt(decidedAt);
+        history.setDelayed(false);
+        reviewHistoryRepository.save(history);
+
+        patentMetadataRepository.findById(patentId).ifPresent(entity -> {
+            if (request.legalActionResult() == LegalActionResult.ABANDONED) {
+                entity.setPatentStatus(PatentLifecycleStatus.ABANDONED);
+            } else if (request.legalActionResult() == LegalActionResult.MAINTAINED && history.getAnnualFeeDueDate() != null) {
+                entity.setFeeDueDate(annualFeeScheduleService.advanceAfterMaintenance(
+                        entity.getCountry(), history.getAnnualFeeDueDate(), entity.getExpectedExpirationDate()));
+            }
+            patentMetadataRepository.save(entity);
+        });
+
+        return new FinalDecisionResponse(
+                patentId,
+                new FinalDecisionRecordResponse(
+                        history.getFinalDecisionId(),
+                        history.getFinalDecisionReason(),
+                        history.getFinalDecisionDecidedAt()),
+                history.getLegalActionResult(),
+                history.getReviewWorkflowStatus());
     }
 
     // ── 분기 / 배치 관리 ─────────────────────────────────────
@@ -212,6 +353,9 @@ public class PatentWorkflowService {
                     .findByPatentIdAndQuarterKey(entity.getPatentId(), quarterKey)
                     .orElseGet(() -> new PatentReviewHistoryEntity(entity.getPatentId(), quarterKey));
             history.setReviewWorkflowStatus(ReviewWorkflowStatus.REVIEW_QUARTER_STARTED);
+            history.setResponseDueDate(null);
+            history.setResponseDueDateExtendedUntil(null);
+            history.setUrgentRequestedAt(null);
             if (history.getAiRecommendation() == null) {
                 history.setAiRecommendation(Recommendation.HOLD);
             }
@@ -223,6 +367,31 @@ public class PatentWorkflowService {
         });
         return reviewStarted;
     }
+
+    private void setDefaultResponseDueDate(String patentId) {
+        String quarterKey = patentMetadataRepository.findById(patentId)
+                .map(PatentMetadataEntity::getCurrentQuarterKey)
+                .orElse(null);
+        if (quarterKey == null || quarterKey.isBlank()) {
+            return;
+        }
+        PatentReviewHistoryEntity history = reviewHistoryRepository
+                .findByPatentIdAndQuarterKey(patentId, quarterKey)
+                .orElse(null);
+        if (history == null || history.getResponseDueDate() != null) {
+            return;
+        }
+        history.setResponseDueDate(resolveQuarterResponseDueDate(quarterKey));
+        reviewHistoryRepository.save(history);
+    }
+
+    private LocalDate resolveQuarterResponseDueDate(String quarterKey) {
+        return quarterSettingRepository.findById(quarterKey)
+                .map(q -> q.getSubmissionDeadline() != null ? q.getSubmissionDeadline() : q.getStartDate())
+                .orElse(null);
+    }
+
+    public record ResponseDeadlineExtensionTarget(String patentId, String quarterKey) {}
 
     // ── 상태 변환 빌더 (with*) ────────────────────────────────
 
@@ -237,7 +406,13 @@ public class PatentWorkflowService {
                 ReviewWorkflowStatus.MAIL_READY, patent.feeDueDate(), patent.reviewReason(),
                 report.recommendation(), patent.businessOpinionDecision(), patent.legalActionResult(),
                 withAgentSummary(patent.summary(), agentSummary), report,
-                patent.finalDecisionRecord(), patent.businessOpinion(), true);
+                patent.finalDecisionRecord(), patent.businessOpinion(),
+                true,
+                patent.isDelayed(),
+                patent.responseDueDate(),
+                patent.responseDueDateExtendedUntil(),
+                patent.urgentRequestedAt(),
+                patent.currentQuarterKey());
     }
 
     private PatentSummaryResponse withAgentSummary(PatentSummaryResponse summary, String agentSummary) {
@@ -260,7 +435,13 @@ public class PatentWorkflowService {
                 ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED, patent.feeDueDate(),
                 patent.reviewReason(), patent.currentRecommendation(), decision,
                 patent.legalActionResult(), patent.summary(), patent.aiEvaluationReport(),
-                patent.finalDecisionRecord(), new BusinessOpinionResponse(decision, reason, submittedAt), true);
+                patent.finalDecisionRecord(), new BusinessOpinionResponse(decision, reason, submittedAt),
+                true,
+                patent.isDelayed(),
+                patent.responseDueDate(),
+                patent.responseDueDateExtendedUntil(),
+                patent.urgentRequestedAt(),
+                patent.currentQuarterKey());
     }
 
     private PatentDetailResponse withFinalDecision(
@@ -286,7 +467,13 @@ public class PatentWorkflowService {
                                 ? patent.patentId() + "-DEC-01"
                                 : patent.finalDecisionRecord().decisionId(),
                         request.reason(), decidedAt),
-                patent.businessOpinion(), false);
+                patent.businessOpinion(),
+                false,
+                false,
+                patent.responseDueDate(),
+                patent.responseDueDateExtendedUntil(),
+                patent.urgentRequestedAt(),
+                null);
     }
 
     private PatentDetailResponse withClearedFinalDecision(PatentDetailResponse patent) {
@@ -300,7 +487,13 @@ public class PatentWorkflowService {
                 ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED, patent.feeDueDate(),
                 patent.reviewReason(), patent.currentRecommendation(), patent.businessOpinionDecision(),
                 null, patent.summary(), patent.aiEvaluationReport(),
-                new FinalDecisionRecordResponse(null, null, null), patent.businessOpinion(), true);
+                new FinalDecisionRecordResponse(null, null, null), patent.businessOpinion(),
+                true,
+                patent.isDelayed(),
+                patent.responseDueDate(),
+                patent.responseDueDateExtendedUntil(),
+                patent.urgentRequestedAt(),
+                patent.currentQuarterKey());
     }
 
     private PatentDetailResponse withPatchedFinalDecision(
@@ -331,7 +524,13 @@ public class PatentWorkflowService {
                                 ? patent.patentId() + "-DEC-01"
                                 : patent.finalDecisionRecord().decisionId(),
                         reason, decidedAt),
-                patent.businessOpinion(), false);
+                patent.businessOpinion(),
+                false,
+                false,
+                patent.responseDueDate(),
+                patent.responseDueDateExtendedUntil(),
+                patent.urgentRequestedAt(),
+                null);
     }
 
     PatentDetailResponse withReviewWorkflowStatus(PatentDetailResponse patent, ReviewWorkflowStatus status) {
@@ -346,12 +545,20 @@ public class PatentWorkflowService {
                 patent.currentRecommendation(), patent.businessOpinionDecision(),
                 patent.legalActionResult(), patent.summary(), patent.aiEvaluationReport(),
                 patent.finalDecisionRecord(), patent.businessOpinion(),
-                status != ReviewWorkflowStatus.NOT_IN_REVIEW);
+                status != ReviewWorkflowStatus.NOT_IN_REVIEW,
+                patent.isDelayed(),
+                patent.responseDueDate(),
+                patent.responseDueDateExtendedUntil(),
+                patent.urgentRequestedAt(),
+                patent.currentQuarterKey());
     }
 
     // ── AI 레포트 응답 매핑 ───────────────────────────────────
 
     AiEvaluationReportResponse mapAgentResponse(AgentEvaluateResponse agent, String patentId) {
+        if (agent == null) {
+            throw new PatentFlowException(ErrorCode.AI_REPORT_FAILED);
+        }
         String reportId = "REPORT-" + patentId + "-" + System.currentTimeMillis();
         List<EvaluationScoreResponse> scores = agent.scores() == null ? List.of() :
                 agent.scores().stream()

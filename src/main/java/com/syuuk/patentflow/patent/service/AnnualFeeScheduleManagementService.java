@@ -39,12 +39,17 @@ public class AnnualFeeScheduleManagementService {
     }
 
     public List<AnnualFeeScheduleItemResponse> getSchedule(String country) {
-        String normalizedCountry = country == null ? null : country.trim().toUpperCase();
-        return patentMetadataRepository.findAll(Sort.by("feeDueDate", "managementNumber")).stream()
-                .filter(patent -> normalizedCountry == null || normalizedCountry.isBlank()
-                        || "ALL".equals(normalizedCountry)
-                        || normalizedCountry.equalsIgnoreCase(patent.getCountry()))
-                .map(this::toResponse)
+        String normalizedCountry = country == null || country.isBlank() || "ALL".equalsIgnoreCase(country.trim()) ? null : country.trim().toUpperCase();
+        List<PatentMetadataEntity> patents = patentMetadataRepository.findByCountryOrderByFeeDueDateAndManagementNumber(normalizedCountry);
+        
+        // [최적화] 각 특허마다 연차료 조정 이력을 조회하는 N+1 쿼리를 방지하기 위해,
+        // 전체 조정 이력을 한 번에 가져와서 메모리에서 특허 ID를 기준으로 그룹핑(In-memory Join) 처리
+        java.util.Map<String, List<AnnualFeeAdjustmentEntity>> adjustmentsByPatent = adjustmentRepository.findAll().stream()
+                .sorted(java.util.Comparator.comparing(AnnualFeeAdjustmentEntity::getAdjustedAt).reversed())
+                .collect(java.util.stream.Collectors.groupingBy(AnnualFeeAdjustmentEntity::getPatentId));
+
+        return patents.stream()
+                .map(p -> toResponseWithHistory(p, adjustmentsByPatent.getOrDefault(p.getPatentId(), List.of())))
                 .toList();
     }
 
@@ -78,13 +83,11 @@ public class AnnualFeeScheduleManagementService {
                 request.reason(),
                 request.adjustedBy() == null || request.adjustedBy().isBlank() ? "관리자" : request.adjustedBy().trim()));
 
-        return toResponse(patent);
+        return toResponseWithHistory(patent, adjustmentRepository.findByPatentIdOrderByAdjustedAtDesc(patent.getPatentId()));
     }
 
-    private AnnualFeeScheduleItemResponse toResponse(PatentMetadataEntity patent) {
-        List<AnnualFeeAdjustmentHistoryResponse> history = adjustmentRepository
-                .findByPatentIdOrderByAdjustedAtDesc(patent.getPatentId())
-                .stream()
+    private AnnualFeeScheduleItemResponse toResponseWithHistory(PatentMetadataEntity patent, List<AnnualFeeAdjustmentEntity> adjustmentEntities) {
+        List<AnnualFeeAdjustmentHistoryResponse> history = adjustmentEntities.stream()
                 .map(this::toHistoryResponse)
                 .toList();
         AnnualFeeAdjustmentHistoryResponse latestAdjustment = history.isEmpty() ? null : history.get(0);

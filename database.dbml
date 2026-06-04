@@ -1,4 +1,4 @@
-// PatentFlow_BE Database Schema - 2026-05-29
+// PatentFlow_BE Database Schema - 2026-06-01
 //
 // Runtime database
 //   PostgreSQL database: patentflow
@@ -39,7 +39,8 @@ Table patents {
   joint_application varchar(16) [note: "Y/N style source value"]
   co_applicant_name varchar(512)
   patent_status varchar(64) [note: "PatentLifecycleStatus enum: ACTIVE | ABANDONED | EXPIRED"]
-  is_in_review boolean [not null, default: false, note: "Current review flag; true while any active review workflow is open"]
+  is_in_review boolean [not null, default: false, note: "분기 검토 대상 여부; 분기 활성화 시 true, 검토 완료 후 false"]
+  current_quarter_key varchar(16) [note: "현재 속한 검토 분기 키 (예: 2026-Q3); 검토 아님이면 null"]
   application_date date
   registration_date date
   application_number varchar(64)
@@ -54,7 +55,8 @@ Table patent_review_history {
   id varchar(64) [pk, note: "{patent_id}|{quarter_key}"]
   patent_id varchar(32) [not null]
   quarter_key varchar(16) [not null]
-  review_workflow_status varchar(64) [note: "ReviewWorkflowStatus enum: NOT_IN_REVIEW | REVIEW_QUARTER_STARTED | MAIL_READY | WAITING_BUSINESS_RESPONSE | BUSINESS_RESPONSE_RECEIVED"]
+  review_workflow_status varchar(64) [note: "ReviewWorkflowStatus enum: NOT_IN_REVIEW | REVIEW_QUARTER_STARTED | MAIL_READY | WAITING_BUSINESS_RESPONSE | BUSINESS_RESPONSE_RECEIVED. 지연 여부는 is_delayed 참조"]
+  is_delayed boolean [not null, default: false, note: "납부기간 시작일까지 검토 미완료 시 true. review_workflow_status는 마지막 진행 단계를 유지해 어느 단계에서 지연됐는지 파악 가능"]
   ai_recommendation varchar(64) [note: "Recommendation enum: MAINTAIN | REVIEW_AGAIN | ABANDON | HOLD"]
   ai_report_id varchar(128)
   ai_report_created_at timestamptz

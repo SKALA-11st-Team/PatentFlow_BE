@@ -3,17 +3,13 @@ package com.syuuk.patentflow.patent.controller;
 import com.syuuk.patentflow.common.response.ApiResponse;
 import com.syuuk.patentflow.common.response.PageResponse;
 import com.syuuk.patentflow.patent.dto.AssignDepartmentRequest;
-import com.syuuk.patentflow.patent.dto.BatchPatentIdsRequest;
-import com.syuuk.patentflow.patent.dto.FinalDecisionRequest;
-import com.syuuk.patentflow.patent.dto.FinalDecisionResponse;
-import com.syuuk.patentflow.patent.dto.PatchFinalDecisionRequest;
 import com.syuuk.patentflow.patent.dto.PatentBibliographicInfoResponse;
 import com.syuuk.patentflow.patent.dto.PatentContextSuggestionRequest;
 import com.syuuk.patentflow.patent.dto.PatentContextSuggestionResponse;
 import com.syuuk.patentflow.patent.dto.PatentDetailResponse;
 import com.syuuk.patentflow.patent.dto.PatentHistoryResponse;
+import com.syuuk.patentflow.patent.dto.PatentReviewHistoryItemResponse;
 import com.syuuk.patentflow.patent.dto.PatentListItemResponse;
-
 import com.syuuk.patentflow.patent.dto.PatentUpsertRequest;
 import com.syuuk.patentflow.patent.dto.PatentUpsertResponse;
 import com.syuuk.patentflow.patent.dto.ReviewWorkflowStatus;
@@ -53,8 +49,10 @@ public class PatentController {
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String departmentId,
             @RequestParam(required = false) ReviewWorkflowStatus reviewWorkflowStatus,
-            @RequestParam(required = false) String sort) {
-        return patentReviewService.getPatents(page, size, keyword, departmentId, reviewWorkflowStatus, sort);
+            @RequestParam(required = false) String sort,
+            @RequestParam(required = false) String quarterKey,
+            @RequestParam(required = false) Boolean isDelayed) {
+        return patentReviewService.getPatents(page, size, keyword, departmentId, reviewWorkflowStatus, sort, quarterKey, isDelayed);
     }
 
     /**
@@ -141,30 +139,10 @@ public class PatentController {
         return ApiResponse.ok(patentReviewService.getPatentHistory(patentId));
     }
 
-    /**
-     * @relatedFR FR-LEGAL-09, FR-LEGAL-10
-     * @relatedUI UI-LEGAL-04
-     * @description 특허 최종 판단을 기록하는 API.
-     */
-    @PostMapping("/{patentId}/final-decision")
-    public ApiResponse<FinalDecisionResponse> recordFinalDecision(
-            @PathVariable String patentId,
-            @Valid @RequestBody FinalDecisionRequest request
-    ) {
-        return ApiResponse.ok(patentReviewService.recordFinalDecision(patentId, request));
-    }
-
-    /**
-     * @relatedFR FR-LEGAL-20
-     * @relatedUI UI-LEGAL-04
-     * @description 특허 최종 판단을 수정하거나 취소하는 API.
-     */
-    @PatchMapping("/{patentId}/final-decision")
-    public ApiResponse<FinalDecisionResponse> patchFinalDecision(
-            @PathVariable String patentId,
-            @RequestBody PatchFinalDecisionRequest request
-    ) {
-        return ApiResponse.ok(patentReviewService.patchFinalDecision(patentId, request));
+    // 특허의 분기별 검토 이력(patent_review_history) 조회 — 과거 분기 이력 페이지에 사용
+    @GetMapping("/{patentId}/review-history")
+    public ApiResponse<List<PatentReviewHistoryItemResponse>> getReviewHistory(@PathVariable String patentId) {
+        return ApiResponse.ok(patentReviewService.getReviewHistory(patentId));
     }
 
     /**
@@ -176,22 +154,6 @@ public class PatentController {
             @Valid @RequestBody AssignDepartmentRequest request
     ) {
         return ApiResponse.ok(patentReviewService.assignDepartment(patentId, request.departmentId()));
-    }
-
-    /**
-     * @description AI 평가 레포트 생성 요청 — FastAPI agent 호출 후 상태를 MAIL_READY로 전환.
-     */
-    @PostMapping("/{patentId}/request-ai-report")
-    public ApiResponse<PatentDetailResponse> requestAiReport(@PathVariable String patentId) {
-        return ApiResponse.ok(patentReviewService.generateAiReport(patentId));
-    }
-
-    /**
-     * @description 복수 특허를 MAIL_READY 상태로 일괄 전환하는 API.
-     */
-    @PostMapping("/batch/mark-mail-ready")
-    public ApiResponse<List<String>> markMailReady(@Valid @RequestBody BatchPatentIdsRequest request) {
-        return ApiResponse.ok(patentReviewService.markMailReady(request.patentIds()));
     }
 
 }
