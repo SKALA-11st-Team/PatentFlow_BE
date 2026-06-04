@@ -125,10 +125,8 @@ public class BusinessReviewService {
      */
     @Transactional
     public BusinessSubmissionVersionResponse submit(String patentId, BusinessChecklistSubmissionRequest request) {
-        patentReviewService.ensurePatentExists(patentId);
-        String quarterKey = quarterSettingRepository.findFirstByActivatedTrueAndEndedFalseOrderByQuarterKeyDesc() != null 
-                ? quarterSettingRepository.findFirstByActivatedTrueAndEndedFalseOrderByQuarterKeyDesc().getQuarterKey() 
-                : null;
+        PatentDetailResponse patent = patentReviewService.getPatentDetail(patentId);
+        String quarterKey = patent.currentQuarterKey();
         OffsetDateTime submittedAt = OffsetDateTime.now(KST);
         BusinessSubmissionVersionResponse submission = toVersion(patentId, request, submittedAt);
         patentWorkflowService.recordBusinessOpinion(
@@ -139,7 +137,6 @@ public class BusinessReviewService {
         PatentReviewHistoryEntity history = findBusinessSubmissionState(patentId, quarterKey);
         applySubmission(history, submission);
         reviewHistoryRepository.save(history);
-        PatentDetailResponse patent = patentReviewService.getPatentDetail(patentId);
         String deptName = patent.departmentName() != null ? patent.departmentName() : "사업부";
         notificationService.addNotification(
                 "사업부 의견 수신",

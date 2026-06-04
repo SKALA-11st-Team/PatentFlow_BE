@@ -1107,11 +1107,14 @@ public class PatentReviewService {
     }
 
     private void persistPatentState(PatentDetailResponse patent) {
-        List<PatentReviewHistoryEntity> history =
-                reviewHistoryRepository.findByPatentIdOrderByCreatedAtDesc(patent.patentId());
-        PatentReviewHistoryEntity state = history.isEmpty()
-                ? new PatentReviewHistoryEntity(patent.patentId(), "UNQUARTERED")
-                : history.get(0);
+        PatentReviewHistoryEntity state;
+        if (patent.currentQuarterKey() != null) {
+            state = reviewHistoryRepository.findByPatentIdAndQuarterKey(patent.patentId(), patent.currentQuarterKey())
+                    .orElseGet(() -> new PatentReviewHistoryEntity(patent.patentId(), patent.currentQuarterKey()));
+        } else {
+            List<PatentReviewHistoryEntity> history = reviewHistoryRepository.findByPatentIdOrderByCreatedAtDesc(patent.patentId());
+            state = history.isEmpty() ? new PatentReviewHistoryEntity(patent.patentId(), "UNQUARTERED") : history.get(0);
+        }
         state.setReviewWorkflowStatus(patent.reviewWorkflowStatus());
         state.setAiRecommendation(patent.currentRecommendation());
         applyAiReportToHistory(state, patent.aiEvaluationReport());

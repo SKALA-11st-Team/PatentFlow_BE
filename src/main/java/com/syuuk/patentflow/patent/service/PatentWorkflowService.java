@@ -290,6 +290,7 @@ public class PatentWorkflowService {
         reviewHistoryRepository.save(history);
 
         patentMetadataRepository.findById(patentId).ifPresent(entity -> {
+            entity.setInReview(false);
             if (request.legalActionResult() == LegalActionResult.ABANDONED) {
                 entity.setPatentStatus(PatentLifecycleStatus.ABANDONED);
             } else if (request.legalActionResult() == LegalActionResult.MAINTAINED && history.getAnnualFeeDueDate() != null) {
