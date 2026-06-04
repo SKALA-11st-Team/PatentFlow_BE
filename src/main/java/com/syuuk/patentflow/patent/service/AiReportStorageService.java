@@ -25,9 +25,14 @@ public class AiReportStorageService {
         }
 
         try {
-            Path patentDir = storageRoot.resolve(safeSegment(patentId));
-            Files.createDirectories(patentDir);
-            Path reportPath = patentDir.resolve(safeSegment(reportId) + ".md");
+            Path storageBase = storageRoot.toAbsolutePath().normalize();
+            Path patentDir = storageBase.resolve(safeSegment(patentId));
+            Path reportPath = patentDir.resolve(safeSegment(reportId) + ".md").normalize();
+            // Path Traversal 차단: 정규화 후 저장 루트를 벗어나는 경로(../ 등)는 거부한다.
+            if (!reportPath.startsWith(storageBase)) {
+                throw new IllegalArgumentException("저장 경로가 허용된 디렉토리를 벗어났습니다.");
+            }
+            Files.createDirectories(reportPath.getParent());
             Files.writeString(reportPath, markdown, StandardCharsets.UTF_8);
             return reportPath.toString();
         } catch (IOException exception) {
