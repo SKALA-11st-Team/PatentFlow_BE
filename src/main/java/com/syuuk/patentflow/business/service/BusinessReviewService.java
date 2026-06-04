@@ -15,6 +15,7 @@ import com.syuuk.patentflow.patent.dto.Recommendation;
 import com.syuuk.patentflow.notification.service.NotificationService;
 import com.syuuk.patentflow.patent.repository.PatentReviewHistoryRepository;
 import com.syuuk.patentflow.patent.service.PatentReviewService;
+import com.syuuk.patentflow.patent.service.PatentWorkflowService;
 import com.syuuk.patentflow.settings.repository.QuarterSettingRepository;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -23,24 +24,27 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class BusinessFixtureService {
+public class BusinessReviewService {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     private final PatentReviewService patentReviewService;
+    private final PatentWorkflowService patentWorkflowService;
     private final PatentReviewHistoryRepository reviewHistoryRepository;
     private final ObjectMapper objectMapper;
     private final NotificationService notificationService;
     private final QuarterSettingRepository quarterSettingRepository;
 
-    public BusinessFixtureService(
+    public BusinessReviewService(
             PatentReviewService patentReviewService,
+            PatentWorkflowService patentWorkflowService,
             PatentReviewHistoryRepository reviewHistoryRepository,
             ObjectMapper objectMapper,
             NotificationService notificationService,
             QuarterSettingRepository quarterSettingRepository
     ) {
         this.patentReviewService = patentReviewService;
+        this.patentWorkflowService = patentWorkflowService;
         this.reviewHistoryRepository = reviewHistoryRepository;
         this.objectMapper = objectMapper;
         this.notificationService = notificationService;
@@ -122,15 +126,12 @@ public class BusinessFixtureService {
     @Transactional
     public BusinessSubmissionVersionResponse submit(String patentId, BusinessChecklistSubmissionRequest request) {
         patentReviewService.ensurePatentExists(patentId);
-        String quarterKey = quarterSettingRepository.findAll().stream()
-                .filter(q -> q.isActivated() && !q.isEnded())
-                .findFirst()
-                .or(() -> quarterSettingRepository.findAll().stream().filter(q -> q.isActivated()).findFirst())
-                .map(q -> q.getQuarterKey())
-                .orElse(null);
+        String quarterKey = quarterSettingRepository.findFirstByActivatedTrueAndEndedFalseOrderByQuarterKeyDesc() != null 
+                ? quarterSettingRepository.findFirstByActivatedTrueAndEndedFalseOrderByQuarterKeyDesc().getQuarterKey() 
+                : null;
         OffsetDateTime submittedAt = OffsetDateTime.now(KST);
         BusinessSubmissionVersionResponse submission = toVersion(patentId, request, submittedAt);
-        patentReviewService.recordBusinessOpinion(
+        patentWorkflowService.recordBusinessOpinion(
                 patentId,
                 request.finalOpinion(),
                 valueOrDefault(request.finalReason(), defaultReason(request.finalOpinion())),
@@ -175,6 +176,7 @@ public class BusinessFixtureService {
         history.setBusinessChecklistTotal(submission.checklistTotal());
         history.setBusinessQualitativeScore(submission.qualitativeScore());
         history.setBusinessChecklistScoresJson(writeChecklistScores(submission.checklistScores()));
+        history.setDelayed(false);
     }
 
     private PatentReviewHistoryEntity findBusinessSubmissionState(String patentId, String quarterKey) {

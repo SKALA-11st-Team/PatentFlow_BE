@@ -6,7 +6,7 @@ import com.syuuk.patentflow.business.dto.BusinessChecklistItemResponse;
 import com.syuuk.patentflow.business.dto.BusinessChecklistSubmissionRequest;
 import com.syuuk.patentflow.business.dto.BusinessDashboardSummaryResponse;
 import com.syuuk.patentflow.business.dto.BusinessSubmissionVersionResponse;
-import com.syuuk.patentflow.business.service.BusinessFixtureService;
+import com.syuuk.patentflow.business.service.BusinessReviewService;
 import com.syuuk.patentflow.common.error.ErrorCode;
 import com.syuuk.patentflow.common.error.PatentFlowException;
 import com.syuuk.patentflow.common.response.ApiResponse;
@@ -29,16 +29,16 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class BusinessController {
 
-    private final BusinessFixtureService businessFixtureService;
+    private final BusinessReviewService businessReviewService;
     private final PatentReviewService patentReviewService;
     private final AuthService authService;
 
     public BusinessController(
-            BusinessFixtureService businessFixtureService,
+            BusinessReviewService businessReviewService,
             PatentReviewService patentReviewService,
             AuthService authService
     ) {
-        this.businessFixtureService = businessFixtureService;
+        this.businessReviewService = businessReviewService;
         this.patentReviewService = patentReviewService;
         this.authService = authService;
     }
@@ -50,7 +50,7 @@ public class BusinessController {
      */
     @GetMapping("/api/v1/business/checklist-items")
     public ApiResponse<List<BusinessChecklistItemResponse>> getChecklistItems() {
-        return ApiResponse.ok(businessFixtureService.getChecklistItems());
+        return ApiResponse.ok(businessReviewService.getChecklistItems());
     }
 
     /**
@@ -139,7 +139,7 @@ public class BusinessController {
             Authentication authentication
     ) {
         assertCanAccessPatent(patentId, authentication);
-        return ApiResponse.ok(businessFixtureService.getSubmissions(patentId));
+        return ApiResponse.ok(businessReviewService.getSubmissions(patentId));
     }
 
     /**
@@ -157,7 +157,7 @@ public class BusinessController {
             throw new PatentFlowException(ErrorCode.INVALID_REQUEST);
         }
         assertBusinessDepartmentPatent(patentId, authentication);
-        return ApiResponse.ok(businessFixtureService.submit(patentId, request));
+        return ApiResponse.ok(businessReviewService.submit(patentId, request));
     }
 
     private String getDepartmentId(Authentication authentication) {

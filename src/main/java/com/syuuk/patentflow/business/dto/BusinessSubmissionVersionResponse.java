@@ -20,13 +20,4 @@ public record BusinessSubmissionVersionResponse(
         List<BusinessSubmissionChecklistScoreResponse> checklistScores,
         int qualitativeScore
 ) {
-    @JsonProperty("finalOpinion")
-    public BusinessOpinionDecision finalOpinion() {
-        return decision;
-    }
-
-    @JsonProperty("responses")
-    public List<BusinessSubmissionChecklistScoreResponse> responses() {
-        return checklistScores;
-    }
 }

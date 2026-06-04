@@ -1,14 +1,17 @@
 -- PatentFlow local/demo workflow seed
 -- This script creates presentation-friendly workflow states and histories.
--- It is intentionally loaded only by LocalDemoSeedRunner for local/demo profiles.
+-- It is not loaded automatically by LocalDemoSeedRunner.
+-- Run it manually after skax_patents.sql and core_review_workflow_seed.sql when
+-- additional demo workflow state is needed.
 
-INSERT INTO users (id, username, password, role, department_id, display_name, created_at) VALUES
-    ('USER-business-demo', 'business', '$2a$10$8Cs9O/CKSYzHkTU4/5WBguCSVaE0fWcP8w3pizKrhkoGNOT7nl78e', 'BUSINESS', 'DEPT-ICT', '사업부 데모 담당자', CURRENT_TIMESTAMP)
-ON CONFLICT (username) DO UPDATE SET
+INSERT INTO users (id, email, password, role, department_id, username, created_at) VALUES
+    ('USER-business-demo', 'business.demo@syuuk.test', '$2a$10$8Cs9O/CKSYzHkTU4/5WBguCSVaE0fWcP8w3pizKrhkoGNOT7nl78e', 'BUSINESS', 'DEPT-ICT', '사업부 데모 담당자', CURRENT_TIMESTAMP)
+ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
     password = EXCLUDED.password,
     role = EXCLUDED.role,
     department_id = EXCLUDED.department_id,
-    display_name = EXCLUDED.display_name;
+    username = EXCLUDED.username;
 
 WITH demo_reviews (
     patent_id,
@@ -72,7 +75,7 @@ WITH demo_reviews (
          '장비 신뢰도 기반 계측 조건 제어를 해외 권리로 보호합니다.',
          'ABANDON', '국내 특허를 우선 유지하고 해외 권리는 비용 대비 활용도가 낮아 포기 의견입니다.',
          TIMESTAMP WITH TIME ZONE '2026-05-16 16:10:00+09', NULL, NULL, NULL),
-        ('PAT-2026-0124', 'LEGAL_ACTION_RECORDED', 'MAINTAIN',
+        ('PAT-2026-0124', 'NOT_IN_REVIEW', 'MAINTAIN',
          '보안 관리 권한 획득 절차와 관련되어 유지 가치가 있습니다.', 79,
          '모바일 환경에서 안전하게 관리자 권한을 획득하고 시스템에 접근하는 방법에 대한 특허입니다.',
          '관리 권한 접근 과정에서 보안 이슈를 줄이고 인증 흐름을 명확히 합니다.',
@@ -82,7 +85,7 @@ WITH demo_reviews (
          TIMESTAMP WITH TIME ZONE '2026-05-15 10:20:00+09',
          'MAINTAINED', '보안 운영 관련 활용 가능성이 있어 유지 처리합니다.',
          TIMESTAMP WITH TIME ZONE '2026-05-18 11:00:00+09'),
-        ('PAT-2026-0082', 'LEGAL_ACTION_RECORDED', 'ABANDON',
+        ('PAT-2026-0082', 'NOT_IN_REVIEW', 'ABANDON',
          '내부 활용 가능성이 낮아 포기 검토 대상으로 관리합니다.', 57,
          'IT 서비스 구축 사업의 리스크를 관리하기 위한 절차와 시스템에 관한 특허입니다.',
          '프로젝트 수행 과정의 리스크를 구조화해 관리하는 데 목적이 있습니다.',
@@ -152,7 +155,7 @@ INSERT INTO mailing_history (
         '["security.cc@syuuk.test"]',
         3,
         '[{"patentId":"PAT-2026-0076","managementNumber":"P201603002-KR0","title":"AB 테스팅 기반 서비스 제공 방법 및 시스템"},{"patentId":"PAT-2026-0097","managementNumber":"P201501001-KR0","title":"목소리 특징 정보를 이용한 본인 인증 의뢰 및 대행 방법"},{"patentId":"PAT-2026-0127","managementNumber":"P201203001-KR0","title":"멀티 통신채널, 멀티 디바이스 및 멀티 난수에 의한 멀티 인증 시스템 및 방법"}]',
-        'business',
+        'business.demo@syuuk.test',
         '사업부 데모 담당자',
         'DEPT-ICT',
         TIMESTAMP WITH TIME ZONE '2026-05-14 13:10:00+09',

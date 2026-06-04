@@ -12,8 +12,9 @@ ON CONFLICT (department_id) DO UPDATE SET
     department_name = EXCLUDED.department_name,
     updated_at = EXCLUDED.updated_at;
 
+-- 관리자(ADMIN) 계정은 PATENTFLOW_BOOTSTRAP_ADMIN_* 환경변수로 생성한다.
+-- BootstrapAdminInitializer가 시작 시 자동 생성하므로 여기서는 BUSINESS 사용자만 시드한다.
 INSERT INTO users (id, email, password, role, department_id, username, created_at) VALUES
-    ('USER-admin', 'admin@syuuk.test', '$2a$10$./V2Hi1S3qoucv7eCn3UPevz.heOde1x3SehhcAJCss8OXimprQFC', 'ADMIN', NULL, '특허관리자', CURRENT_TIMESTAMP),
     ('USER-rnd-manager', 'rnd.manager@syuuk.test', '$2a$10$8Cs9O/CKSYzHkTU4/5WBguCSVaE0fWcP8w3pizKrhkoGNOT7nl78e', 'BUSINESS', 'DEPT-RND', 'R&D 담당자', CURRENT_TIMESTAMP),
     ('USER-platform-manager', 'platform.manager@syuuk.test', '$2a$10$8Cs9O/CKSYzHkTU4/5WBguCSVaE0fWcP8w3pizKrhkoGNOT7nl78e', 'BUSINESS', 'DEPT-PLATFORM', '플랫폼 담당자', CURRENT_TIMESTAMP),
     ('USER-esg-manager', 'esg.manager@syuuk.test', '$2a$10$8Cs9O/CKSYzHkTU4/5WBguCSVaE0fWcP8w3pizKrhkoGNOT7nl78e', 'BUSINESS', 'DEPT-ESG', 'ESG 담당자', CURRENT_TIMESTAMP),
@@ -38,39 +39,34 @@ ON CONFLICT (setting_key) DO UPDATE SET
     updated_at = EXCLUDED.updated_at;
 
 
--- Q1은 납부 기간(3월)이 지났으므로 ended=true.
--- Q2 이후는 미활성 상태로 둔다. 검토 시작일이 지나면 백엔드 스케줄러가 활성화하며 검토 이력을 생성한다.
--- submission_deadline = 활성화일(검토 시작일) + 회신기한(기본 1개월)
--- mail_lead_months_snapshot = 활성화 시점의 메일 발송 기준 개월 수 스냅샷 (기본 2)
+-- ============================================================
+-- 분기 설정: Q1(완료), Q2(지연, is_delayed=true), Q3(진행중)
+-- 검토 시작일 = 납부기간 시작일 - 2개월
+-- ============================================================
 INSERT INTO quarter_settings (
-    quarter_key,
-    setting_year,
-    quarter_number,
-    start_date,
-    end_date,
-    activated,
-    activated_at,
-    ended,
-    ended_at,
-    submission_deadline,
-    mail_lead_months_snapshot
+    quarter_key, setting_year, quarter_number, start_date, end_date,
+    activated, activated_at, ended, ended_at, submission_deadline, mail_lead_months_snapshot
 ) VALUES
-    ('2026-Q1', 2026, 1, DATE '2026-01-01', DATE '2026-03-31', true, TIMESTAMP WITH TIME ZONE '2026-01-01 09:00:00+09', true, TIMESTAMP WITH TIME ZONE '2026-03-31 18:00:00+09', DATE '2026-02-01', 2),
-    ('2026-Q2', 2026, 2, DATE '2026-04-01', DATE '2026-06-30', false, NULL, false, NULL, NULL, NULL),
-    ('2026-Q3', 2026, 3, DATE '2026-07-01', DATE '2026-09-30', false, NULL, false, NULL, NULL, NULL),
-    ('2026-Q4', 2026, 4, DATE '2026-10-01', DATE '2026-12-31', false, NULL, false, NULL, NULL, NULL)
+    -- Q1: 검토기간 2025-11-01 ~ 2026-01-01, 완료
+    ('2026-Q1', 2026, 1, DATE '2026-01-01', DATE '2026-03-31',
+     true, TIMESTAMP WITH TIME ZONE '2025-11-01 09:00:00+09',
+     true, TIMESTAMP WITH TIME ZONE '2026-03-31 18:00:00+09',
+     DATE '2025-12-01', 2),
+    -- Q2: 검토기간 2026-02-01 ~ 2026-04-01, 활성화됨 (납부기간 시작일 2026-04-01 경과 → is_delayed=true)
+    ('2026-Q2', 2026, 2, DATE '2026-04-01', DATE '2026-06-30',
+     true, TIMESTAMP WITH TIME ZONE '2026-02-01 09:00:00+09',
+     false, NULL, DATE '2026-03-01', 2),
+    -- Q3: 검토기간 2026-05-01 ~ 2026-07-01, 현재 진행중
+    ('2026-Q3', 2026, 3, DATE '2026-07-01', DATE '2026-09-30',
+     true, TIMESTAMP WITH TIME ZONE '2026-05-01 09:00:00+09',
+     false, NULL, DATE '2026-06-01', 2),
+    -- Q4: 미활성
+    ('2026-Q4', 2026, 4, DATE '2026-10-01', DATE '2026-12-31',
+     false, NULL, false, NULL, NULL, NULL)
 ON CONFLICT (quarter_key) DO UPDATE SET
-    setting_year = EXCLUDED.setting_year,
-    quarter_number = EXCLUDED.quarter_number,
-    start_date = EXCLUDED.start_date,
-    end_date = EXCLUDED.end_date,
-    activated = EXCLUDED.activated,
-    activated_at = EXCLUDED.activated_at,
-    ended = EXCLUDED.ended,
-    ended_at = EXCLUDED.ended_at,
+    setting_year = EXCLUDED.setting_year, quarter_number = EXCLUDED.quarter_number,
+    start_date = EXCLUDED.start_date, end_date = EXCLUDED.end_date,
+    activated = EXCLUDED.activated, activated_at = EXCLUDED.activated_at,
+    ended = EXCLUDED.ended, ended_at = EXCLUDED.ended_at,
     submission_deadline = EXCLUDED.submission_deadline,
     mail_lead_months_snapshot = EXCLUDED.mail_lead_months_snapshot;
-
--- patent_review_history는 seed에서 미리 만들지 않는다.
--- 분기 활성화 시 백엔드가 patents.patent_status = ACTIVE 인 특허를 대상으로
--- REVIEW_QUARTER_STARTED 이력을 생성하고 patents.is_in_review=true로 전환한다.
