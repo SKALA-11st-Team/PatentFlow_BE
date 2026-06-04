@@ -2,9 +2,9 @@ package com.syuuk.patentflow.user.service;
 
 import com.syuuk.patentflow.common.error.ErrorCode;
 import com.syuuk.patentflow.common.error.PatentFlowException;
-import com.syuuk.patentflow.mailing.domain.DepartmentEntity;
+import com.syuuk.patentflow.department.domain.DepartmentEntity;
 import com.syuuk.patentflow.mailing.dto.DepartmentRecipientMappingResponse;
-import com.syuuk.patentflow.mailing.repository.DepartmentRepository;
+import com.syuuk.patentflow.department.repository.DepartmentRepository;
 import com.syuuk.patentflow.patent.service.PatentReviewService;
 import com.syuuk.patentflow.user.dto.CreateDepartmentRequest;
 import com.syuuk.patentflow.user.dto.UpdateDepartmentRequest;

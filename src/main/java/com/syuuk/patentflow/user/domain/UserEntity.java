@@ -1,6 +1,6 @@
 package com.syuuk.patentflow.user.domain;
 
-import com.syuuk.patentflow.mailing.domain.DepartmentEntity;
+import com.syuuk.patentflow.department.domain.DepartmentEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;

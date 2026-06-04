@@ -26,6 +26,7 @@ import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AdminUserService {
@@ -58,12 +59,11 @@ public class AdminUserService {
                 .toList();
     }
 
+    @Transactional
     public UserResponse createUser(CreateUserRequest request) {
         // 관리자는 시스템 전체에 1명만 허용 — 역할 분리 정책. 추가 관리자 필요 시 정책 변경 필요
         if ("ADMIN".equals(request.role())) {
-            boolean adminExists = userRepository.findAll().stream()
-                    .anyMatch(u -> "ADMIN".equals(u.getRole()));
-            if (adminExists) {
+            if (userRepository.existsByRole("ADMIN")) {
                 throw new PatentFlowException(ErrorCode.INVALID_REQUEST,
                         "관리자 계정은 1개만 허용됩니다.");
             }
@@ -82,6 +82,7 @@ public class AdminUserService {
         return UserResponse.from(user);
     }
 
+    @Transactional
     public UserResponse updateUser(String userId, CreateUserRequest request) {
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new PatentFlowException(ErrorCode.INVALID_REQUEST,
@@ -92,13 +93,22 @@ public class AdminUserService {
                     throw new PatentFlowException(ErrorCode.INVALID_REQUEST,
                             "이미 존재하는 계정입니다: " + request.email());
                 });
+        boolean emailChanged = !user.getEmail().equalsIgnoreCase(request.email());
         user.setEmail(request.email());
         user.setRole(request.role());
         user.setDepartmentId(request.departmentId());
         user.setUsername(request.username());
+        if (emailChanged) {
+            String tempPassword = generatePassword();
+            user.setPassword(passwordEncoder.encode(tempPassword));
+            UserEntity savedUser = userRepository.save(user);
+            sendEmailChangedPasswordResetEmail(savedUser.getEmail(), savedUser.getUsername(), tempPassword);
+            return UserResponse.from(savedUser);
+        }
         return UserResponse.from(userRepository.save(user));
     }
 
+    @Transactional
     public void deleteUser(String userId) {
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new PatentFlowException(ErrorCode.INVALID_REQUEST,
@@ -110,6 +120,7 @@ public class AdminUserService {
         userRepository.delete(user);
     }
 
+    @Transactional
     public ResetPasswordResponse resetPassword(String userId) {
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new PatentFlowException(ErrorCode.INVALID_REQUEST,
@@ -140,6 +151,14 @@ public class AdminUserService {
         String subject = "[PatentFlow] 비밀번호가 초기화되었습니다";
         String body = String.format(
                 "%s 님, PatentFlow 계정 비밀번호가 초기화되었습니다.\n\n계정: %s\n임시 비밀번호: %s\n\n로그인 후 비밀번호를 변경해 주세요.",
+                username, email, tempPassword);
+        sendEmail(email, subject, body, tempPassword);
+    }
+
+    private void sendEmailChangedPasswordResetEmail(String email, String username, String tempPassword) {
+        String subject = "[PatentFlow] 계정 이메일이 변경되었습니다";
+        String body = String.format(
+                "%s 님, PatentFlow 계정 이메일이 변경되어 임시 비밀번호가 새로 발급되었습니다.\n\n계정: %s\n임시 비밀번호: %s\n\n새 이메일과 임시 비밀번호로 로그인한 뒤 비밀번호를 변경해 주세요.",
                 username, email, tempPassword);
         sendEmail(email, subject, body, tempPassword);
     }

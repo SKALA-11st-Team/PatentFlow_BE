@@ -104,7 +104,7 @@ class AuthControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {
-                          "username": "admin@test.com",
+                          "email": "admin@test.com",
                           "password": "wrong-password"
                         }
                         """))
@@ -174,7 +174,7 @@ class AuthControllerTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
                             {
-                              "username": "lock@test.com",
+                              "email": "lock@test.com",
                               "password": "wrong-password"
                             }
                             """))
@@ -185,7 +185,7 @@ class AuthControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {
-                          "username": "lock@test.com",
+                          "email": "lock@test.com",
                           "password": "lock1234"
                         }
                         """))
@@ -242,7 +242,7 @@ class AuthControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {
-                          "username": "%s",
+                          "email": "%s",
                           "password": "%s"
                         }
                         """.formatted(username, password)))

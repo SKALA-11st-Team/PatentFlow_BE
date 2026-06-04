@@ -19,6 +19,10 @@ public record ErrorResponse(
         return new ErrorResponse(errorCode.name(), errorCode.message(), details, now());
     }
 
+    public static ErrorResponse of(ErrorCode errorCode, String message) {
+        return new ErrorResponse(errorCode.name(), message, Map.of(), now());
+    }
+
     private static OffsetDateTime now() {
         return OffsetDateTime.now(ZoneId.of("Asia/Seoul"));
     }

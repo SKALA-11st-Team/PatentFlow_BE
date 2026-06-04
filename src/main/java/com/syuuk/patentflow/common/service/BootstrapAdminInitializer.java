@@ -11,9 +11,10 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
-// local·demo 프로파일에서는 실행하지 않음 — 각 환경의 전용 initializer 또는 마이그레이션으로 처리
+// demo 프로파일은 별도 SQL 시드로 어드민을 관리하므로 제외.
+// local·기본 프로파일 모두 env 변수(PATENTFLOW_BOOTSTRAP_ADMIN_*)로 어드민 계정을 생성한다.
 @Component
-@Profile("!local & !demo")
+@Profile("!demo")
 public class BootstrapAdminInitializer implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(BootstrapAdminInitializer.class);

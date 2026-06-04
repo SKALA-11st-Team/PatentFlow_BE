@@ -114,8 +114,8 @@ public class SystemSettingsService {
     }
 
     public void clearGmailOAuth2() {
-        set(KEY_GMAIL_OAUTH2_REFRESH_TOKEN, "");
-        set(KEY_GMAIL_OAUTH2_CONNECTED_EMAIL, "");
+        repository.deleteById(KEY_GMAIL_OAUTH2_REFRESH_TOKEN);
+        repository.deleteById(KEY_GMAIL_OAUTH2_CONNECTED_EMAIL);
     }
 
     public MailSettingsResponse saveMailSettings(MailSettingsRequest request) {
