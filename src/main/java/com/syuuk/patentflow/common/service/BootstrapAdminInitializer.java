@@ -50,22 +50,27 @@ public class BootstrapAdminInitializer implements ApplicationRunner {
         }
 
         String normalizedEmail = email.trim();
-        // upsert — 재기동 시마다 env에 설정된 비밀번호·이름으로 덮어써 일관성 유지
-        UserEntity user = userRepository.findByEmail(normalizedEmail)
-                .orElseGet(() -> new UserEntity(
-                        BOOTSTRAP_ADMIN_ID,
-                        normalizedEmail,
-                        passwordEncoder.encode(password),
-                        "ADMIN",
-                        null,
-                        normalizedDisplayName(normalizedEmail)));
+        try {
+            // upsert — 재기동 시마다 env에 설정된 비밀번호·이름으로 덮어써 일관성 유지
+            UserEntity user = userRepository.findByEmail(normalizedEmail)
+                    .orElseGet(() -> new UserEntity(
+                            BOOTSTRAP_ADMIN_ID,
+                            normalizedEmail,
+                            passwordEncoder.encode(password),
+                            "ADMIN",
+                            null,
+                            normalizedDisplayName(normalizedEmail)));
 
-        user.setPassword(passwordEncoder.encode(password));
-        user.setRole("ADMIN");
-        user.setDepartmentId(null);
-        user.setUsername(normalizedDisplayName(normalizedEmail));
-        userRepository.save(user);
-        log.info("Bootstrap admin upserted: {}", normalizedEmail);
+            user.setPassword(passwordEncoder.encode(password));
+            user.setRole("ADMIN");
+            user.setDepartmentId(null);
+            user.setUsername(normalizedDisplayName(normalizedEmail));
+            userRepository.save(user);
+            log.info("Bootstrap admin upserted: {}", normalizedEmail);
+        } catch (Exception exception) {
+            // 부트스트랩 실패가 애플리케이션 기동을 막지 않도록 한다(예: 스키마 마이그레이션 미적용 상황).
+            log.error("Bootstrap admin upsert failed; continuing startup. Check the users table schema (email column).", exception);
+        }
     }
 
     private String normalizedDisplayName(String fallback) {
