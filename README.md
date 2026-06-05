@@ -52,15 +52,19 @@ target `users` row (e.g. `USER-admin`) with a freshly generated bcrypt hash. Not
 re-runs at startup when baseline rows are missing (`LocalDemoSeedRunner.needsCoreWorkflowSeed`),
 so editing the seed file does not change an already-populated database.
 
-For non-`local`/`demo` profiles, the first administrator is created from environment variables
-(`BootstrapAdminInitializer` runs only when the profile is not `local`/`demo` and the email does
-not already exist; it is disabled under `demo`):
+The administrator account is created/updated from environment variables in **all** profiles
+(`BootstrapAdminInitializer` runs in every profile and upserts the admin by email on each startup,
+mirroring `BootstrapBusinessInitializer`):
 
 ```bash
 PATENTFLOW_BOOTSTRAP_ADMIN_USERNAME=admin@example.com   # used as the login email
 PATENTFLOW_BOOTSTRAP_ADMIN_PASSWORD=change-this-initial-admin-password
 PATENTFLOW_BOOTSTRAP_ADMIN_DISPLAY_NAME=특허관리자
 ```
+
+The env-based admin is stored under id `USER-admin-bootstrap` (distinct from the demo seed's
+`USER-admin` / `admin@syuuk.test`), so both can coexist. On EKS the values come from the
+`PATENTFLOW_BOOTSTRAP_ADMIN_*` GitHub secrets, so a redeploy reconciles the admin login.
 
 Login example:
 

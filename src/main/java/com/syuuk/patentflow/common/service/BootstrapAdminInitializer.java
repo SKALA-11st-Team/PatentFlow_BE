@@ -7,16 +7,20 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
-import org.springframework.context.annotation.Profile;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
-// local·demo 프로파일에서는 실행하지 않음 — 각 환경의 전용 initializer 또는 마이그레이션으로 처리
+// 모든 프로파일(local/demo 포함)에서 실행 — demo/prod를 구분하지 않으므로 관리자 계정도
+// 환경변수(PATENTFLOW_BOOTSTRAP_ADMIN_*) 기준으로 매 기동 시 upsert 한다. (BootstrapBusinessInitializer와 동일 패턴)
 @Component
-@Profile("!local & !demo")
+@Order(1)
 public class BootstrapAdminInitializer implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(BootstrapAdminInitializer.class);
+
+    // 데모 시드(core_review_workflow_seed.sql)의 'USER-admin'과 PK 충돌을 피하기 위한 별도 ID
+    private static final String BOOTSTRAP_ADMIN_ID = "USER-admin-bootstrap";
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -44,18 +48,28 @@ public class BootstrapAdminInitializer implements ApplicationRunner {
             log.info("Bootstrap admin is not configured; skipping initial admin creation.");
             return;
         }
-        if (userRepository.existsByEmail(email)) {
-            log.info("Bootstrap admin already exists: {}", email);
-            return;
-        }
-        userRepository.save(new UserEntity(
-                "USER-admin",
-                email.trim(),
-                passwordEncoder.encode(password),
-                "ADMIN",
-                null,
-                isBlank(displayName) ? email.trim() : displayName.trim()));
-        log.info("Bootstrap admin created: {}", email);
+
+        String normalizedEmail = email.trim();
+        // upsert — 재기동 시마다 env에 설정된 비밀번호·이름으로 덮어써 일관성 유지
+        UserEntity user = userRepository.findByEmail(normalizedEmail)
+                .orElseGet(() -> new UserEntity(
+                        BOOTSTRAP_ADMIN_ID,
+                        normalizedEmail,
+                        passwordEncoder.encode(password),
+                        "ADMIN",
+                        null,
+                        normalizedDisplayName(normalizedEmail)));
+
+        user.setPassword(passwordEncoder.encode(password));
+        user.setRole("ADMIN");
+        user.setDepartmentId(null);
+        user.setUsername(normalizedDisplayName(normalizedEmail));
+        userRepository.save(user);
+        log.info("Bootstrap admin upserted: {}", normalizedEmail);
+    }
+
+    private String normalizedDisplayName(String fallback) {
+        return isBlank(displayName) ? fallback : displayName.trim();
     }
 
     private static boolean isBlank(String value) {

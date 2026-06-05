@@ -33,9 +33,9 @@ Review target identification
 - In this project, the `demo` profile is not disposable fake data. It loads presentation-ready workflow state around the real SK AX patent metadata used by the team.
 - The seeded patent metadata comes from managed project sources such as `docs/skax_patents_list.md` and `src/main/resources/db/seed/skax_patents.sql`.
 - Do not change the EKS deployment profile from `demo` to `prod` unless the team explicitly decides to stop loading the demonstration workflow seed data.
-- With `demo`, `LocalDemoSeedRunner` runs and `BootstrapAdminInitializer` does not run. Therefore bootstrap admin environment variables are not the source of the initial admin account in the demo deployment.
+- With `demo`, `LocalDemoSeedRunner` loads the seed dataset. `BootstrapAdminInitializer` now runs in **all** profiles and upserts the admin from `PATENTFLOW_BOOTSTRAP_ADMIN_*` on each startup, so the admin login is driven by those secrets (demo and prod are not distinguished).
 - Demo business login credentials must be managed through bootstrap business secrets: `PATENTFLOW_BOOTSTRAP_BUSINESS_USERNAME`, `PATENTFLOW_BOOTSTRAP_BUSINESS_PASSWORD`, `PATENTFLOW_BOOTSTRAP_BUSINESS_DEPARTMENT_ID`, and `PATENTFLOW_BOOTSTRAP_BUSINESS_DISPLAY_NAME`. The `USERNAME` value is used as the login email.
-- Under `demo`, the admin account comes from the seed (`db/seed/core_review_workflow_seed.sql`) — admin email `admin@syuuk.test`. `PATENTFLOW_BOOTSTRAP_ADMIN_*` is injected into the pod but is not consumed because `BootstrapAdminInitializer` is disabled in `demo`.
+- The env-based admin (`PATENTFLOW_BOOTSTRAP_ADMIN_USERNAME` = login email, `PATENTFLOW_BOOTSTRAP_ADMIN_PASSWORD`) is stored under id `USER-admin-bootstrap`. The demo seed's `USER-admin` / `admin@syuuk.test` also remains usable; both are ADMIN and can coexist.
 
 ## Authentication
 
