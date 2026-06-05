@@ -29,21 +29,41 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
     private final List<String> allowedOrigins;
+    private final AuthProperties authProperties;
 
     public SecurityConfig(
-            @Value("${patentflow.cors.allowed-origins}") String allowedOrigins
+            @Value("${patentflow.cors.allowed-origins}") String allowedOrigins,
+            AuthProperties authProperties
     ) {
         this.allowedOrigins = Arrays.stream(allowedOrigins.split(","))
                 .map(String::trim)
                 .filter(origin -> !origin.isBlank())
                 .toList();
+        this.authProperties = authProperties;
+    }
+
+    /**
+     * CSRF 토큰 쿠키(XSRF-TOKEN) 설정. 크로스 서브도메인(FE patentflow.live ↔ BE api.patentflow.live)
+     * 환경에서 SPA가 JS로 쿠키를 읽을 수 있도록 상위 도메인을 지정한다(설정값이 있을 때).
+     */
+    private CookieCsrfTokenRepository csrfTokenRepository() {
+        CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        repository.setCookieCustomizer(builder -> {
+            builder.secure(authProperties.isCookieSecure());
+            builder.sameSite(authProperties.getCookieSameSite());
+            String cookieDomain = authProperties.getCookieDomain();
+            if (cookieDomain != null && !cookieDomain.isBlank()) {
+                builder.domain(cookieDomain);
+            }
+        });
+        return repository;
     }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
         return http
             .csrf(csrf -> csrf
-                    .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                    .csrfTokenRepository(csrfTokenRepository())
                     .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler())
                     .ignoringRequestMatchers(
                             "/api/v1/auth/login",

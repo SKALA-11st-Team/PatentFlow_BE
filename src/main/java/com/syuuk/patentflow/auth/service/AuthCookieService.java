@@ -65,13 +65,16 @@ public class AuthCookieService {
     }
 
     private ResponseCookie cookie(String name, String value, String path, Duration maxAge) {
-        return ResponseCookie.from(name, value)
+        ResponseCookie.ResponseCookieBuilder builder = ResponseCookie.from(name, value)
                 .httpOnly(true)
                 .secure(properties.isCookieSecure())
                 .sameSite(properties.getCookieSameSite())
                 .path(path)
-                .maxAge(maxAge)
-                .build();
+                .maxAge(maxAge);
+        if (properties.getCookieDomain() != null && !properties.getCookieDomain().isBlank()) {
+            builder.domain(properties.getCookieDomain());
+        }
+        return builder.build();
     }
 
     private Duration maxAge(Instant expiresAt) {

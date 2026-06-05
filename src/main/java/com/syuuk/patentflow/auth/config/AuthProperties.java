@@ -17,6 +17,8 @@ public class AuthProperties {
     private String refreshCookieName = "patentflow_refresh";
     private boolean cookieSecure = false;
     private String cookieSameSite = "Lax";
+    // 비어 있으면 host-only 쿠키(로컬 기본). 크로스 서브도메인 배포에선 ".patentflow.live" 처럼 상위 도메인을 지정한다.
+    private String cookieDomain = "";
 
     public String getJwtSecret() {
         return jwtSecret;
@@ -88,6 +90,14 @@ public class AuthProperties {
 
     public void setCookieSameSite(String cookieSameSite) {
         this.cookieSameSite = cookieSameSite;
+    }
+
+    public String getCookieDomain() {
+        return cookieDomain;
+    }
+
+    public void setCookieDomain(String cookieDomain) {
+        this.cookieDomain = cookieDomain;
     }
 
     @PostConstruct
