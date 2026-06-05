@@ -32,18 +32,32 @@ JWT authentication is enabled for `/api/**` endpoints. Public endpoints are:
 - `GET /actuator/health`
 - Swagger UI and OpenAPI docs
 
-Local/demo accounts:
+Login ID is the user **email** (`email` field, validated as an email address). There is no username-based login.
+
+Demo/seed accounts are created by `src/main/resources/db/seed/core_review_workflow_seed.sql`
+(loaded by `LocalDemoSeedRunner` under the `local`/`demo` profiles on PostgreSQL):
 
 ```text
-admin / admin1234
-business / business1234
+admin@syuuk.test            ADMIN     (특허관리자)
+rnd.manager@syuuk.test      BUSINESS  (R&D 담당자)
+platform.manager@syuuk.test BUSINESS  (플랫폼 담당자)
+esg.manager@syuuk.test      BUSINESS  (ESG 담당자)
+ict.manager@syuuk.test      BUSINESS  (ICT 담당자)
+mfg.manager@syuuk.test      BUSINESS  (제조 담당자)
+biz.manager@syuuk.test      BUSINESS  (사업기획 담당자)
 ```
 
-For non-local profiles, create the first administrator with environment variables.
-The bootstrap runs only when the username does not already exist.
+Passwords are the bcrypt values stored in that seed file. To use a known password, update the
+target `users` row (e.g. `USER-admin`) with a freshly generated bcrypt hash. Note: the seed only
+re-runs at startup when baseline rows are missing (`LocalDemoSeedRunner.needsCoreWorkflowSeed`),
+so editing the seed file does not change an already-populated database.
+
+For non-`local`/`demo` profiles, the first administrator is created from environment variables
+(`BootstrapAdminInitializer` runs only when the profile is not `local`/`demo` and the email does
+not already exist; it is disabled under `demo`):
 
 ```bash
-PATENTFLOW_BOOTSTRAP_ADMIN_USERNAME=admin@example.com
+PATENTFLOW_BOOTSTRAP_ADMIN_USERNAME=admin@example.com   # used as the login email
 PATENTFLOW_BOOTSTRAP_ADMIN_PASSWORD=change-this-initial-admin-password
 PATENTFLOW_BOOTSTRAP_ADMIN_DISPLAY_NAME=특허관리자
 ```
@@ -51,9 +65,9 @@ PATENTFLOW_BOOTSTRAP_ADMIN_DISPLAY_NAME=특허관리자
 Login example:
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/auth/login \
+curl -X POST https://api.patentflow.live/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin1234"}'
+  -d '{"email":"admin@syuuk.test","password":"<password>"}'
 ```
 
 Use the returned token as a Bearer token:

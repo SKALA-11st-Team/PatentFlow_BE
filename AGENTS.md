@@ -34,7 +34,20 @@ Review target identification
 - The seeded patent metadata comes from managed project sources such as `docs/skax_patents_list.md` and `src/main/resources/db/seed/skax_patents.sql`.
 - Do not change the EKS deployment profile from `demo` to `prod` unless the team explicitly decides to stop loading the demonstration workflow seed data.
 - With `demo`, `LocalDemoSeedRunner` runs and `BootstrapAdminInitializer` does not run. Therefore bootstrap admin environment variables are not the source of the initial admin account in the demo deployment.
-- Demo business login credentials must be managed through bootstrap business secrets: `PATENTFLOW_BOOTSTRAP_BUSINESS_USERNAME`, `PATENTFLOW_BOOTSTRAP_BUSINESS_PASSWORD`, `PATENTFLOW_BOOTSTRAP_BUSINESS_DEPARTMENT_ID`, and `PATENTFLOW_BOOTSTRAP_BUSINESS_DISPLAY_NAME`.
+- Demo business login credentials must be managed through bootstrap business secrets: `PATENTFLOW_BOOTSTRAP_BUSINESS_USERNAME`, `PATENTFLOW_BOOTSTRAP_BUSINESS_PASSWORD`, `PATENTFLOW_BOOTSTRAP_BUSINESS_DEPARTMENT_ID`, and `PATENTFLOW_BOOTSTRAP_BUSINESS_DISPLAY_NAME`. The `USERNAME` value is used as the login email.
+- Under `demo`, the admin account comes from the seed (`db/seed/core_review_workflow_seed.sql`) — admin email `admin@syuuk.test`. `PATENTFLOW_BOOTSTRAP_ADMIN_*` is injected into the pod but is not consumed because `BootstrapAdminInitializer` is disabled in `demo`.
+
+## Authentication
+
+- Login ID is the user **email**. `POST /api/v1/auth/login` accepts `{ "email", "password" }` and validates `email` as an email address. There is no username-based login.
+
+## Public Deployment Topology
+
+- Frontend: Vercel at `https://patentflow.live`. Backend API: EKS at `https://api.patentflow.live`.
+- FE and BE are different subdomains of the same registrable domain (`patentflow.live`) — same-site but cross-origin. Production config must account for this:
+  - `PATENTFLOW_CORS_ALLOWED_ORIGINS` must include `https://patentflow.live`.
+  - Over HTTPS set `PATENTFLOW_COOKIE_SECURE=true` with an appropriate `PATENTFLOW_COOKIE_SAME_SITE`.
+  - The CSRF `XSRF-TOKEN` cookie must be readable by the SPA at `patentflow.live` via JavaScript, so it needs a parent cookie domain (`.patentflow.live`). A host-only cookie scoped to `api.patentflow.live` cannot be read by the frontend and will break the `X-XSRF-TOKEN` header on state-changing requests.
 
 ## Kubernetes Naming Rules
 
