@@ -19,7 +19,8 @@ env:
   PATENTFLOW_COOKIE_SECURE: "true"
   PATENTFLOW_COOKIE_SAME_SITE: None
   # FE(patentflow.live)와 BE(api.patentflow.live)가 서브도메인이 달라, SPA가 XSRF-TOKEN 쿠키를 읽을 수 있도록 상위 도메인 지정
-  PATENTFLOW_COOKIE_DOMAIN: ${{ vars.PATENTFLOW_COOKIE_DOMAIN || '.patentflow.live' }}
+  # 주의: 맨 앞 점(.) 금지 — Tomcat RFC6265 검증이 ".patentflow.live"를 거부함. 점 없이도 서브도메인 커버.
+  PATENTFLOW_COOKIE_DOMAIN: ${{ vars.PATENTFLOW_COOKIE_DOMAIN || 'patentflow.live' }}
   BE_INGRESS_HOST: ${{ vars.BE_INGRESS_HOST || 'api.patentflow.example.com' }}
   BE_ACM_CERTIFICATE_ARN: ${{ vars.BE_ACM_CERTIFICATE_ARN || '' }}
   AWS_REGION: ${{ vars.AWS_REGION || 'ap-northeast-2' }}
