@@ -104,4 +104,39 @@ public class AiReportAgentClient {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record AgentScoreItem(String category, Integer score, String evidence) {}
+
+    /**
+     * 특허 분야 추천 — 관리자 분류(taxonomy)를 함께 보내 에이전트에 추천을 요청한다.
+     * 비정상 응답/실패 시 null을 반환해 호출 측이 기존 in-memory 추천으로 폴백하도록 한다.
+     */
+    public AgentFieldRecommendation recommendFields(String patentId, Object requestBody) {
+        try {
+            String url = agentUrl + "/api/v1/ai/patents/" + patentId + "/recommend-fields";
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(TIMEOUT)
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(requestBody)))
+                    .build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) {
+                log.warn("FastAPI recommend-fields returned {} for patent {}", response.statusCode(), patentId);
+                return null;
+            }
+            return objectMapper.readValue(response.body(), AgentFieldRecommendation.class);
+        } catch (Exception e) {
+            log.warn("FastAPI recommend-fields failed for patent {}: {}", patentId, e.getMessage());
+            return null;
+        }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record AgentFieldRecommendation(
+            String businessArea,
+            String technologyArea,
+            String productName,
+            Double confidence,
+            String confidenceText,
+            String reason
+    ) {}
 }

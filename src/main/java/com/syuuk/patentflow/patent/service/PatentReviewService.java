@@ -35,6 +35,9 @@ import com.syuuk.patentflow.mailing.domain.DepartmentEntity;
 import com.syuuk.patentflow.mailing.repository.DepartmentRepository;
 import com.syuuk.patentflow.patent.repository.PatentMetadataRepository;
 import com.syuuk.patentflow.patent.repository.PatentReviewHistoryRepository;
+import com.syuuk.patentflow.patent.client.AiReportAgentClient;
+import com.syuuk.patentflow.common.dto.ClassificationResponse;
+import com.syuuk.patentflow.common.service.SystemSettingsService;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Predicate;
@@ -76,6 +79,8 @@ public class PatentReviewService {
     private final Environment environment;
     private final PatentWorkflowService workflowService;
     private final PatentLookupService lookupService;
+    private final AiReportAgentClient aiReportAgentClient;
+    private final SystemSettingsService systemSettingsService;
     private Map<String, String> departmentNameCache;
 
     public record WorkflowBatchUpdateResult(
@@ -91,8 +96,12 @@ public class PatentReviewService {
             ObjectMapper objectMapper,
             Environment environment,
             PatentWorkflowService workflowService,
-            PatentLookupService lookupService
+            PatentLookupService lookupService,
+            AiReportAgentClient aiReportAgentClient,
+            SystemSettingsService systemSettingsService
     ) {
+        this.aiReportAgentClient = aiReportAgentClient;
+        this.systemSettingsService = systemSettingsService;
         this.patentMetadataRepository = patentMetadataRepository;
         this.reviewHistoryRepository = reviewHistoryRepository;
         this.annualFeeScheduleService = annualFeeScheduleService;
@@ -491,8 +500,58 @@ public class PatentReviewService {
                 managementNumber, applicationNumber, registrationNumber, sourcePriority, loadPatentsFromDatabase());
     }
 
+    /**
+     * @relatedFR FR-LEGAL-04
+     * @relatedUI UI-LEGAL-03, UI-LEGAL-04
+     * @description 특허 분야 추천. 관리자 관리 분류(taxonomy)를 함께 AI 에이전트에 전달해 추천을 받고,
+     * 에이전트 미가용/실패 시 기존 metadata 기반 in-memory 추천으로 폴백한다. (에이전트는 DB에 직접 접근하지 않는다)
+     */
     public PatentContextSuggestionResponse suggestContext(PatentContextSuggestionRequest request) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("title", request.title());
+        body.put("managementNumber", request.managementNumber());
+        body.put("applicationNumber", request.applicationNumber());
+        body.put("technologyArea", request.technologyArea());
+        body.put("businessArea", request.businessArea());
+        body.put("productName", request.productName());
+        body.put("taxonomy", buildClassificationTaxonomy());
+
+        String patentRef = request.managementNumber() != null && !request.managementNumber().isBlank()
+                ? request.managementNumber()
+                : "new";
+        AiReportAgentClient.AgentFieldRecommendation recommendation =
+                aiReportAgentClient.recommendFields(patentRef, body);
+
+        if (recommendation != null
+                && ((recommendation.businessArea() != null && !recommendation.businessArea().isBlank())
+                || (recommendation.technologyArea() != null && !recommendation.technologyArea().isBlank()))) {
+            return new PatentContextSuggestionResponse(
+                    recommendation.businessArea(),
+                    recommendation.confidenceText(),
+                    recommendation.reason(),
+                    recommendation.technologyArea());
+        }
+
+        // 에이전트가 비정상/빈 응답이면 기존 metadata 키워드 매칭으로 폴백한다.
         return lookupService.suggestContext(request, loadPatentsFromDatabase());
+    }
+
+    /**
+     * 관리자 관리 분류값을 에이전트가 이해하는 taxonomy 형태로 변환한다. (제품명은 자유 입력 허용 → 빈 목록)
+     */
+    private Map<String, List<String>> buildClassificationTaxonomy() {
+        Map<String, List<String>> taxonomy = new HashMap<>();
+        taxonomy.put("businessArea", List.of());
+        taxonomy.put("technologyArea", List.of());
+        taxonomy.put("productName", List.of());
+        for (ClassificationResponse classification : systemSettingsService.getClassifications()) {
+            if ("BUSINESS".equals(classification.type())) {
+                taxonomy.put("businessArea", classification.values());
+            } else if ("TECHNOLOGY".equals(classification.type())) {
+                taxonomy.put("technologyArea", classification.values());
+            }
+        }
+        return taxonomy;
     }
 
     /**
