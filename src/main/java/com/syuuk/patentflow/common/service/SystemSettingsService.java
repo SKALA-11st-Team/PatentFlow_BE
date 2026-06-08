@@ -131,7 +131,10 @@ public class SystemSettingsService {
 
     @Transactional
     public MailSettingsResponse saveMailSettings(MailSettingsRequest request) {
-        if (request.gmailUsername() != null) {
+        // getMailSettings가 마스킹된 username을 반환하므로, 마스킹 값이 그대로 되돌아오면(미변경) 덮어쓰지 않는다.
+        if (request.gmailUsername() != null
+                && !request.gmailUsername().isBlank()
+                && !request.gmailUsername().contains("*")) {
             set(KEY_GMAIL_USERNAME, request.gmailUsername().trim());
         }
         if (request.gmailAppPassword() != null
