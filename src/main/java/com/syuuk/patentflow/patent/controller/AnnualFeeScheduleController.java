@@ -1,11 +1,13 @@
 package com.syuuk.patentflow.patent.controller;
 
 import com.syuuk.patentflow.common.response.ApiResponse;
+import com.syuuk.patentflow.auth.dto.UserPrincipalResponse;
 import com.syuuk.patentflow.patent.dto.AnnualFeeScheduleAdjustmentRequest;
 import com.syuuk.patentflow.patent.dto.AnnualFeeScheduleItemResponse;
 import com.syuuk.patentflow.patent.service.AnnualFeeScheduleManagementService;
 import jakarta.validation.Valid;
 import java.util.List;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -33,7 +35,25 @@ public class AnnualFeeScheduleController {
     @PatchMapping("/{patentId}")
     public ApiResponse<AnnualFeeScheduleItemResponse> adjustSchedule(
             @PathVariable String patentId,
-            @Valid @RequestBody AnnualFeeScheduleAdjustmentRequest request) {
-        return ApiResponse.ok(service.adjustSchedule(patentId, request));
+            @Valid @RequestBody AnnualFeeScheduleAdjustmentRequest request,
+            Authentication authentication) {
+        return ApiResponse.ok(service.adjustSchedule(patentId, request, currentAdjuster(authentication)));
+    }
+
+    private String currentAdjuster(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return "관리자";
+        }
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof UserPrincipalResponse userPrincipal) {
+            if (userPrincipal.username() != null && !userPrincipal.username().isBlank()) {
+                return userPrincipal.username().trim();
+            }
+            if (userPrincipal.email() != null && !userPrincipal.email().isBlank()) {
+                return userPrincipal.email().trim();
+            }
+        }
+        String name = authentication.getName();
+        return name == null || name.isBlank() ? "관리자" : name.trim();
     }
 }

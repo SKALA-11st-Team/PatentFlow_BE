@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 public class AnnualFeeScheduleService {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+    private static final int DEFAULT_EXTENSION_MONTHS = 12;
 
     private final SystemSettingsService systemSettingsService;
 
@@ -32,7 +33,7 @@ public class AnnualFeeScheduleService {
             LocalDate expectedExpirationDate,
             LocalDate baseDate
     ) {
-        LocalDate base = applicationDate != null ? applicationDate : registrationDate;
+        LocalDate base = applicationDate;
         if (base == null) {
             return LocalDate.of(baseDate.getYear(), 12, 31);
         }
@@ -69,5 +70,12 @@ public class AnnualFeeScheduleService {
             return expectedExpirationDate;
         }
         return dueDate;
+    }
+
+    public int getCountryExtensionMonths(String country) {
+        if (country == null || country.isBlank()) {
+            return DEFAULT_EXTENSION_MONTHS;
+        }
+        return systemSettingsService.getCountryExtensionMonths(country);
     }
 }

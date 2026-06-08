@@ -8,11 +8,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.syuuk.patentflow.auth.dto.UserPrincipalResponse;
 import com.syuuk.patentflow.patent.client.AiReportAgentClient;
 import com.syuuk.patentflow.patent.domain.AnnualFeeAdjustmentEntity;
 import com.syuuk.patentflow.patent.repository.AnnualFeeAdjustmentRepository;
 import com.syuuk.patentflow.patent.repository.PatentMetadataRepository;
 import com.syuuk.patentflow.patent.repository.PatentReviewHistoryRepository;
+import com.syuuk.patentflow.settings.service.SettingsService;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -20,6 +22,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -46,6 +50,9 @@ class AnnualFeeScheduleControllerTest {
     @MockitoBean
     private AiReportAgentClient aiReportAgentClient;
 
+    @MockitoBean
+    private SettingsService settingsService;
+
     @Test
     void getAnnualFeeScheduleReturnsCountryAwareRows() throws Exception {
         mockMvc.perform(get("/api/v1/annual-fees/schedule"))
@@ -55,6 +62,9 @@ class AnnualFeeScheduleControllerTest {
                 .andExpect(jsonPath("$.data[0].managementNumber").isNotEmpty())
                 .andExpect(jsonPath("$.data[0].country").isNotEmpty())
                 .andExpect(jsonPath("$.data[0].nextAnnualFeeDueDate").isNotEmpty())
+                .andExpect(jsonPath("$.data[0].calculatedAnnualFeeDueDate").isNotEmpty())
+                .andExpect(jsonPath("$.data[0].effectiveAnnualFeeDueDate").isNotEmpty())
+                .andExpect(jsonPath("$.data[0].countryExtensionMonths").value(12))
                 .andExpect(jsonPath("$.data[0].adjustmentHistory").isArray());
     }
 
@@ -70,21 +80,26 @@ class AnnualFeeScheduleControllerTest {
     @Test
     void adjustAnnualFeeSchedulePersistsDateAndHistory() throws Exception {
         mockMvc.perform(patch("/api/v1/annual-fees/schedule/PAT-2026-0001")
+                        .principal(adminPrincipal("이소율"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
                                   "adjustedDueDate": "2026-08-15",
                                   "reason": "해외 패밀리 납부 일정과 맞추기 위해 조정",
-                                  "adjustedBy": "테스트 관리자"
+                                  "adjustedBy": "요청 바디 조정자"
                                 }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.patentId").value("PAT-2026-0001"))
+                .andExpect(jsonPath("$.data.annualFeeBaseDate").value("2024-08-28"))
+                .andExpect(jsonPath("$.data.calculatedAnnualFeeDueDate").value("2026-08-28"))
+                .andExpect(jsonPath("$.data.storedAnnualFeeDueDate").value("2026-08-15"))
+                .andExpect(jsonPath("$.data.effectiveAnnualFeeDueDate").value("2026-08-15"))
                 .andExpect(jsonPath("$.data.nextAnnualFeeDueDate").value("2026-08-15"))
                 .andExpect(jsonPath("$.data.adjustedAnnualFeeDueDate").value("2026-08-15"))
                 .andExpect(jsonPath("$.data.latestAdjustmentReason").value("해외 패밀리 납부 일정과 맞추기 위해 조정"))
                 .andExpect(jsonPath("$.data.adjustmentHistory", hasSize(1)))
-                .andExpect(jsonPath("$.data.adjustmentHistory[0].adjustedBy").value("테스트 관리자"));
+                .andExpect(jsonPath("$.data.adjustmentHistory[0].adjustedBy").value("이소율"));
 
         mockMvc.perform(get("/api/v1/patents/PAT-2026-0001"))
                 .andExpect(status().isOk())
@@ -101,7 +116,7 @@ class AnnualFeeScheduleControllerTest {
         assertThat(adjustments).hasSize(1);
         assertThat(adjustments.get(0).getAdjustedDueDate()).isEqualTo(adjustedDueDate);
         assertThat(adjustments.get(0).getReason()).isEqualTo("해외 패밀리 납부 일정과 맞추기 위해 조정");
-        assertThat(adjustments.get(0).getAdjustedBy()).isEqualTo("테스트 관리자");
+        assertThat(adjustments.get(0).getAdjustedBy()).isEqualTo("이소율");
     }
 
     @Test
@@ -116,5 +131,35 @@ class AnnualFeeScheduleControllerTest {
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
+
+    @Test
+    void adjustAnnualFeeScheduleRejectsTooLongReason() throws Exception {
+        mockMvc.perform(patch("/api/v1/annual-fees/schedule/PAT-2026-0001")
+                        .principal(adminPrincipal("이소율"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "adjustedDueDate": "2026-08-15",
+                                  "reason": "%s"
+                                }
+                                """.formatted("가".repeat(1001))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+                .andExpect(jsonPath("$.details.reason").isNotEmpty());
+    }
+
+    private UsernamePasswordAuthenticationToken adminPrincipal(String username) {
+        return new UsernamePasswordAuthenticationToken(
+                new UserPrincipalResponse(
+                        "admin@test.com",
+                        username,
+                        List.of("ROLE_ADMIN"),
+                        "USER-admin-test",
+                        "ADMIN",
+                        null,
+                        null),
+                null,
+                AuthorityUtils.createAuthorityList("ROLE_ADMIN"));
     }
 }

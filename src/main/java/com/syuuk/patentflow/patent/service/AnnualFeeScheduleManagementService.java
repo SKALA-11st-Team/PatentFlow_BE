@@ -12,9 +12,13 @@ import com.syuuk.patentflow.patent.repository.AnnualFeeAdjustmentRepository;
 import com.syuuk.patentflow.patent.repository.PatentMetadataRepository;
 import com.syuuk.patentflow.patent.repository.PatentReviewHistoryRepository;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,18 +42,24 @@ public class AnnualFeeScheduleManagementService {
         this.reviewHistoryRepository = reviewHistoryRepository;
     }
 
+    @Transactional(readOnly = true)
     public List<AnnualFeeScheduleItemResponse> getSchedule(String country) {
         String normalizedCountry = country == null ? null : country.trim().toUpperCase();
-        return patentMetadataRepository.findAll(Sort.by("feeDueDate", "managementNumber")).stream()
-                .filter(patent -> normalizedCountry == null || normalizedCountry.isBlank()
-                        || "ALL".equals(normalizedCountry)
-                        || normalizedCountry.equalsIgnoreCase(patent.getCountry()))
-                .map(this::toResponse)
+        List<PatentMetadataEntity> patents = normalizedCountry == null || normalizedCountry.isBlank() || "ALL".equals(normalizedCountry)
+                ? patentMetadataRepository.findAllByOrderByFeeDueDateAscManagementNumberAsc()
+                : patentMetadataRepository.findByCountryIgnoreCaseOrderByFeeDueDateAscManagementNumberAsc(normalizedCountry);
+        Map<String, List<AnnualFeeAdjustmentHistoryResponse>> historiesByPatentId = findAdjustmentHistoriesByPatentId(patents);
+        return patents.stream()
+                .map(patent -> toResponse(patent, historiesByPatentId.getOrDefault(patent.getPatentId(), List.of())))
                 .toList();
     }
 
     @Transactional
-    public AnnualFeeScheduleItemResponse adjustSchedule(String patentId, AnnualFeeScheduleAdjustmentRequest request) {
+    public AnnualFeeScheduleItemResponse adjustSchedule(
+            String patentId,
+            AnnualFeeScheduleAdjustmentRequest request,
+            String adjustedBy
+    ) {
         PatentMetadataEntity patent = patentMetadataRepository.findById(patentId)
                 .orElseThrow(() -> new PatentFlowException(ErrorCode.PATENT_NOT_FOUND));
         if (request.adjustedDueDate() == null) {
@@ -76,24 +86,40 @@ public class AnnualFeeScheduleManagementService {
                 previousDueDate,
                 request.adjustedDueDate(),
                 request.reason(),
-                request.adjustedBy() == null || request.adjustedBy().isBlank() ? "관리자" : request.adjustedBy().trim()));
+                adjustedBy == null || adjustedBy.isBlank() ? "관리자" : adjustedBy.trim()));
 
-        return toResponse(patent);
+        return toResponse(patent, adjustmentRepository.findByPatentIdOrderByAdjustedAtDesc(patent.getPatentId()).stream()
+                .map(this::toHistoryResponse)
+                .toList());
     }
 
-    private AnnualFeeScheduleItemResponse toResponse(PatentMetadataEntity patent) {
-        List<AnnualFeeAdjustmentHistoryResponse> history = adjustmentRepository
-                .findByPatentIdOrderByAdjustedAtDesc(patent.getPatentId())
-                .stream()
-                .map(this::toHistoryResponse)
+    private Map<String, List<AnnualFeeAdjustmentHistoryResponse>> findAdjustmentHistoriesByPatentId(List<PatentMetadataEntity> patents) {
+        if (patents.isEmpty()) {
+            return Map.of();
+        }
+        List<String> patentIds = patents.stream()
+                .map(PatentMetadataEntity::getPatentId)
                 .toList();
+        Map<String, List<AnnualFeeAdjustmentHistoryResponse>> historiesByPatentId = new LinkedHashMap<>();
+        adjustmentRepository.findByPatentIdInOrderByPatentIdAscAdjustedAtDesc(patentIds).forEach(entity -> {
+            historiesByPatentId.computeIfAbsent(entity.getPatentId(), ignored -> new ArrayList<>())
+                    .add(toHistoryResponse(entity));
+        });
+        historiesByPatentId.replaceAll((ignored, histories) -> histories.stream()
+                .sorted(Comparator.comparing(AnnualFeeAdjustmentHistoryResponse::adjustedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList());
+        return Collections.unmodifiableMap(historiesByPatentId);
+    }
+
+    private AnnualFeeScheduleItemResponse toResponse(PatentMetadataEntity patent, List<AnnualFeeAdjustmentHistoryResponse> history) {
         AnnualFeeAdjustmentHistoryResponse latestAdjustment = history.isEmpty() ? null : history.get(0);
-        LocalDate baseDate = patent.getApplicationDate() != null ? patent.getApplicationDate() : patent.getRegistrationDate();
+        LocalDate baseDate = patent.getApplicationDate();
         LocalDate calculatedDueDate = annualFeeScheduleService.calculateNextDueDate(
                 patent.getCountry(),
                 patent.getApplicationDate(),
                 patent.getRegistrationDate(),
                 patent.getExpectedExpirationDate());
+        LocalDate effectiveDueDate = patent.getFeeDueDate() != null ? patent.getFeeDueDate() : calculatedDueDate;
 
         return new AnnualFeeScheduleItemResponse(
                 patent.getPatentId(),
@@ -105,9 +131,13 @@ public class AnnualFeeScheduleManagementService {
                 patent.getRegistrationDate(),
                 patent.getExpectedExpirationDate(),
                 baseDate,
-                patent.getFeeDueDate() != null ? patent.getFeeDueDate() : calculatedDueDate,
+                calculatedDueDate,
+                patent.getFeeDueDate(),
+                effectiveDueDate,
+                effectiveDueDate,
                 latestAdjustment == null ? null : latestAdjustment.adjustedDueDate(),
                 latestAdjustment == null ? null : latestAdjustment.reason(),
+                annualFeeScheduleService.getCountryExtensionMonths(patent.getCountry()),
                 history);
     }
 

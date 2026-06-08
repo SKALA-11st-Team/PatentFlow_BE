@@ -17,6 +17,10 @@ public interface PatentMetadataRepository extends JpaRepository<PatentMetadataEn
             """)
     int findMaxPatentSequence();
 
+    List<PatentMetadataEntity> findAllByOrderByFeeDueDateAscManagementNumberAsc();
+
+    List<PatentMetadataEntity> findByCountryIgnoreCaseOrderByFeeDueDateAscManagementNumberAsc(String country);
+
     /**
      * 연차료 납부 기준일이 지난 보유 중(ACTIVE) 특허를 조회한다.
      * 목록 조회 시 과기 특허를 포기 상태로 일괄 보정하기 위한 용도.

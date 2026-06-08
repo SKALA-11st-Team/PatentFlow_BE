@@ -7,4 +7,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface AnnualFeeAdjustmentRepository extends JpaRepository<AnnualFeeAdjustmentEntity, String> {
 
     List<AnnualFeeAdjustmentEntity> findByPatentIdOrderByAdjustedAtDesc(String patentId);
+
+    List<AnnualFeeAdjustmentEntity> findByPatentIdInOrderByPatentIdAscAdjustedAtDesc(List<String> patentIds);
 }

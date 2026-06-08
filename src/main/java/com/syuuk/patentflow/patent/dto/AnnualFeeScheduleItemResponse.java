@@ -13,9 +13,13 @@ public record AnnualFeeScheduleItemResponse(
         LocalDate registrationDate,
         LocalDate expectedExpirationDate,
         LocalDate annualFeeBaseDate,
+        LocalDate calculatedAnnualFeeDueDate,
+        LocalDate storedAnnualFeeDueDate,
+        LocalDate effectiveAnnualFeeDueDate,
         LocalDate nextAnnualFeeDueDate,
         LocalDate adjustedAnnualFeeDueDate,
         String latestAdjustmentReason,
+        int countryExtensionMonths,
         List<AnnualFeeAdjustmentHistoryResponse> adjustmentHistory
 ) {
 }
