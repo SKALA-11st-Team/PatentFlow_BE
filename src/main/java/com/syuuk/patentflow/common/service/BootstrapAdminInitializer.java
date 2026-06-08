@@ -21,6 +21,9 @@ public class BootstrapAdminInitializer implements ApplicationRunner {
 
     // 데모 시드(core_review_workflow_seed.sql)의 'USER-admin'과 PK 충돌을 피하기 위한 별도 ID
     private static final String BOOTSTRAP_ADMIN_ID = "USER-admin-bootstrap";
+    private static final String SEED_ADMIN_ID = "USER-admin";
+    private static final String ROLE_ADMIN = "ADMIN";
+    private static final String ROLE_BUSINESS = "BUSINESS";
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -51,21 +54,24 @@ public class BootstrapAdminInitializer implements ApplicationRunner {
 
         String normalizedEmail = email.trim();
         try {
-            // upsert — 재기동 시마다 env에 설정된 비밀번호·이름으로 덮어써 일관성 유지
+            // upsert — 기존 ADMIN이 있으면 그 계정을 env 관리자 계정으로 인계해 ADMIN 단일성 정책을 유지한다.
             UserEntity user = userRepository.findByEmail(normalizedEmail)
+                    .or(() -> userRepository.findFirstByRoleOrderByCreatedAtAsc(ROLE_ADMIN))
                     .orElseGet(() -> new UserEntity(
                             BOOTSTRAP_ADMIN_ID,
                             normalizedEmail,
                             passwordEncoder.encode(password),
-                            "ADMIN",
+                            ROLE_ADMIN,
                             null,
                             normalizedDisplayName(normalizedEmail)));
 
+            user.setEmail(normalizedEmail);
             user.setPassword(passwordEncoder.encode(password));
-            user.setRole("ADMIN");
+            user.setRole(ROLE_ADMIN);
             user.setDepartmentId(null);
             user.setUsername(normalizedDisplayName(normalizedEmail));
             userRepository.save(user);
+            demoteBootstrapAdminDuplicates(user.getId());
             log.info("Bootstrap admin upserted: {}", normalizedEmail);
         } catch (Exception exception) {
             // 부트스트랩 실패가 애플리케이션 기동을 막지 않도록 한다(예: 스키마 마이그레이션 미적용 상황).
@@ -75,6 +81,17 @@ public class BootstrapAdminInitializer implements ApplicationRunner {
 
     private String normalizedDisplayName(String fallback) {
         return isBlank(displayName) ? fallback : displayName.trim();
+    }
+
+    private void demoteBootstrapAdminDuplicates(String retainedAdminId) {
+        userRepository.findByRoleAndIdNot(ROLE_ADMIN, retainedAdminId).stream()
+                .filter(user -> SEED_ADMIN_ID.equals(user.getId()) || BOOTSTRAP_ADMIN_ID.equals(user.getId()))
+                .forEach(user -> {
+                    user.setRole(ROLE_BUSINESS);
+                    user.setDepartmentId(null);
+                    userRepository.save(user);
+                    log.info("Bootstrap duplicate admin demoted: {}", user.getEmail());
+                });
     }
 
     private static boolean isBlank(String value) {

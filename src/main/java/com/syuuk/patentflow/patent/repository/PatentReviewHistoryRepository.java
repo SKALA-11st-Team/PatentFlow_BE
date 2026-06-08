@@ -16,6 +16,8 @@ public interface PatentReviewHistoryRepository extends JpaRepository<PatentRevie
 
     Optional<PatentReviewHistoryEntity> findByPatentIdAndQuarterKey(String patentId, String quarterKey);
 
+    boolean existsByDepartmentId(String departmentId);
+
     /**
      * 여러 특허의 최신(가장 최근 createdAt) 이력 행을 한 번의 쿼리로 조회한다.
      * 목록/페이징 조회 시 특허마다 이력을 따로 읽던 N+1을 제거하기 위한 배치 조회용.

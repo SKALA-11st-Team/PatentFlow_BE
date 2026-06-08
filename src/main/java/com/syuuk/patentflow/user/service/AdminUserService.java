@@ -3,9 +3,11 @@ package com.syuuk.patentflow.user.service;
 import com.syuuk.patentflow.common.error.ErrorCode;
 import com.syuuk.patentflow.common.error.PatentFlowException;
 import com.syuuk.patentflow.common.service.SystemSettingsService;
+import com.syuuk.patentflow.mailing.repository.DepartmentRepository;
 import com.syuuk.patentflow.mailing.service.MailOAuth2Service;
 import com.syuuk.patentflow.user.domain.UserEntity;
 import com.syuuk.patentflow.user.dto.CreateUserRequest;
+import com.syuuk.patentflow.user.dto.PageResponse;
 import com.syuuk.patentflow.user.dto.ResetPasswordResponse;
 import com.syuuk.patentflow.user.dto.UserResponse;
 import com.syuuk.patentflow.user.repository.UserRepository;
@@ -17,10 +19,13 @@ import jakarta.mail.internet.MimeMessage;
 import java.security.SecureRandom;
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -33,6 +38,9 @@ public class AdminUserService {
 
     private static final Logger log = LoggerFactory.getLogger(AdminUserService.class);
     private static final String CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$";
+    private static final String ROLE_ADMIN = "ADMIN";
+    private static final String ROLE_BUSINESS = "BUSINESS";
+    private static final Set<String> PROTECTED_ADMIN_IDS = Set.of("USER-admin", "USER-admin-bootstrap");
 
     @Value("${spring.mail.username:}")
     private String envGmailUsername;
@@ -41,13 +49,16 @@ public class AdminUserService {
     private String envGmailAppPassword;
 
     private final UserRepository userRepository;
+    private final DepartmentRepository departmentRepository;
     private final PasswordEncoder passwordEncoder;
     private final SystemSettingsService systemSettingsService;
     private final MailOAuth2Service mailOAuth2Service;
 
-    public AdminUserService(UserRepository userRepository, PasswordEncoder passwordEncoder,
+    public AdminUserService(UserRepository userRepository, DepartmentRepository departmentRepository,
+            PasswordEncoder passwordEncoder,
             SystemSettingsService systemSettingsService, MailOAuth2Service mailOAuth2Service) {
         this.userRepository = userRepository;
+        this.departmentRepository = departmentRepository;
         this.passwordEncoder = passwordEncoder;
         this.systemSettingsService = systemSettingsService;
         this.mailOAuth2Service = mailOAuth2Service;
@@ -60,17 +71,21 @@ public class AdminUserService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public PageResponse<UserResponse> getUsers(int page, int size, String search) {
+        PageRequest pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100),
+                Sort.by("createdAt"));
+        Page<UserEntity> users = isBlank(search)
+                ? userRepository.findAll(pageable)
+                : userRepository.findByEmailContainingIgnoreCaseOrUsernameContainingIgnoreCaseOrDepartmentIdContainingIgnoreCase(
+                        search.trim(), search.trim(), search.trim(), pageable);
+        return PageResponse.from(users.map(UserResponse::from));
+    }
+
     @Transactional
     public UserResponse createUser(CreateUserRequest request) {
-        // 관리자는 시스템 전체에 1명만 허용 — 역할 분리 정책. 추가 관리자 필요 시 정책 변경 필요
-        if ("ADMIN".equals(request.role())) {
-            boolean adminExists = userRepository.findAll().stream()
-                    .anyMatch(u -> "ADMIN".equals(u.getRole()));
-            if (adminExists) {
-                throw new PatentFlowException(ErrorCode.INVALID_REQUEST,
-                        "관리자 계정은 1개만 허용됩니다.");
-            }
-        }
+        validateAdminRoleChange(null, null, request.role());
+        String departmentId = validateDepartmentId(request.role(), request.departmentId());
         if (userRepository.existsByEmail(request.email())) {
             throw new PatentFlowException(ErrorCode.INVALID_REQUEST,
                     "이미 존재하는 계정입니다: " + request.email());
@@ -79,7 +94,7 @@ public class AdminUserService {
         String id = "USER-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase();
         UserEntity user = new UserEntity(id, request.email(),
                 passwordEncoder.encode(tempPassword),
-                request.role(), request.departmentId(), request.username());
+                request.role(), departmentId, request.username());
         userRepository.save(user);
         sendWelcomeEmail(user.getEmail(), user.getUsername(), tempPassword);
         return UserResponse.from(user);
@@ -96,21 +111,28 @@ public class AdminUserService {
                     throw new PatentFlowException(ErrorCode.INVALID_REQUEST,
                             "이미 존재하는 계정입니다: " + request.email());
                 });
+        validateAdminRoleChange(userId, user.getRole(), request.role());
+        String departmentId = validateDepartmentId(request.role(), request.departmentId());
         user.setEmail(request.email());
         user.setRole(request.role());
-        user.setDepartmentId(request.departmentId());
+        user.setDepartmentId(departmentId);
         user.setUsername(request.username());
         return UserResponse.from(userRepository.save(user));
     }
 
     @Transactional
-    public void deleteUser(String userId) {
+    public void deleteUser(String userId, String currentUserId) {
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new PatentFlowException(ErrorCode.INVALID_REQUEST,
                         "사용자를 찾을 수 없습니다: " + userId));
-        // "USER-admin"은 BootstrapAdminInitializer가 생성하는 고정 ID — 시스템 잠금 방지
-        if ("USER-admin".equals(userId)) {
+        if (userId.equals(currentUserId)) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "자기 자신의 계정은 삭제할 수 없습니다.");
+        }
+        if (isProtectedAdminId(userId)) {
             throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "기본 관리자 계정은 삭제할 수 없습니다.");
+        }
+        if (ROLE_ADMIN.equals(user.getRole()) && userRepository.countByRole(ROLE_ADMIN) <= 1) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "마지막 관리자 계정은 삭제할 수 없습니다.");
         }
         userRepository.delete(user);
     }
@@ -120,11 +142,48 @@ public class AdminUserService {
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new PatentFlowException(ErrorCode.INVALID_REQUEST,
                         "사용자를 찾을 수 없습니다: " + userId));
+        if (isProtectedAdminId(userId)) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "기본 관리자 계정의 비밀번호는 초기화할 수 없습니다.");
+        }
         String tempPassword = generatePassword();
         user.setPassword(passwordEncoder.encode(tempPassword));
         userRepository.save(user);
         sendPasswordResetEmail(user.getEmail(), user.getUsername(), tempPassword);
-        return new ResetPasswordResponse(user.getId(), user.getEmail(), tempPassword);
+        return new ResetPasswordResponse(user.getId(), user.getEmail(), "************", true,
+                "임시 비밀번호를 이메일로 발송했습니다.");
+    }
+
+    private void validateAdminRoleChange(String userId, String currentRole, String requestedRole) {
+        if (ROLE_ADMIN.equals(requestedRole) && hasOtherAdmin(userId)) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST,
+                    "관리자 계정은 1개만 허용됩니다.");
+        }
+        if (ROLE_ADMIN.equals(currentRole) && !ROLE_ADMIN.equals(requestedRole)
+                && !userRepository.existsByRoleAndIdNot(ROLE_ADMIN, userId)) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST,
+                    "마지막 관리자 계정의 역할은 변경할 수 없습니다.");
+        }
+    }
+
+    private boolean hasOtherAdmin(String userId) {
+        return userId == null
+                ? userRepository.existsByRole(ROLE_ADMIN)
+                : userRepository.existsByRoleAndIdNot(ROLE_ADMIN, userId);
+    }
+
+    private String validateDepartmentId(String role, String departmentId) {
+        String normalizedDepartmentId = normalize(departmentId);
+        if (ROLE_ADMIN.equals(role)) {
+            return null;
+        }
+        if (ROLE_BUSINESS.equals(role) && isBlank(normalizedDepartmentId)) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "사업부 계정에는 사업부 ID가 필요합니다.");
+        }
+        if (!isBlank(normalizedDepartmentId) && !departmentRepository.existsById(normalizedDepartmentId)) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST,
+                    "존재하지 않는 사업부입니다: " + normalizedDepartmentId);
+        }
+        return normalizedDepartmentId;
     }
 
     private String generatePassword() {
@@ -150,7 +209,8 @@ public class AdminUserService {
         sendEmail(email, subject, body, tempPassword);
     }
 
-    private void sendEmail(String to, String subject, String body, String tempPassword) {
+    protected void sendEmail(String to, String subject, String body, String tempPassword) {
+        // USER-06: 메일 레인에서 커밋 후 비동기 이벤트 발송으로 분리할 대상.
         if (mailOAuth2Service.isConnected()) {
             // OAuth2 연동 계정으로 발송 (권장)
             String senderEmail = systemSettingsService.getGmailOAuth2ConnectedEmail();
@@ -161,7 +221,7 @@ public class AdminUserService {
             String senderEmail = resolve(systemSettingsService.getGmailUsername(), envGmailUsername);
             String password = resolve(systemSettingsService.getGmailAppPassword(), envGmailAppPassword);
             if (senderEmail == null || senderEmail.isBlank() || password == null || password.isBlank()) {
-                log.warn("Gmail 미연동 — 이메일 발송 불가. 임시 비밀번호 ({}): {}", to, tempPassword);
+                log.warn("Gmail 미연동 — 이메일 발송 불가. 임시 비밀번호는 보안상 로그에 남기지 않습니다. recipient={}", to);
                 throw new PatentFlowException(ErrorCode.INVALID_REQUEST,
                         "Gmail이 연동되지 않아 이메일을 발송할 수 없습니다. 설정 페이지에서 Google 계정을 먼저 연동해 주세요.");
             }
@@ -223,5 +283,17 @@ public class AdminUserService {
 
     private static String resolve(String fromDb, String fromEnv) {
         return (fromDb != null && !fromDb.isBlank()) ? fromDb : fromEnv;
+    }
+
+    private static boolean isProtectedAdminId(String userId) {
+        return PROTECTED_ADMIN_IDS.contains(userId);
+    }
+
+    private static String normalize(String value) {
+        return value == null ? null : value.trim();
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 }
