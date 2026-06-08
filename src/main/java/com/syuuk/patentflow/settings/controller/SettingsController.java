@@ -14,6 +14,7 @@ import com.syuuk.patentflow.settings.dto.QuarterSettingResponse;
 import com.syuuk.patentflow.settings.dto.ReviewPeriodTemplateRequest;
 import com.syuuk.patentflow.settings.dto.ReviewPeriodTemplateResponse;
 import com.syuuk.patentflow.settings.service.SettingsService;
+import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
@@ -52,7 +53,7 @@ public class SettingsController {
     @PutMapping("/review-periods/{periodNumber}")
     public ApiResponse<ReviewPeriodTemplateResponse> updatePeriodTemplate(
             @PathVariable int periodNumber,
-            @RequestBody ReviewPeriodTemplateRequest request) {
+            @Valid @RequestBody ReviewPeriodTemplateRequest request) {
         return ApiResponse.ok(settingsService.updatePeriodTemplate(periodNumber, request));
     }
 
@@ -66,7 +67,7 @@ public class SettingsController {
     }
 
     @PatchMapping("/mail-lead-months")
-    public ApiResponse<MailLeadMonthsResponse> updateMailLeadMonths(@RequestBody MailLeadMonthsResponse request) {
+    public ApiResponse<MailLeadMonthsResponse> updateMailLeadMonths(@Valid @RequestBody MailLeadMonthsResponse request) {
         int updated = systemSettingsService.updateMailLeadMonths(request.mailLeadMonths());
         return ApiResponse.ok(new MailLeadMonthsResponse(updated));
     }
@@ -84,7 +85,7 @@ public class SettingsController {
 
     @PatchMapping("/response-deadline")
     public ApiResponse<ResponseDeadlineResponse> updateResponseDeadline(
-            @RequestBody ResponseDeadlineResponse request) {
+            @Valid @RequestBody ResponseDeadlineResponse request) {
         systemSettingsService.updateResponseDeadline(request.months(), request.days());
         return ApiResponse.ok(new ResponseDeadlineResponse(
                 systemSettingsService.getResponseDeadlineMonths(),
@@ -108,7 +109,7 @@ public class SettingsController {
     @PutMapping("/review-quarters/{quarterKey}")
     public ApiResponse<QuarterSettingResponse> updateQuarterSetting(
             @PathVariable String quarterKey,
-            @RequestBody QuarterSettingRequest request) {
+            @Valid @RequestBody QuarterSettingRequest request) {
         return ApiResponse.ok(settingsService.updateQuarterSetting(quarterKey, request));
     }
 
@@ -127,7 +128,7 @@ public class SettingsController {
     @PutMapping("/country-extensions/{country}")
     public ApiResponse<CountryExtensionResponse> updateCountryExtension(
             @PathVariable String country,
-            @RequestBody CountryExtensionRequest request) {
+            @Valid @RequestBody CountryExtensionRequest request) {
         return ApiResponse.ok(systemSettingsService.updateCountryExtension(country, request));
     }
 
@@ -141,7 +142,7 @@ public class SettingsController {
     @PostMapping("/classifications/{type}")
     public ApiResponse<ClassificationResponse> addClassification(
             @PathVariable String type,
-            @RequestBody ClassificationRequest request) {
+            @Valid @RequestBody ClassificationRequest request) {
         return ApiResponse.ok(systemSettingsService.addClassification(type, request.value()));
     }
 
@@ -149,7 +150,7 @@ public class SettingsController {
     public ApiResponse<ClassificationResponse> renameClassification(
             @PathVariable String type,
             @PathVariable String value,
-            @RequestBody ClassificationRequest request) {
+            @Valid @RequestBody ClassificationRequest request) {
         return ApiResponse.ok(systemSettingsService.renameClassification(type, value, request.value()));
     }
 

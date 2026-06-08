@@ -15,6 +15,7 @@ import com.syuuk.patentflow.settings.dto.ReviewPeriodTemplateRequest;
 import com.syuuk.patentflow.settings.dto.ReviewPeriodTemplateResponse;
 import com.syuuk.patentflow.settings.repository.QuarterSettingRepository;
 import com.syuuk.patentflow.settings.repository.ReviewPeriodTemplateRepository;
+import java.time.DateTimeException;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -26,12 +27,19 @@ import org.springframework.transaction.annotation.Transactional;
 public class SettingsService {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+    private static final int[][] FIXED_QUARTER_BOUNDARIES = {
+            {1, 1, 3, 31},
+            {4, 1, 6, 30},
+            {7, 1, 9, 30},
+            {10, 1, 12, 31}
+    };
 
     private final QuarterSettingRepository quarterSettingRepository;
     private final ReviewPeriodTemplateRepository periodTemplateRepository;
     private final PatentReviewService patentReviewService;
     private final AiReportBatchService aiReportBatchService;
     private final SystemSettingsService systemSettingsService;
+    private final Object quarterActivationMonitor = new Object();
 
     public SettingsService(
             QuarterSettingRepository quarterSettingRepository,
@@ -57,10 +65,11 @@ public class SettingsService {
 
     @Transactional
     public ReviewPeriodTemplateResponse updatePeriodTemplate(int periodNumber, ReviewPeriodTemplateRequest request) {
+        validatePeriodNumber(periodNumber);
         ReviewPeriodTemplateEntity template = periodTemplateRepository.findById(periodNumber)
                 .orElseThrow(() -> new PatentFlowException(ErrorCode.INVALID_REQUEST,
                         "분기 템플릿을 찾을 수 없습니다: Q" + periodNumber));
-        validateDateRange(request.startMonth(), request.startDay(), request.endMonth(), request.endDay());
+        validateDateRange(periodNumber, request.startMonth(), request.startDay(), request.endMonth(), request.endDay());
         template.update(request.startMonth(), request.startDay(), request.endMonth(), request.endDay());
         periodTemplateRepository.save(template);
         return toTemplateResponse(template);
@@ -85,8 +94,7 @@ public class SettingsService {
 
     @Transactional(readOnly = true)
     public QuarterSettingResponse getActiveQuarter() {
-        return quarterSettingRepository.findAll().stream()
-                .filter(QuarterSettingEntity::isActivated)
+        return quarterSettingRepository.findByActivatedTrueAndEndedFalseOrderByActivatedAtDesc().stream()
                 .findFirst()
                 .map(q -> toResponse(q, q.getQuarterKey(), q.getYear(), q.getQuarterNumber(),
                         q.getStartDate(), q.getEndDate()))
@@ -96,15 +104,14 @@ public class SettingsService {
     @Transactional
     public QuarterSettingResponse updateQuarterSetting(String quarterKey, QuarterSettingRequest request) {
         QuarterSettingEntity quarter = findOrCreateQuarter(quarterKey);
+        validateQuarterDates(quarter.getYear(), quarter.getStartDate(), quarter.getEndDate());
         if (request.startDate() != null || request.endDate() != null) {
             if (quarter.isActivated()) {
                 throw new PatentFlowException(ErrorCode.INVALID_WORKFLOW_STATUS, "이미 활성화된 분기는 납부 기간을 수정할 수 없습니다.");
             }
             LocalDate start = request.startDate() != null ? request.startDate() : quarter.getStartDate();
             LocalDate end = request.endDate() != null ? request.endDate() : quarter.getEndDate();
-            if (start != null && end != null && start.isAfter(end)) {
-                throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "시작일이 종료일보다 늦을 수 없습니다.");
-            }
+            validateQuarterDates(quarter.getYear(), start, end);
             if (request.startDate() != null) quarter.setStartDate(request.startDate());
             if (request.endDate() != null) quarter.setEndDate(request.endDate());
         }
@@ -112,6 +119,7 @@ public class SettingsService {
                 ? request.businessResponseDueDate()
                 : request.submissionDeadline();
         if (deadline != null) {
+            validateBusinessResponseDueDate(quarter, deadline);
             quarter.setSubmissionDeadline(deadline);
         }
         quarterSettingRepository.save(quarter);
@@ -124,7 +132,10 @@ public class SettingsService {
         systemSettingsService.updateMailLeadMonths(mailLeadMonths);
         List<QuarterSettingEntity> quarters = quarterSettingRepository.findByYearOrderByQuarterNumber(year);
         if (businessResponseDueDate != null) {
-            quarters.forEach(quarter -> quarter.setSubmissionDeadline(businessResponseDueDate));
+            quarters.forEach(quarter -> {
+                validateBusinessResponseDueDate(quarter, businessResponseDueDate);
+                quarter.setSubmissionDeadline(businessResponseDueDate);
+            });
             quarterSettingRepository.saveAll(quarters);
         }
         return getQuarterSettings(year);
@@ -132,22 +143,30 @@ public class SettingsService {
 
     @Transactional
     public QuarterActivateResponse activateQuarter(String quarterKey) {
-        QuarterSettingEntity quarter = findOrCreateQuarter(quarterKey);
-        if (quarter.isActivated()) {
-            throw new PatentFlowException(ErrorCode.INVALID_WORKFLOW_STATUS, "이미 활성화된 분기입니다.");
+        synchronized (quarterActivationMonitor) {
+            QuarterSettingEntity quarter = findOrCreateQuarterForUpdate(quarterKey);
+            if (quarter.isActivated() && !quarter.isEnded()) {
+                return buildActivateResponse(quarter);
+            }
+            validateActivatable(quarter);
+            ensureNoOtherActiveQuarter(quarter);
+            doActivate(quarter);
+            return buildActivateResponse(quarter);
         }
-        doActivate(quarter);
-        return buildActivateResponse(quarter);
     }
 
     @Transactional
     public boolean activateQuarterIfNeeded(String quarterKey) {
-        QuarterSettingEntity quarter = findOrCreateQuarter(quarterKey);
-        if (quarter.isActivated()) {
-            return false;
+        synchronized (quarterActivationMonitor) {
+            QuarterSettingEntity quarter = findOrCreateQuarterForUpdate(quarterKey);
+            if (quarter.isActivated() && !quarter.isEnded()) {
+                return false;
+            }
+            validateActivatable(quarter);
+            ensureNoOtherActiveQuarter(quarter);
+            doActivate(quarter);
+            return true;
         }
-        doActivate(quarter);
-        return true;
     }
 
     @Transactional
@@ -172,7 +191,9 @@ public class SettingsService {
         int mailLeadMonths = systemSettingsService.getMailLeadMonths();
         LocalDate activationDate = LocalDate.now(KST);
 
-        quarter.setSubmissionDeadline(activationDate.plusMonths(responseDeadlineMonths).plusDays(responseDeadlineDays));
+        LocalDate businessResponseDueDate = activationDate.plusMonths(responseDeadlineMonths).plusDays(responseDeadlineDays);
+        validateBusinessResponseDueDate(quarter, businessResponseDueDate);
+        quarter.setSubmissionDeadline(businessResponseDueDate);
         quarter.setMailLeadMonthsSnapshot(mailLeadMonths);
         quarter.setActivated(true);
         quarter.setActivatedAt(OffsetDateTime.now(KST));
@@ -197,21 +218,27 @@ public class SettingsService {
     }
 
     private QuarterSettingEntity findOrCreateQuarter(String quarterKey) {
-        return quarterSettingRepository.findById(quarterKey).orElseGet(() -> {
-            String[] parts = quarterKey.split("-Q");
-            if (parts.length != 2) {
-                throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "잘못된 분기 키 형식입니다: " + quarterKey);
-            }
-            int year = Integer.parseInt(parts[0]);
-            int periodNumber = Integer.parseInt(parts[1]);
-            ReviewPeriodTemplateEntity template = periodTemplateRepository.findById(periodNumber)
-                    .orElseThrow(() -> new PatentFlowException(ErrorCode.INVALID_REQUEST,
-                            "분기 템플릿을 찾을 수 없습니다: Q" + periodNumber));
-            LocalDate startDate = LocalDate.of(year, template.getStartMonth(), template.getStartDay());
-            LocalDate endDate = LocalDate.of(year, template.getEndMonth(), template.getEndDay());
-            return quarterSettingRepository.save(
-                    new QuarterSettingEntity(quarterKey, year, periodNumber, startDate, endDate));
+        return quarterSettingRepository.findById(quarterKey)
+                .orElseGet(() -> quarterSettingRepository.save(createQuarter(quarterKey)));
+    }
+
+    private QuarterSettingEntity findOrCreateQuarterForUpdate(String quarterKey) {
+        return quarterSettingRepository.findByIdForUpdate(quarterKey).orElseGet(() -> {
+            QuarterSettingEntity created = createQuarter(quarterKey);
+            quarterSettingRepository.saveAndFlush(created);
+            return quarterSettingRepository.findByIdForUpdate(quarterKey).orElse(created);
         });
+    }
+
+    private QuarterSettingEntity createQuarter(String quarterKey) {
+        QuarterParts parts = parseQuarterKey(quarterKey);
+        ReviewPeriodTemplateEntity template = periodTemplateRepository.findById(parts.quarterNumber())
+                .orElseThrow(() -> new PatentFlowException(ErrorCode.INVALID_REQUEST,
+                        "분기 템플릿을 찾을 수 없습니다: Q" + parts.quarterNumber()));
+        LocalDate startDate = LocalDate.of(parts.year(), template.getStartMonth(), template.getStartDay());
+        LocalDate endDate = LocalDate.of(parts.year(), template.getEndMonth(), template.getEndDay());
+        validateQuarterDates(parts.year(), startDate, endDate);
+        return new QuarterSettingEntity(quarterKey, parts.year(), parts.quarterNumber(), startDate, endDate);
     }
 
     private QuarterSettingEntity findQuarter(String quarterKey) {
@@ -285,13 +312,91 @@ public class SettingsService {
                 label);
     }
 
-    private void validateDateRange(int startMonth, int startDay, int endMonth, int endDay) {
-        LocalDate start = LocalDate.of(2000, startMonth, startDay);
-        LocalDate end = LocalDate.of(2000, endMonth, endDay);
+    private void validateDateRange(int periodNumber, int startMonth, int startDay, int endMonth, int endDay) {
+        validatePeriodNumber(periodNumber);
+        LocalDate start;
+        LocalDate end;
+        try {
+            start = LocalDate.of(2000, startMonth, startDay);
+            end = LocalDate.of(2000, endMonth, endDay);
+        } catch (DateTimeException e) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "유효하지 않은 분기 경계 날짜입니다.");
+        }
         if (!start.isBefore(end)) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "시작일은 종료일보다 빨라야 합니다.");
+        }
+        int[] boundary = FIXED_QUARTER_BOUNDARIES[periodNumber - 1];
+        LocalDate fixedStart = LocalDate.of(2000, boundary[0], boundary[1]);
+        LocalDate fixedEnd = LocalDate.of(2000, boundary[2], boundary[3]);
+        if (start.isBefore(fixedStart) || end.isAfter(fixedEnd)) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "분기 경계는 고정된 달력 분기 범위 안에서만 설정할 수 있습니다.");
+        }
+    }
+
+    private void validatePeriodNumber(int periodNumber) {
+        if (periodNumber < 1 || periodNumber > 4) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "분기는 Q1부터 Q4까지만 사용할 수 있습니다.");
+        }
+    }
+
+    private QuarterParts parseQuarterKey(String quarterKey) {
+        String[] parts = quarterKey == null ? new String[0] : quarterKey.split("-Q");
+        if (parts.length != 2) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "잘못된 분기 키 형식입니다: " + quarterKey);
+        }
+        try {
+            int year = Integer.parseInt(parts[0]);
+            int quarterNumber = Integer.parseInt(parts[1]);
+            validatePeriodNumber(quarterNumber);
+            return new QuarterParts(year, quarterNumber);
+        } catch (NumberFormatException e) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "잘못된 분기 키 형식입니다: " + quarterKey);
+        }
+    }
+
+    private void validateQuarterDates(int year, LocalDate startDate, LocalDate endDate) {
+        if (startDate == null || endDate == null) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "분기 시작일과 종료일은 모두 필요합니다.");
+        }
+        if (startDate.getYear() != year || endDate.getYear() != year) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "분기 시작일과 종료일은 분기 키의 연도와 일치해야 합니다.");
+        }
+        if (startDate.isAfter(endDate)) {
             throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "시작일이 종료일보다 늦을 수 없습니다.");
         }
     }
+
+    private void validateBusinessResponseDueDate(QuarterSettingEntity quarter, LocalDate dueDate) {
+        validateQuarterDates(quarter.getYear(), quarter.getStartDate(), quarter.getEndDate());
+        LocalDate earliest = quarter.isActivated() && quarter.getActivatedAt() != null
+                ? quarter.getActivatedAt().toLocalDate()
+                : quarter.getStartDate().minusMonths(systemSettingsService.getMailLeadMonths());
+        if (dueDate.isBefore(earliest)) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "회신 기한은 검토 요청 가능일보다 빠를 수 없습니다.");
+        }
+        if (dueDate.isAfter(quarter.getEndDate())) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "회신 기한은 분기 종료일보다 늦을 수 없습니다.");
+        }
+    }
+
+    private void validateActivatable(QuarterSettingEntity quarter) {
+        if (quarter.isEnded()) {
+            throw new PatentFlowException(ErrorCode.INVALID_WORKFLOW_STATUS, "이미 종료된 분기는 다시 활성화할 수 없습니다.");
+        }
+        validateQuarterDates(quarter.getYear(), quarter.getStartDate(), quarter.getEndDate());
+    }
+
+    private void ensureNoOtherActiveQuarter(QuarterSettingEntity quarter) {
+        quarterSettingRepository.findActiveForUpdate().stream()
+                .filter(active -> !active.getQuarterKey().equals(quarter.getQuarterKey()))
+                .findFirst()
+                .ifPresent(active -> {
+                    throw new PatentFlowException(ErrorCode.INVALID_WORKFLOW_STATUS,
+                            "이미 활성화된 분기가 있습니다: " + active.getQuarterKey());
+                });
+    }
+
+    private record QuarterParts(int year, int quarterNumber) {}
 
     private void seedDefaultTemplatesIfNeeded() {
         if (!periodTemplateRepository.findAll().isEmpty()) {

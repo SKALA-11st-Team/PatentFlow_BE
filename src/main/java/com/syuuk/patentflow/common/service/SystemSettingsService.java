@@ -1,5 +1,8 @@
 package com.syuuk.patentflow.common.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.syuuk.patentflow.common.domain.SystemSettingsEntity;
 import com.syuuk.patentflow.common.dto.ClassificationResponse;
 import com.syuuk.patentflow.common.dto.CountryExtensionRequest;
@@ -11,6 +14,7 @@ import com.syuuk.patentflow.common.error.PatentFlowException;
 import com.syuuk.patentflow.common.repository.SystemSettingsRepository;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,6 +49,8 @@ public class SystemSettingsService {
     private static final int DEFAULT_MAIL_LEAD_MONTHS = 2;
     private static final int DEFAULT_RESPONSE_DEADLINE_MONTHS = 1;
     private static final int DEFAULT_RESPONSE_DEADLINE_DAYS = 0;
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final TypeReference<List<String>> STRING_LIST = new TypeReference<>() {};
     private static final List<String> DEFAULT_BUSINESS_CLASSIFICATIONS = List.of(
             "AI", "Data", "Blockchain", "Cloud", "ESG", "제조", "통신", "금융/전략", "통합서비스", "기존 사업");
     private static final List<String> DEFAULT_TECHNOLOGY_CLASSIFICATIONS = List.of(
@@ -86,7 +92,7 @@ public class SystemSettingsService {
     public MailSettingsResponse getMailSettings() {
         String username = getGmailUsername();
         String password = getGmailAppPassword();
-        return new MailSettingsResponse(username, password != null && !password.isBlank());
+        return new MailSettingsResponse(maskEmail(username), password != null && !password.isBlank());
     }
 
     // ── Gmail OAuth2 앱 자격증명 ──────────────────────────────
@@ -115,6 +121,7 @@ public class SystemSettingsService {
     public void saveGmailOAuth2(String refreshToken, String email) {
         set(KEY_GMAIL_OAUTH2_REFRESH_TOKEN, refreshToken);
         set(KEY_GMAIL_OAUTH2_CONNECTED_EMAIL, email);
+        set(KEY_GMAIL_APP_PASSWORD, "");
     }
 
     public void clearGmailOAuth2() {
@@ -127,7 +134,9 @@ public class SystemSettingsService {
         if (request.gmailUsername() != null) {
             set(KEY_GMAIL_USERNAME, request.gmailUsername().trim());
         }
-        if (request.gmailAppPassword() != null && !request.gmailAppPassword().isBlank()) {
+        if (request.gmailAppPassword() != null
+                && !request.gmailAppPassword().isBlank()
+                && !request.gmailAppPassword().contains("*")) {
             set(KEY_GMAIL_APP_PASSWORD, request.gmailAppPassword().trim());
         }
         return getMailSettings();
@@ -225,12 +234,12 @@ public class SystemSettingsService {
     public ClassificationResponse addClassification(String type, String value) {
         String normalizedType = normalizeClassificationType(type);
         String normalizedValue = normalizeClassificationValue(value);
-        List<String> values = new java.util.ArrayList<>(getClassificationValues(normalizedType));
+        List<String> values = new java.util.ArrayList<>(getClassificationValuesForUpdate(normalizedType));
         if (!values.contains(normalizedValue)) {
             values.add(normalizedValue);
-            values.sort(String::compareTo);
-            set(classificationKey(normalizedType), writeClassificationValues(values));
         }
+        values = normalizedClassificationValues(values);
+        setForUpdate(classificationKey(normalizedType), writeClassificationValues(values));
         return new ClassificationResponse(normalizedType, values);
     }
 
@@ -239,15 +248,15 @@ public class SystemSettingsService {
         String normalizedType = normalizeClassificationType(type);
         String normalizedCurrent = normalizeClassificationValue(currentValue);
         String normalizedNext = normalizeClassificationValue(nextValue);
-        List<String> values = new java.util.ArrayList<>(getClassificationValues(normalizedType));
+        List<String> values = new java.util.ArrayList<>(getClassificationValuesForUpdate(normalizedType));
         int index = values.indexOf(normalizedCurrent);
         if (index >= 0) {
             values.set(index, normalizedNext);
         } else {
             values.add(normalizedNext);
         }
-        values = values.stream().distinct().sorted().toList();
-        set(classificationKey(normalizedType), writeClassificationValues(values));
+        values = normalizedClassificationValues(values);
+        setForUpdate(classificationKey(normalizedType), writeClassificationValues(values));
         return new ClassificationResponse(normalizedType, values);
     }
 
@@ -255,11 +264,11 @@ public class SystemSettingsService {
     public ClassificationResponse deleteClassification(String type, String value) {
         String normalizedType = normalizeClassificationType(type);
         String normalizedValue = normalizeClassificationValue(value);
-        List<String> values = getClassificationValues(normalizedType).stream()
+        List<String> values = getClassificationValuesForUpdate(normalizedType).stream()
                 .filter(item -> !item.equals(normalizedValue))
-                .sorted()
                 .toList();
-        set(classificationKey(normalizedType), writeClassificationValues(values));
+        values = normalizedClassificationValues(values);
+        setForUpdate(classificationKey(normalizedType), writeClassificationValues(values));
         return new ClassificationResponse(normalizedType, values);
     }
 
@@ -269,7 +278,37 @@ public class SystemSettingsService {
         if (savedValue == null || savedValue.isBlank()) {
             return defaultClassificationValues(normalizedType);
         }
-        return java.util.Arrays.stream(savedValue.split("\\n"))
+        return readClassificationValues(savedValue);
+    }
+
+    private List<String> getClassificationValuesForUpdate(String type) {
+        String normalizedType = normalizeClassificationType(type);
+        String savedValue = repository.findByIdForUpdate(classificationKey(normalizedType))
+                .map(SystemSettingsEntity::getValue)
+                .orElse(null);
+        if (savedValue == null || savedValue.isBlank()) {
+            return defaultClassificationValues(normalizedType);
+        }
+        return readClassificationValues(savedValue);
+    }
+
+    private List<String> readClassificationValues(String savedValue) {
+        if (savedValue.trim().startsWith("[")) {
+            try {
+                return normalizedClassificationValues(OBJECT_MAPPER.readValue(savedValue, STRING_LIST));
+            } catch (JsonProcessingException ignored) {
+                return List.of();
+            }
+        }
+        return normalizedClassificationValues(Stream.of(savedValue.split("\\n"))
+                .map(String::trim)
+                .filter(value -> !value.isBlank())
+                .toList());
+    }
+
+    private List<String> normalizedClassificationValues(List<String> values) {
+        return values.stream()
+                .filter(value -> value != null)
                 .map(String::trim)
                 .filter(value -> !value.isBlank())
                 .distinct()
@@ -301,6 +340,29 @@ public class SystemSettingsService {
     }
 
     private String writeClassificationValues(List<String> values) {
-        return String.join("\n", values);
+        try {
+            return OBJECT_MAPPER.writeValueAsString(normalizedClassificationValues(values));
+        } catch (JsonProcessingException e) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "분류 설정을 저장할 수 없습니다.");
+        }
+    }
+
+    private void setForUpdate(String key, String value) {
+        SystemSettingsEntity entity = repository.findByIdForUpdate(key)
+                .orElse(new SystemSettingsEntity(key));
+        entity.setValue(value);
+        repository.save(entity);
+    }
+
+    private String maskEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return email;
+        }
+        String trimmed = email.trim();
+        int at = trimmed.indexOf('@');
+        if (at <= 1) {
+            return "***" + (at >= 0 ? trimmed.substring(at) : "");
+        }
+        return trimmed.charAt(0) + "***" + trimmed.substring(at);
     }
 }
