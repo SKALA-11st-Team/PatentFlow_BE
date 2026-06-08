@@ -4,11 +4,14 @@ import com.syuuk.patentflow.auth.dto.UserPrincipalResponse;
 import com.syuuk.patentflow.auth.service.AuthCookieService;
 import com.syuuk.patentflow.auth.service.AuthTokenRevocationService;
 import com.syuuk.patentflow.auth.service.JwtTokenProvider;
+import com.syuuk.patentflow.user.domain.UserEntity;
+import com.syuuk.patentflow.user.repository.UserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -26,15 +29,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final AuthCookieService authCookieService;
     private final JwtTokenProvider jwtTokenProvider;
     private final AuthTokenRevocationService tokenRevocationService;
+    private final UserRepository userRepository;
 
     public JwtAuthenticationFilter(
             AuthCookieService authCookieService,
             JwtTokenProvider jwtTokenProvider,
-            AuthTokenRevocationService tokenRevocationService
+            AuthTokenRevocationService tokenRevocationService,
+            UserRepository userRepository
     ) {
         this.authCookieService = authCookieService;
         this.jwtTokenProvider = jwtTokenProvider;
         this.tokenRevocationService = tokenRevocationService;
+        this.userRepository = userRepository;
     }
 
     @Override
@@ -63,6 +69,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         UserPrincipalResponse principal = jwtTokenProvider.getUserPrincipal(token);
+        if (wasIssuedBeforePasswordChange(token, principal)) {
+            return;
+        }
         List<SimpleGrantedAuthority> authorities = jwtTokenProvider.getRoles(token).stream()
                 .map(SimpleGrantedAuthority::new)
                 .toList();
@@ -74,5 +83,24 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
         SecurityContextHolder.getContext().setAuthentication(authentication);
+    }
+
+    private boolean wasIssuedBeforePasswordChange(String token, UserPrincipalResponse principal) {
+        return userRepository.findById(principal.userId())
+                .or(() -> userRepository.findByEmail(principal.email()))
+                .map(user -> isStaleToken(token, user))
+                .orElse(true);
+    }
+
+    private boolean isStaleToken(String token, UserEntity user) {
+        if (user.getPasswordChangedAt() == null) {
+            return false;
+        }
+        Instant tokenPasswordChangedAt = jwtTokenProvider.getPasswordChangedAt(token);
+        if (tokenPasswordChangedAt != null) {
+            return !tokenPasswordChangedAt.equals(user.getPasswordChangedAt().toInstant());
+        }
+        Instant issuedAt = jwtTokenProvider.getIssuedAt(token);
+        return !issuedAt.isAfter(user.getPasswordChangedAt().toInstant());
     }
 }

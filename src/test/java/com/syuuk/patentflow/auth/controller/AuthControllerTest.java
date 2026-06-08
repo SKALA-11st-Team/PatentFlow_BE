@@ -88,6 +88,26 @@ class AuthControllerTest {
     }
 
     @Test
+    void refreshTokenReuseRevokesOtherSessionsForSameUser() throws Exception {
+        ensureRefreshReuseTestUser();
+        LoginCapture firstLogin = loginCapture("refresh-reuse@test.com", "OldPass123!");
+        LoginCapture secondLogin = loginCapture("refresh-reuse@test.com", "OldPass123!");
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                .cookie(firstLogin.refreshCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.accessToken").isNotEmpty());
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                .cookie(firstLogin.refreshCookie()))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                .cookie(secondLogin.refreshCookie()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void protectedApiRequiresBearerToken() throws Exception {
         mockMvc.perform(get("/api/v1/patents"))
                 .andExpect(status().isUnauthorized());
@@ -214,6 +234,53 @@ class AuthControllerTest {
     }
 
     @Test
+    void changePasswordInvalidatesExistingAccessTokenAndRequiresStrongPassword() throws Exception {
+        ensurePasswordChangeTestUser();
+        String token = login("password-change@test.com", "OldPass123!");
+
+        mockMvc.perform(patch("/api/v1/auth/password")
+                .with(csrf())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                          "currentPassword": "OldPass123!",
+                          "newPassword": "weakpass123"
+                        }
+                        """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mockMvc.perform(patch("/api/v1/auth/password")
+                .with(csrf())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                          "currentPassword": "OldPass123!",
+                          "newPassword": "BetterPass123!"
+                        }
+                        """))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/auth/me")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                          "email": "password-change@test.com",
+                          "password": "OldPass123!"
+                        }
+                        """))
+                .andExpect(status().isUnauthorized());
+
+        login("password-change@test.com", "BetterPass123!");
+    }
+
+    @Test
     void businessUserCanAccessOnlyAssignedDepartmentPatentResources() throws Exception {
         ensureBusinessUser();
         String token = login("business@test.com", "business1234");
@@ -321,6 +388,38 @@ class AuthControllerTest {
                 "ADMIN",
                 null,
                 "잠금 테스트 사용자"));
+    }
+
+    private void ensurePasswordChangeTestUser() {
+        userRepository.findByEmail("password-change@test.com").ifPresentOrElse(
+                user -> {
+                    user.setPassword(passwordEncoder.encode("OldPass123!"));
+                    user.setPasswordChangedAt(null);
+                    userRepository.save(user);
+                },
+                () -> userRepository.save(new UserEntity(
+                        "USER-password-change-test",
+                        "password-change@test.com",
+                        passwordEncoder.encode("OldPass123!"),
+                        "ADMIN",
+                        null,
+                        "비밀번호 변경 테스트 사용자")));
+    }
+
+    private void ensureRefreshReuseTestUser() {
+        userRepository.findByEmail("refresh-reuse@test.com").ifPresentOrElse(
+                user -> {
+                    user.setPassword(passwordEncoder.encode("OldPass123!"));
+                    user.setPasswordChangedAt(null);
+                    userRepository.save(user);
+                },
+                () -> userRepository.save(new UserEntity(
+                        "USER-refresh-reuse-test",
+                        "refresh-reuse@test.com",
+                        passwordEncoder.encode("OldPass123!"),
+                        "ADMIN",
+                        null,
+                        "리프레시 재사용 테스트 사용자")));
     }
 
     private record LoginCapture(String accessToken, Cookie accessCookie, Cookie refreshCookie) {}

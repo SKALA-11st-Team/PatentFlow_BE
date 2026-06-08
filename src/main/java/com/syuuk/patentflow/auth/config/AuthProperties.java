@@ -19,6 +19,9 @@ public class AuthProperties {
     private String jwtSecret;
     private long accessTokenExpirationSeconds = 3600;
     private long refreshTokenExpirationSeconds = 1209600;
+    private String jwtIssuer = "patentflow";
+    private String jwtAudience = "patentflow-api";
+    private String jwtKeyId = "default";
     private int maxLoginFailures = 5;
     private long loginLockSeconds = 300;
     private String accessCookieName = "patentflow_access";
@@ -50,6 +53,30 @@ public class AuthProperties {
 
     public void setRefreshTokenExpirationSeconds(long refreshTokenExpirationSeconds) {
         this.refreshTokenExpirationSeconds = refreshTokenExpirationSeconds;
+    }
+
+    public String getJwtIssuer() {
+        return jwtIssuer;
+    }
+
+    public void setJwtIssuer(String jwtIssuer) {
+        this.jwtIssuer = jwtIssuer;
+    }
+
+    public String getJwtAudience() {
+        return jwtAudience;
+    }
+
+    public void setJwtAudience(String jwtAudience) {
+        this.jwtAudience = jwtAudience;
+    }
+
+    public String getJwtKeyId() {
+        return jwtKeyId;
+    }
+
+    public void setJwtKeyId(String jwtKeyId) {
+        this.jwtKeyId = jwtKeyId;
     }
 
     public int getMaxLoginFailures() {
@@ -121,6 +148,15 @@ public class AuthProperties {
         }
         if (refreshTokenExpirationSeconds <= 0) {
             throw new IllegalStateException("patentflow.auth.refresh-token-expiration-seconds must be positive.");
+        }
+        if (jwtIssuer == null || jwtIssuer.isBlank()) {
+            throw new IllegalStateException("patentflow.auth.jwt-issuer must not be blank.");
+        }
+        if (jwtAudience == null || jwtAudience.isBlank()) {
+            throw new IllegalStateException("patentflow.auth.jwt-audience must not be blank.");
+        }
+        if (jwtKeyId == null || jwtKeyId.isBlank()) {
+            throw new IllegalStateException("patentflow.auth.jwt-key-id must not be blank.");
         }
         if (maxLoginFailures <= 0) {
             throw new IllegalStateException("patentflow.auth.max-login-failures must be positive.");

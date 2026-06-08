@@ -53,7 +53,7 @@ public class AuthSessionService {
         return new RefreshSession(refreshToken, expiresAt.toInstant());
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = PatentFlowException.class)
     public UserSession consume(String refreshToken) {
         if (refreshToken == null || refreshToken.isBlank()) {
             throw new PatentFlowException(ErrorCode.UNAUTHORIZED);
@@ -61,7 +61,13 @@ public class AuthSessionService {
         AuthSessionEntity session = authSessionRepository.findByRefreshTokenHash(hash(refreshToken))
                 .orElseThrow(() -> new PatentFlowException(ErrorCode.UNAUTHORIZED));
         OffsetDateTime now = OffsetDateTime.now(KST);
-        if (session.getRevokedAt() != null || !session.getExpiresAt().isAfter(now)) {
+        if (session.getRevokedAt() != null) {
+            revokeAll(session.getUserId());
+            throw new PatentFlowException(ErrorCode.UNAUTHORIZED);
+        }
+        if (!session.getExpiresAt().isAfter(now)) {
+            session.revoke(now);
+            authSessionRepository.save(session);
             throw new PatentFlowException(ErrorCode.UNAUTHORIZED);
         }
         session.markUsed(now);
@@ -87,13 +93,7 @@ public class AuthSessionService {
     // 비밀번호 변경 후 해당 사용자의 모든 세션을 무효화해 재로그인을 강제한다.
     @Transactional
     public void revokeAll(String userId) {
-        OffsetDateTime now = OffsetDateTime.now(KST);
-        authSessionRepository.findByUserId(userId).forEach(session -> {
-            if (session.getRevokedAt() == null) {
-                session.revoke(now);
-                authSessionRepository.save(session);
-            }
-        });
+        authSessionRepository.revokeActiveByUserId(userId, OffsetDateTime.now(KST));
     }
 
     private String hash(String token) {

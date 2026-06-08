@@ -12,6 +12,8 @@ import com.syuuk.patentflow.user.repository.UserRepository;
 import com.syuuk.patentflow.user.security.CustomUserDetailsService;
 import com.syuuk.patentflow.user.security.UserDetailsImpl;
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -25,6 +27,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AuthService {
+
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     private final AuthenticationManager authenticationManager;
     private final AuthSessionService authSessionService;
@@ -71,7 +75,7 @@ public class AuthService {
         return issueTokens((UserDetailsImpl) userDetails);
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = PatentFlowException.class)
     public AuthResult refresh(String refreshToken) {
         AuthSessionService.UserSession session = authSessionService.consume(refreshToken);
         UserDetails userDetails = userDetailsService.loadUserByUsername(session.email());
@@ -109,7 +113,9 @@ public class AuthService {
         if (!passwordEncoder.matches(request.currentPassword(), user.getPassword())) {
             throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "현재 비밀번호가 올바르지 않습니다.");
         }
+        validateNewPassword(request.newPassword(), request.currentPassword(), user);
         user.setPassword(passwordEncoder.encode(request.newPassword()));
+        user.setPasswordChangedAt(OffsetDateTime.now(KST).withNano(0));
         userRepository.save(user);
         // 비밀번호 변경 후 기존 세션 전체 무효화 — 재로그인 필요
         authSessionService.revokeAll(current.userId());
@@ -151,6 +157,47 @@ public class AuthService {
                 toPrincipalResponse(userDetails),
                 null);
         return new AuthResult(response, accessToken, accessExpiresAt, refreshSession.refreshToken(), refreshSession.expiresAt());
+    }
+
+    private void validateNewPassword(String newPassword, String currentPassword, UserEntity user) {
+        if (newPassword == null || newPassword.isBlank()) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "새 비밀번호를 입력해주세요.");
+        }
+        if (newPassword.length() < 10 || newPassword.length() > 128) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "비밀번호는 10자 이상 128자 이하로 입력해주세요.");
+        }
+        if (newPassword.equals(currentPassword) || passwordEncoder.matches(newPassword, user.getPassword())) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "기존 비밀번호와 다른 비밀번호를 사용해주세요.");
+        }
+        if (!hasUppercase(newPassword) || !hasLowercase(newPassword)
+                || !hasDigit(newPassword) || !hasSpecialCharacter(newPassword)) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "비밀번호는 대문자, 소문자, 숫자, 특수문자를 모두 포함해야 합니다.");
+        }
+        String emailPrefix = user.getEmail() == null ? "" : user.getEmail().split("@", 2)[0].toLowerCase();
+        String username = user.getUsername() == null ? "" : user.getUsername().toLowerCase();
+        String normalizedPassword = newPassword.toLowerCase();
+        if (!emailPrefix.isBlank() && normalizedPassword.contains(emailPrefix)) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "비밀번호에 이메일 ID를 포함할 수 없습니다.");
+        }
+        if (!username.isBlank() && normalizedPassword.contains(username)) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "비밀번호에 사용자 이름을 포함할 수 없습니다.");
+        }
+    }
+
+    private boolean hasUppercase(String value) {
+        return value.chars().anyMatch(Character::isUpperCase);
+    }
+
+    private boolean hasLowercase(String value) {
+        return value.chars().anyMatch(Character::isLowerCase);
+    }
+
+    private boolean hasDigit(String value) {
+        return value.chars().anyMatch(Character::isDigit);
+    }
+
+    private boolean hasSpecialCharacter(String value) {
+        return value.chars().anyMatch(ch -> !Character.isLetterOrDigit(ch));
     }
 
     private UserPrincipalResponse toPrincipalResponse(UserDetails userDetails) {

@@ -11,6 +11,7 @@ import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -42,12 +43,25 @@ public class JwtTokenProvider {
                 .map(GrantedAuthority::getAuthority)
                 .toList();
         UserPrincipalResponse principal = toPrincipalResponse(userDetails, roles);
+        Long passwordChangedAtMillis = passwordChangedAtMillis(userDetails);
 
-        return createToken(principal, issuedAt, expiresAt);
+        return createToken(principal, issuedAt, expiresAt, passwordChangedAtMillis);
     }
 
     public Instant getExpiresAt(String token) {
         return Instant.ofEpochSecond(((Number) claims(token).get("exp")).longValue());
+    }
+
+    public Instant getIssuedAt(String token) {
+        return Instant.ofEpochSecond(((Number) claims(token).get("iat")).longValue());
+    }
+
+    public Instant getPasswordChangedAt(String token) {
+        Object value = claims(token).get("pwdChangedAt");
+        if (!(value instanceof Number number)) {
+            return null;
+        }
+        return Instant.ofEpochMilli(number.longValue());
     }
 
     // sub = email (로그인 ID) — Spring Security의 username 개념과 동일
@@ -89,32 +103,49 @@ public class JwtTokenProvider {
                 return false;
             }
             Instant expiresAt = Instant.ofEpochSecond(((Number) claims(token).get("exp")).longValue());
-            return expiresAt.isAfter(Instant.now());
+            return expiresAt.isAfter(Instant.now()) && hasExpectedRegisteredClaims(token);
         } catch (Exception exception) {
             return false;
         }
     }
 
-    private String createToken(UserPrincipalResponse principal, Instant issuedAt, Instant expiresAt) {
+    private String createToken(UserPrincipalResponse principal, Instant issuedAt, Instant expiresAt, Long passwordChangedAtMillis) {
         try {
-            String header = encodeJson(Map.of("alg", "HS256", "typ", "JWT"));
-            String payload = encodeJson(Map.ofEntries(
-                    Map.entry("sub", principal.email()),      // sub = 로그인 ID (email)
-                    Map.entry("roles", principal.roles()),
-                    Map.entry("userId", principal.userId()),
-                    Map.entry("username", principal.username()), // 실제 이름
-                    Map.entry("email", principal.email()),
-                    Map.entry("role", principal.role()),
-                    Map.entry("departmentId", valueOrEmpty(principal.departmentId())),
-                    Map.entry("departmentName", valueOrEmpty(principal.departmentName())),
-                    Map.entry("jti", UUID.randomUUID().toString()),
-                    Map.entry("iat", issuedAt.getEpochSecond()),
-                    Map.entry("exp", expiresAt.getEpochSecond())));
+            String header = encodeJson(Map.of(
+                    "alg", "HS256",
+                    "typ", "JWT",
+                    "kid", properties.getJwtKeyId()));
+            Map<String, Object> claims = new HashMap<>();
+            claims.put("sub", principal.email());      // sub = 로그인 ID (email)
+            claims.put("iss", properties.getJwtIssuer());
+            claims.put("aud", properties.getJwtAudience());
+            claims.put("roles", principal.roles());
+            claims.put("userId", principal.userId());
+            claims.put("username", principal.username()); // 실제 이름
+            claims.put("email", principal.email());
+            claims.put("role", principal.role());
+            claims.put("departmentId", valueOrEmpty(principal.departmentId()));
+            claims.put("departmentName", valueOrEmpty(principal.departmentName()));
+            claims.put("jti", UUID.randomUUID().toString());
+            claims.put("iat", issuedAt.getEpochSecond());
+            claims.put("exp", expiresAt.getEpochSecond());
+            if (passwordChangedAtMillis != null) {
+                claims.put("pwdChangedAt", passwordChangedAtMillis);
+            }
+            String payload = encodeJson(claims);
             String signedContent = header + "." + payload;
             return signedContent + "." + sign(signedContent);
         } catch (Exception exception) {
             throw new IllegalStateException("JWT 토큰을 생성할 수 없습니다.", exception);
         }
+    }
+
+    private boolean hasExpectedRegisteredClaims(String token) {
+        Map<String, Object> tokenClaims = claims(token);
+        Map<String, Object> headerClaims = headerClaims(token);
+        return properties.getJwtIssuer().equals(tokenClaims.get("iss"))
+                && properties.getJwtAudience().equals(tokenClaims.get("aud"))
+                && properties.getJwtKeyId().equals(headerClaims.get("kid"));
     }
 
     private UserPrincipalResponse toPrincipalResponse(UserDetails userDetails, List<String> roles) {
@@ -127,6 +158,13 @@ public class JwtTokenProvider {
         }
         String email = userDetails.getUsername();
         return new UserPrincipalResponse(email, email, roles, email, "BUSINESS", null, null);
+    }
+
+    private Long passwordChangedAtMillis(UserDetails userDetails) {
+        if (userDetails instanceof UserDetailsImpl impl && impl.getUser().getPasswordChangedAt() != null) {
+            return impl.getUser().getPasswordChangedAt().toInstant().toEpochMilli();
+        }
+        return null;
     }
 
     private String stringClaim(Map<String, Object> claims, String key, String defaultValue) {
@@ -152,6 +190,20 @@ public class JwtTokenProvider {
             });
         } catch (Exception exception) {
             throw new IllegalArgumentException("JWT 토큰을 읽을 수 없습니다.", exception);
+        }
+    }
+
+    private Map<String, Object> headerClaims(String token) {
+        try {
+            String[] parts = token.split("\\.");
+            if (parts.length != 3) {
+                throw new IllegalArgumentException("Invalid JWT token");
+            }
+            byte[] decodedHeader = BASE64_URL_DECODER.decode(parts[0]);
+            return objectMapper.readValue(decodedHeader, new TypeReference<>() {
+            });
+        } catch (Exception exception) {
+            throw new IllegalArgumentException("JWT 헤더를 읽을 수 없습니다.", exception);
         }
     }
 

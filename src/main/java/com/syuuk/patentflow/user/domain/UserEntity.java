@@ -46,6 +46,9 @@ public class UserEntity {
     @Column(name = "created_at")
     private OffsetDateTime createdAt;
 
+    @Column(name = "password_changed_at")
+    private OffsetDateTime passwordChangedAt;
+
     protected UserEntity() {}
 
     public UserEntity(String id, String email, String password, String role,
@@ -72,4 +75,6 @@ public class UserEntity {
     public String getUsername() { return username; }
     public void setUsername(String username) { this.username = username; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
+    public OffsetDateTime getPasswordChangedAt() { return passwordChangedAt; }
+    public void setPasswordChangedAt(OffsetDateTime passwordChangedAt) { this.passwordChangedAt = passwordChangedAt; }
 }
