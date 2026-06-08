@@ -135,6 +135,10 @@ public class MailingService {
         return getRecipientMappings(departmentId).get(0);
     }
 
+    // 전체 원자성(MAIL-02): 이력 저장과 워크플로우 전이를 한 트랜잭션으로 묶고, 발송 중 하나라도 실패하면
+    // 예외를 전파해 전체 롤백한다(올오어낫싱). 이미 물리적으로 전송된 메일 자체는 되돌릴 수 없으나,
+    // DB 상태(이력·워크플로우 전이)는 항상 일관되게 유지된다.
+    @Transactional
     public MailingSendResponse send(MailingSendRequest request) {
         // OAuth2 연동 우선 → 앱 비밀번호(레거시) → 미발송 기록
         boolean oauth2Connected = mailOAuth2Service.isConnected();
@@ -149,48 +153,22 @@ public class MailingService {
         Map<String, String> departmentIdsByEmail = loadDepartmentIdsByEmail(request);
         String sentBy = currentUsername();
         List<BusinessReviewMailSendDraft> sentDrafts = new ArrayList<>();
-        int failedCount = 0;
         int recordedCount = 0;
 
         if (oauth2Connected) {
             String senderEmail = systemSettingsService.getGmailOAuth2ConnectedEmail();
-            String accessToken;
-            try {
-                accessToken = mailOAuth2Service.getValidAccessToken();
-            } catch (PatentFlowException exception) {
-                for (BusinessReviewMailSendDraft draft : request.drafts()) {
-                    saveHistory(mailingBatchId, draft, STATUS_FAILED, departmentIdsByEmail, sentBy);
-                    failedCount++;
-                }
-                return new MailingSendResponse(
-                        mailingBatchId,
-                        0,
-                        List.of(),
-                        List.of(),
-                        0,
-                        failedCount,
-                        recordedCount);
-            }
+            // 토큰 획득 실패 시 예외를 전파해 전체 롤백한다(이력 미기록).
+            String accessToken = mailOAuth2Service.getValidAccessToken();
             for (BusinessReviewMailSendDraft draft : request.drafts()) {
-                try {
-                    sendEmailOAuth2(senderEmail, accessToken, draft);
-                    saveHistory(mailingBatchId, draft, STATUS_SENT, departmentIdsByEmail, sentBy);
-                    sentDrafts.add(draft);
-                } catch (PatentFlowException exception) {
-                    saveHistory(mailingBatchId, draft, STATUS_FAILED, departmentIdsByEmail, sentBy);
-                    failedCount++;
-                }
+                sendEmailOAuth2(senderEmail, accessToken, draft);
+                saveHistory(mailingBatchId, draft, STATUS_SENT, departmentIdsByEmail, sentBy);
+                sentDrafts.add(draft);
             }
         } else if (appPasswordConfigured) {
             for (BusinessReviewMailSendDraft draft : request.drafts()) {
-                try {
-                    sendEmail(username, appPassword, draft);
-                    saveHistory(mailingBatchId, draft, STATUS_SENT, departmentIdsByEmail, sentBy);
-                    sentDrafts.add(draft);
-                } catch (PatentFlowException exception) {
-                    saveHistory(mailingBatchId, draft, STATUS_FAILED, departmentIdsByEmail, sentBy);
-                    failedCount++;
-                }
+                sendEmail(username, appPassword, draft);
+                saveHistory(mailingBatchId, draft, STATUS_SENT, departmentIdsByEmail, sentBy);
+                sentDrafts.add(draft);
             }
         } else {
             // OAuth2·앱비밀번호 모두 미연동 — 실제 발송 없이 이력만 기록한다. RECORDED는 워크플로우 전이 대상이 아니다.
@@ -201,7 +179,7 @@ public class MailingService {
             }
         }
 
-        // 실제 발송 성공분만 사업부 회신 대기 상태로 전이한다. FAILED/RECORDED는 상태를 유지한다.
+        // 발송 성공분(SENT)만 사업부 회신 대기 상태로 전이한다. RECORDED는 상태를 유지한다.
         List<String> patentIds = sentDrafts.stream()
                 .flatMap(draft -> draft.patents().stream())
                 .map(BusinessReviewMailPatentSummary::patentId)
@@ -215,7 +193,7 @@ public class MailingService {
                 updateResult.updatedPatentIds(),
                 updateResult.skippedPatentIds(),
                 sentDrafts.size(),
-                failedCount,
+                0,
                 recordedCount);
     }
 
