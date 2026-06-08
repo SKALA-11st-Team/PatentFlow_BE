@@ -211,11 +211,11 @@ class PatentControllerTest {
 
     @Test
     void submitBusinessChecklistCreatesSubmissionHistory() throws Exception {
-        mockMvc.perform(post("/api/v1/patents/PAT-2026-0001/business-submissions")
+        mockMvc.perform(post("/api/v1/patents/PAT-2026-0003/business-submissions")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {
-                          "patentId": "PAT-2026-0001",
+                          "patentId": "PAT-2026-0003",
                           "evaluatorName": "R&D본부",
                           "evaluatedAt": "2026-05-06",
                           "responses": [
@@ -243,19 +243,42 @@ class PatentControllerTest {
                 .andExpect(jsonPath("$.data.finalOpinion").value("MAINTAIN"))
                 .andExpect(jsonPath("$.data.responses", hasSize(2)));
 
-        mockMvc.perform(get("/api/v1/patents/PAT-2026-0001/business-submissions"))
+        mockMvc.perform(get("/api/v1/patents/PAT-2026-0003/business-submissions"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data", hasSize(1)))
-                .andExpect(jsonPath("$.data[0].submissionId").value("PAT-2026-0001-SUB-01"))
+                .andExpect(jsonPath("$.data[0].submissionId").value("PAT-2026-0003-SUB-01"))
                 .andExpect(jsonPath("$.data[0].decision").value("MAINTAIN"))
                 .andExpect(jsonPath("$.data[0].checklistTotal").value(9))
-                .andExpect(jsonPath("$.data[0].aiRecommendation").value("MAINTAIN"));
+                .andExpect(jsonPath("$.data[0].aiRecommendation").value("ABANDON"));
 
-        mockMvc.perform(get("/api/v1/patents/PAT-2026-0001"))
+        mockMvc.perform(get("/api/v1/patents/PAT-2026-0003"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.reviewWorkflowStatus").value("BUSINESS_RESPONSE_RECEIVED"))
                 .andExpect(jsonPath("$.data.businessOpinionDecision").value("MAINTAIN"))
                 .andExpect(jsonPath("$.data.businessOpinion.decision").value("MAINTAIN"));
+    }
+
+    @Test
+    void submitBusinessChecklistRejectsInvalidWorkflowStatus() throws Exception {
+        mockMvc.perform(post("/api/v1/patents/PAT-2026-0001/business-submissions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                          "patentId": "PAT-2026-0001",
+                          "responses": [
+                            {
+                              "itemId": "TECH_COMPLETENESS",
+                              "score": 4,
+                              "aiSuggestedScore": 3,
+                              "memo": "제품 적용 가능성이 확인됩니다."
+                            }
+                          ],
+                          "qualitativeScore": 0,
+                          "finalOpinion": "MAINTAIN"
+                        }
+                        """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("INVALID_WORKFLOW_STATUS"));
     }
 
     @Test
@@ -289,7 +312,7 @@ class PatentControllerTest {
     }
 
     @Test
-    void sendMailingMovesOnlyMailReadyPatentsToWaitingBusinessResponse() throws Exception {
+    void sendMailingWithoutCredentialsRecordsHistoryWithoutWorkflowTransition() throws Exception {
         mockMvc.perform(post("/api/v1/mailings/send")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -304,11 +327,13 @@ class PatentControllerTest {
                                 {
                                   "patentId": "PAT-2026-0001",
                                   "managementNumber": "P202405001-KR0",
+                                  "originalPatentUrl": "https://patents.google.com/patent/KR102932891/ko",
                                   "title": "상품 트렌드 예측을 반영한 강화학습 모델을 적용한 자산배분 시스템 및 방법"
                                 },
                                 {
                                   "patentId": "PAT-2026-0002",
                                   "managementNumber": "P202405002-KR0",
+                                  "originalPatentUrl": "https://patents.google.com/patent/KR102932892/ko",
                                   "title": "테스트 특허"
                                 }
                               ]
@@ -317,18 +342,18 @@ class PatentControllerTest {
                         }
                         """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.updatedCount").value(1))
-                .andExpect(jsonPath("$.data.updatedPatentIds[0]").value("PAT-2026-0002"))
-                .andExpect(jsonPath("$.data.skippedPatentIds[0]").value("PAT-2026-0001"));
+                .andExpect(jsonPath("$.data.updatedCount").value(0))
+                .andExpect(jsonPath("$.data.recordedCount").value(1));
 
         mockMvc.perform(get("/api/v1/patents/PAT-2026-0002"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.reviewWorkflowStatus").value("WAITING_BUSINESS_RESPONSE"));
+                .andExpect(jsonPath("$.data.reviewWorkflowStatus").value("MAIL_READY"));
 
         mockMvc.perform(get("/api/v1/mailings/history")
                 .param("patentId", "PAT-2026-0002"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data", hasSize(1)))
+                .andExpect(jsonPath("$.data[0].status").value("RECORDED"))
                 .andExpect(jsonPath("$.data[0].recipientEmail").value("rnd.manager@syuuk.test"));
     }
 

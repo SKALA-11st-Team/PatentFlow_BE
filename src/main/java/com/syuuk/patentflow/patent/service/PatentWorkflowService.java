@@ -143,8 +143,13 @@ public class PatentWorkflowService {
             String reason,
             OffsetDateTime submittedAt
     ) {
-        patentReviewService.updatePatentInternal(patentId,
-                patent -> withBusinessOpinion(patent, decision, reason, submittedAt));
+        patentReviewService.updatePatentInternal(patentId, patent -> {
+            if (patent.reviewWorkflowStatus() != ReviewWorkflowStatus.WAITING_BUSINESS_RESPONSE) {
+                throw new PatentFlowException(ErrorCode.INVALID_WORKFLOW_STATUS,
+                        "사업부 의견은 사업부 회신 대기 상태에서만 제출할 수 있습니다.");
+            }
+            return withBusinessOpinion(patent, decision, reason, submittedAt);
+        });
     }
 
     @Transactional
@@ -472,8 +477,7 @@ public class PatentWorkflowService {
     // ── 유틸 ─────────────────────────────────────────────────
 
     private boolean canRecordFinalDecision(ReviewWorkflowStatus status) {
-        return status == ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED
-                || status == ReviewWorkflowStatus.NOT_IN_REVIEW;
+        return status == ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED;
     }
 
     private PatentLifecycleStatus lifecycleStatusByLegalAction(LegalActionResult legalActionResult) {
