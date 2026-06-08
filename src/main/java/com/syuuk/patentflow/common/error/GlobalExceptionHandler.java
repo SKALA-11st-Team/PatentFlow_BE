@@ -21,7 +21,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handlePatentFlowException(PatentFlowException exception) {
         ErrorCode errorCode = exception.errorCode();
         log.warn("PatentFlowException occurred: {} - {}", errorCode.name(), exception.getMessage());
-        return ResponseEntity.status(errorCode.status()).body(ErrorResponse.of(errorCode));
+        return ResponseEntity.status(errorCode.status()).body(ErrorResponse.of(errorCode, exception.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

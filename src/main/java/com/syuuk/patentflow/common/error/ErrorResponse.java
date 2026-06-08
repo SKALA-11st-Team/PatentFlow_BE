@@ -15,6 +15,11 @@ public record ErrorResponse(
         return new ErrorResponse(errorCode.name(), errorCode.message(), Map.of(), now());
     }
 
+    public static ErrorResponse of(ErrorCode errorCode, String message) {
+        String resolvedMessage = message == null || message.isBlank() ? errorCode.message() : message;
+        return new ErrorResponse(errorCode.name(), resolvedMessage, Map.of(), now());
+    }
+
     public static ErrorResponse of(ErrorCode errorCode, Map<String, Object> details) {
         return new ErrorResponse(errorCode.name(), errorCode.message(), details, now());
     }
