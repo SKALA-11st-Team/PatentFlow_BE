@@ -12,6 +12,9 @@ public record PatentBibliographicInfoResponse(
         String applicationNumber,
         String registrationNumber,
         LocalDate expectedExpirationDate,
-        String source
+        String source,
+        PatentLookupStatus lookupStatus,
+        String sourceConfidence,
+        String lookupMessage
 ) {
 }

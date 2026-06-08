@@ -273,95 +273,60 @@ public class PatentReviewService {
         String normalizedQuarter = quarter == null ? null : quarter.trim().toUpperCase(Locale.ROOT);
         String normalizedCountry = country == null ? null : country.trim().toUpperCase(Locale.ROOT);
 
-        return getAllPatents().stream()
-                .filter(patent -> reviewWorkflowStatus == null || patent.reviewWorkflowStatus() == reviewWorkflowStatus)
-                .filter(patent -> normalizedCountry == null || normalizedCountry.isBlank()
-                        || "ALL".equals(normalizedCountry)
-                        || normalizedCountry.equalsIgnoreCase(patent.country()))
-                .filter(patent -> matchesDateRange(patent.feeDueDate(), dateFrom, dateTo))
-                .filter(patent -> normalizedQuarter == null || normalizedQuarter.isBlank()
-                        || "ALL".equals(normalizedQuarter)
-                        || normalizedQuarter.equals(quarterKey(patent.feeDueDate())))
+        List<PatentMetadataEntity> entities = patentMetadataRepository.findAll(reviewTargetSpecification(
+                normalizedQuarter, normalizedCountry, dateFrom, dateTo, reviewWorkflowStatus),
+                Sort.by(Sort.Direction.ASC, "feeDueDate", "managementNumber"));
+        Map<String, PatentReviewHistoryEntity> latestHistory = loadLatestHistory(entities);
+        return entities.stream()
+                .map(entity -> toListItem(
+                        patentFromMetadataEntity(entity, latestHistory.get(entity.getPatentId())),
+                        entity.getCurrentQuarterKey()))
                 .toList();
     }
 
-    private boolean matchesDateRange(LocalDate date, LocalDate dateFrom, LocalDate dateTo) {
-        if (date == null) {
-            return dateFrom == null && dateTo == null;
-        }
-        return (dateFrom == null || !date.isBefore(dateFrom))
-                && (dateTo == null || !date.isAfter(dateTo));
+    private Specification<PatentMetadataEntity> reviewTargetSpecification(
+            String normalizedQuarter,
+            String normalizedCountry,
+            LocalDate dateFrom,
+            LocalDate dateTo,
+            ReviewWorkflowStatus reviewWorkflowStatus) {
+        return (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            if (reviewWorkflowStatus != null) {
+                predicates.add(latestHistoryMatches(root, query, cb, "reviewWorkflowStatus", reviewWorkflowStatus));
+            }
+            if (normalizedCountry != null && !normalizedCountry.isBlank() && !"ALL".equals(normalizedCountry)) {
+                predicates.add(cb.equal(cb.upper(cb.coalesce(root.get("country"), "")), normalizedCountry));
+            }
+            if (dateFrom != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("feeDueDate"), dateFrom));
+            }
+            if (dateTo != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("feeDueDate"), dateTo));
+            }
+            if (normalizedQuarter != null && !normalizedQuarter.isBlank() && !"ALL".equals(normalizedQuarter)) {
+                int quarterNumber = quarterNumber(normalizedQuarter);
+                if (quarterNumber > 0) {
+                    LocalDate quarterStart = LocalDate.of(LocalDate.now(KST).getYear(), (quarterNumber - 1) * 3 + 1, 1);
+                    LocalDate quarterEnd = quarterStart.plusMonths(3).minusDays(1);
+                    predicates.add(cb.between(root.get("feeDueDate"), quarterStart, quarterEnd));
+                } else {
+                    predicates.add(cb.or(
+                            cb.equal(root.get("currentQuarterKey"), normalizedQuarter),
+                            cb.like(root.get("currentQuarterKey"), "%-" + normalizedQuarter)));
+                }
+            }
+
+            return predicates.isEmpty() ? cb.conjunction() : cb.and(predicates.toArray(new Predicate[0]));
+        };
     }
 
-    private String quarterKey(LocalDate date) {
-        if (date == null) {
-            return null;
+    private int quarterNumber(String quarter) {
+        if (quarter == null || !quarter.matches("Q[1-4]")) {
+            return -1;
         }
-        return "Q" + ((date.getMonthValue() - 1) / 3 + 1);
-    }
-
-    private Sort parseSort(String sort) {
-        if (sort == null || sort.isBlank()) {
-            return Sort.by(Sort.Direction.ASC, "annualFeeDueDate");
-        }
-        String[] parts = sort.split(",");
-        String property = parts[0];
-        if ("managementNumber".equals(property)) {
-            // managementNumber is in metadata, sorting history by patentId as proxy if relevant
-            property = "patentId";
-        } else if ("feeDueDate".equals(property)) {
-            property = "annualFeeDueDate";
-        }
-
-        Sort.Direction direction = (parts.length > 1 && "desc".equalsIgnoreCase(parts[1]))
-                ? Sort.Direction.DESC : Sort.Direction.ASC;
-
-        return Sort.by(direction, property);
-    }
-
-    private PatentListItemResponse toListItemFromHistory(PatentReviewHistoryEntity history, PatentMetadataEntity metadata) {
-        if (metadata == null) {
-            // Fallback for missing metadata
-            return new PatentListItemResponse(
-                    history.getPatentId(), history.getPatentId(), null, null,
-                    "Unknown", "Unknown", null, null, null, "KR", null,
-                    null, null, null, history.getDepartmentId(), history.getDepartmentName(),
-                    PatentLifecycleStatus.ACTIVE, history.getReviewWorkflowStatus(),
-                    history.getAnnualFeeDueDate(), null, history.getAiRecommendation(),
-                    history.getBusinessOpinionDecision(), history.getLegalActionResult(),
-                    null,
-                    history.getReviewWorkflowStatus() != ReviewWorkflowStatus.NOT_IN_REVIEW,
-                    null
-            );
-        }
-        return new PatentListItemResponse(
-                metadata.getPatentId(),
-                metadata.getManagementNumber(),
-                metadata.getApplicationNumber(),
-                metadata.getRegistrationNumber(),
-                metadata.getTitle(),
-                metadata.getDraftTitle(),
-                metadata.getBusinessArea(),
-                metadata.getTechnologyArea(),
-                metadata.getProductName(),
-                metadata.getCountry(),
-                coApplicants(metadata.getJointApplication(), metadata.getCoApplicantName()),
-                metadata.getApplicationDate(),
-                metadata.getRegistrationDate(),
-                metadata.getExpectedExpirationDate(),
-                history.getDepartmentId(),
-                history.getDepartmentName(),
-                metadata.getPatentStatus(),
-                history.getReviewWorkflowStatus(),
-                history.getAnnualFeeDueDate(),
-                "연차료 납부 검토 시점 도래",
-                history.getAiRecommendation(),
-                history.getBusinessOpinionDecision(),
-                history.getLegalActionResult(),
-                originalPatentUrl(metadata.getCountry(), metadata.getApplicationNumber(), metadata.getRegistrationNumber()),
-                metadata.isInReview(),
-                metadata.getCurrentQuarterKey()
-        );
+        return Integer.parseInt(quarter.substring(1));
     }
 
     public PageResponse<PatentListItemResponse> getReviewRequests(
@@ -748,6 +713,11 @@ public class PatentReviewService {
 
     private PatentMetadataEntity metadataEntityFromColumns(int sequence, List<String> columns) {
         String businessArea = columns.get(3);
+        LocalDate applicationDate = parseDate(columns.get(10));
+        LocalDate registrationDate = parseDate(columns.get(11));
+        LocalDate expectedExpirationDate = parseDate(columns.get(14));
+        LocalDate feeDueDate = annualFeeScheduleService.calculateNextDueDate(
+                columns.get(6), applicationDate, registrationDate, expectedExpirationDate);
         return new PatentMetadataEntity(
                 "PAT-2026-%04d".formatted(sequence),
                 columns.get(0),
@@ -760,12 +730,12 @@ public class PatentReviewService {
                 columns.get(7),
                 columns.get(8),
                 lifecycleStatus(columns.get(9)),
-                parseDate(columns.get(10)),
-                parseDate(columns.get(11)),
+                applicationDate,
+                registrationDate,
                 columns.get(12),
                 columns.get(13),
-                parseDate(columns.get(14)),
-                null);
+                expectedExpirationDate,
+                feeDueDate);
     }
 
     private PatentReviewHistoryEntity reviewHistoryFromMetadataEntity(PatentMetadataEntity entity) {

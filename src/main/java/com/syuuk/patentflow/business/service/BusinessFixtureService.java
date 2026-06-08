@@ -8,6 +8,8 @@ import com.syuuk.patentflow.business.dto.BusinessChecklistScoreOptionResponse;
 import com.syuuk.patentflow.business.dto.BusinessChecklistSubmissionRequest;
 import com.syuuk.patentflow.business.dto.BusinessSubmissionChecklistScoreResponse;
 import com.syuuk.patentflow.business.dto.BusinessSubmissionVersionResponse;
+import com.syuuk.patentflow.common.error.ErrorCode;
+import com.syuuk.patentflow.common.error.PatentFlowException;
 import com.syuuk.patentflow.patent.domain.PatentReviewHistoryEntity;
 import com.syuuk.patentflow.patent.dto.BusinessOpinionDecision;
 import com.syuuk.patentflow.patent.dto.PatentDetailResponse;
@@ -18,7 +20,9 @@ import com.syuuk.patentflow.patent.service.PatentReviewService;
 import com.syuuk.patentflow.settings.repository.QuarterSettingRepository;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +30,44 @@ import org.springframework.transaction.annotation.Transactional;
 public class BusinessFixtureService {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+    private static final int SUBMISSION_VERSION = 1;
+    private static final List<BusinessChecklistItemResponse> CHECKLIST_ITEMS = List.of(
+            checklistItem(
+                    "TECH_COMPLETENESS",
+                    "기술적 가치",
+                    "기술완성도",
+                    "회사가 특허 관련 기술을 얼마나 구현해 놓은 상태인지 평가",
+                    "판매 가능한 수준으로 개발 완료",
+                    "테스트용 제품 개발 완료",
+                    "테스트용 제품 개발 진행 중",
+                    "아이디어 상태"),
+            checklistItem(
+                    "TECH_ORIGINALITY",
+                    "기술적 가치",
+                    "기술 독창성",
+                    "기존 기술 대비 얼마나 뛰어난 기술인지 평가",
+                    "타사 대비 독창적이고 최고 수준",
+                    "타사와 유사하거나 약간 개량",
+                    "동일 기능이나 기술 수준은 낮음",
+                    "종래기술의 단순 조합 수준"),
+            checklistItem(
+                    "MARKETABILITY",
+                    "경제적 가치",
+                    "시장성",
+                    "국내 및 해외 경쟁사가 유사 분야의 사업을 진행할 가능성 평가",
+                    "국내외 경쟁사 사업 진행 가능성 높음",
+                    "국내 경쟁사 사업 진행 가능성 높음",
+                    "당사만 관련 사업 진행",
+                    "관련 사업 진행 회사 없음"),
+            checklistItem(
+                    "EXPECTED_EFFECT",
+                    "경제적 가치",
+                    "기대효과",
+                    "기술보호, 수익창출, 비용절감에 기여하는 정도 평가",
+                    "기술보호, 수익창출, 비용절감 모두 기여",
+                    "세 가지 중 두 가지에 기여",
+                    "세 가지 중 한 가지에 기여",
+                    "특허 기여도 없음"));
 
     private final PatentReviewService patentReviewService;
     private final PatentReviewHistoryRepository reviewHistoryRepository;
@@ -53,43 +95,7 @@ public class BusinessFixtureService {
      * @description 사업부 평가 체크리스트 정의를 조회한다.
      */
     public List<BusinessChecklistItemResponse> getChecklistItems() {
-        return List.of(
-                checklistItem(
-                        "TECH_COMPLETENESS",
-                        "기술적 가치",
-                        "기술완성도",
-                        "회사가 특허 관련 기술을 얼마나 구현해 놓은 상태인지 평가",
-                        "판매 가능한 수준으로 개발 완료",
-                        "테스트용 제품 개발 완료",
-                        "테스트용 제품 개발 진행 중",
-                        "아이디어 상태"),
-                checklistItem(
-                        "TECH_ORIGINALITY",
-                        "기술적 가치",
-                        "기술 독창성",
-                        "기존 기술 대비 얼마나 뛰어난 기술인지 평가",
-                        "타사 대비 독창적이고 최고 수준",
-                        "타사와 유사하거나 약간 개량",
-                        "동일 기능이나 기술 수준은 낮음",
-                        "종래기술의 단순 조합 수준"),
-                checklistItem(
-                        "MARKETABILITY",
-                        "경제적 가치",
-                        "시장성",
-                        "국내 및 해외 경쟁사가 유사 분야의 사업을 진행할 가능성 평가",
-                        "국내외 경쟁사 사업 진행 가능성 높음",
-                        "국내 경쟁사 사업 진행 가능성 높음",
-                        "당사만 관련 사업 진행",
-                        "관련 사업 진행 회사 없음"),
-                checklistItem(
-                        "EXPECTED_EFFECT",
-                        "경제적 가치",
-                        "기대효과",
-                        "기술보호, 수익창출, 비용절감에 기여하는 정도 평가",
-                        "기술보호, 수익창출, 비용절감 모두 기여",
-                        "세 가지 중 두 가지에 기여",
-                        "세 가지 중 한 가지에 기여",
-                        "특허 기여도 없음"));
+        return CHECKLIST_ITEMS;
     }
 
     /**
@@ -122,6 +128,7 @@ public class BusinessFixtureService {
     @Transactional
     public BusinessSubmissionVersionResponse submit(String patentId, BusinessChecklistSubmissionRequest request) {
         patentReviewService.ensurePatentExists(patentId);
+        validateChecklistResponses(request);
         String quarterKey = quarterSettingRepository.findAll().stream()
                 .filter(q -> q.isActivated() && !q.isEnded())
                 .findFirst()
@@ -151,7 +158,7 @@ public class BusinessFixtureService {
     private BusinessSubmissionVersionResponse toResponse(PatentReviewHistoryEntity entity) {
         return new BusinessSubmissionVersionResponse(
                 submissionId(entity.getPatentId()),
-                1,
+                SUBMISSION_VERSION,
                 entity.getBusinessOpinionDecision(),
                 entity.getBusinessOpinionReason(),
                 entity.getBusinessOpinionSubmittedBy(),
@@ -228,7 +235,7 @@ public class BusinessFixtureService {
 
         return new BusinessSubmissionVersionResponse(
                 submissionId(patentId),
-                1,
+                SUBMISSION_VERSION,
                 request.finalOpinion(),
                 valueOrDefault(request.finalReason(), defaultReason(request.finalOpinion())),
                 valueOrDefault(request.evaluatorName(), "사업부 담당자"),
@@ -244,19 +251,10 @@ public class BusinessFixtureService {
     private BusinessSubmissionVersionResponse toSeedVersion(PatentDetailResponse patent) {
         BusinessOpinionDecision decision = patent.businessOpinion().decision();
         int qualitativeScore = decision == BusinessOpinionDecision.MAINTAIN ? 3 : -3;
-        List<BusinessSubmissionChecklistScoreResponse> checklistScores = getChecklistItems().stream()
-                .map(item -> new BusinessSubmissionChecklistScoreResponse(
-                        item.id(),
-                        decision == BusinessOpinionDecision.MAINTAIN ? 3 : 2,
-                        "%s 기준으로 기존 제출 의견을 복원했습니다.".formatted(item.title())))
-                .toList();
-        int checklistTotal = checklistScores.stream()
-                .mapToInt(BusinessSubmissionChecklistScoreResponse::score)
-                .sum() + qualitativeScore;
 
         return new BusinessSubmissionVersionResponse(
                 "%s-SUB-01".formatted(patent.patentId()),
-                1,
+                SUBMISSION_VERSION,
                 decision,
                 valueOrDefault(patent.businessOpinion().reason(), defaultReason(decision)),
                 patent.departmentName() + " 담당자",
@@ -266,8 +264,8 @@ public class BusinessFixtureService {
                 patent.aiEvaluationReport().totalScore() == null
                         ? 0
                         : patent.aiEvaluationReport().totalScore(),
-                checklistTotal,
-                checklistScores,
+                qualitativeScore,
+                List.of(),
                 qualitativeScore);
     }
 
@@ -279,7 +277,24 @@ public class BusinessFixtureService {
         return value == null ? 0 : value;
     }
 
-    private BusinessChecklistItemResponse checklistItem(
+    private void validateChecklistResponses(BusinessChecklistSubmissionRequest request) {
+        Set<String> definedIds = CHECKLIST_ITEMS.stream()
+                .map(BusinessChecklistItemResponse::id)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        Set<String> submittedIds = new LinkedHashSet<>();
+        for (BusinessChecklistResponseDto response : request.responses()) {
+            if (!definedIds.contains(response.itemId()) || !submittedIds.add(response.itemId())) {
+                throw new PatentFlowException(ErrorCode.INVALID_REQUEST,
+                        "체크리스트 응답은 정의된 항목을 중복 없이 제출해야 합니다.");
+            }
+        }
+        if (!submittedIds.equals(definedIds)) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST,
+                    "체크리스트 응답은 모든 정의 항목을 포함해야 합니다.");
+        }
+    }
+
+    private static BusinessChecklistItemResponse checklistItem(
             String id,
             String category,
             String title,

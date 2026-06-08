@@ -2,6 +2,7 @@ package com.syuuk.patentflow.patent.client;
 
 import com.syuuk.patentflow.patent.config.PatentLookupProperties;
 import com.syuuk.patentflow.patent.dto.PatentBibliographicInfoResponse;
+import com.syuuk.patentflow.patent.dto.PatentLookupStatus;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -15,12 +16,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.w3c.dom.Document;
 
 @Component
 public class KiprisPatentLookupClient implements ExternalPatentLookupClient {
 
+    private static final Logger log = LoggerFactory.getLogger(KiprisPatentLookupClient.class);
     private static final Duration TIMEOUT = Duration.ofSeconds(5);
     private static final List<String> QUOTA_EXHAUSTED_MARKERS = List.of(
             "quota",
@@ -50,7 +54,7 @@ public class KiprisPatentLookupClient implements ExternalPatentLookupClient {
         PatentLookupProperties.Kipris kipris = properties.kipris();
         List<String> serviceKeys = serviceKeys(kipris);
         if (serviceKeys.isEmpty()) {
-            return Optional.empty();
+            throw new PatentLookupException("KIPRIS", "KIPRIS service key is not configured");
         }
 
         String applicationNumber = digitsOnly(query.applicationNumber());
@@ -93,8 +97,12 @@ public class KiprisPatentLookupClient implements ExternalPatentLookupClient {
                     return Optional.empty();
                 }
                 return parseResponse(searchResponse.body(), query);
+            } catch (PatentLookupException exception) {
+                throw exception;
             } catch (Exception exception) {
-                return Optional.empty();
+                log.warn("KIPRIS lookup failed. operation applicationNumber={}, keyword={}",
+                        applicationNumber, query.keyword(), exception);
+                throw new PatentLookupException("KIPRIS", "KIPRIS lookup failed", exception);
             }
         }
         return Optional.empty();
@@ -131,7 +139,10 @@ public class KiprisPatentLookupClient implements ExternalPatentLookupClient {
                 applicationNumber,
                 registrationNumber,
                 null,
-                "KIPRIS"));
+                "KIPRIS",
+                PatentLookupStatus.FOUND,
+                "HIGH",
+                null));
     }
 
     private String digitsOnly(String value) {

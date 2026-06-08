@@ -2,17 +2,21 @@ package com.syuuk.patentflow.patent.service;
 
 import com.syuuk.patentflow.patent.client.GooglePatentsLookupClient;
 import com.syuuk.patentflow.patent.client.KiprisPatentLookupClient;
+import com.syuuk.patentflow.patent.client.PatentLookupException;
 import com.syuuk.patentflow.patent.client.PatentLookupQuery;
 import com.syuuk.patentflow.patent.dto.PatentBibliographicInfoResponse;
 import com.syuuk.patentflow.patent.dto.PatentContextSuggestionRequest;
 import com.syuuk.patentflow.patent.dto.PatentContextSuggestionResponse;
 import com.syuuk.patentflow.patent.dto.PatentDetailResponse;
+import com.syuuk.patentflow.patent.dto.PatentLookupStatus;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 /**
@@ -25,6 +29,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class PatentLookupService {
 
+    private static final Logger log = LoggerFactory.getLogger(PatentLookupService.class);
     private static final Set<String> CONTEXT_STOP_WORDS =
             Set.of("관련", "기술", "시스템", "방법", "특허", "장치");
     private static final Pattern CONTEXT_TOKEN_SPLITTER = Pattern.compile("[^0-9a-z가-힣]+");
@@ -60,7 +65,9 @@ public class PatentLookupService {
         PatentDetailResponse knownPatent = allPatents.stream()
                 .filter(patent -> lowerEquals(patent.managementNumber(), keyword)
                         || lowerEquals(patent.applicationNumber(), keyword)
-                        || lowerEquals(patent.registrationNumber(), keyword))
+                        || lowerEquals(patent.registrationNumber(), keyword)
+                        || normalizedPatentNumberEquals(patent.country(), patent.registrationNumber(), lookupValue)
+                        || normalizedPatentNumberEquals(patent.country(), patent.applicationNumber(), lookupValue))
                 .findFirst()
                 .orElse(null);
 
@@ -70,18 +77,41 @@ public class PatentLookupService {
                 knownPatent == null ? registrationNumber : knownPatent.registrationNumber(),
                 knownPatent == null ? "KR" : knownPatent.country());
 
+        PatentLookupException lastLookupException = null;
         for (String source : lookupPriority(sourcePriority)) {
-            PatentBibliographicInfoResponse externalResult = switch (source) {
-                case "KIPRIS" -> kiprisPatentLookupClient.lookup(query).orElse(null);
-                case "GOOGLE_PATENTS" -> googlePatentsLookupClient.lookup(query).orElse(null);
-                default -> null;
-            };
+            PatentBibliographicInfoResponse externalResult;
+            try {
+                externalResult = switch (source) {
+                    case "KIPRIS" -> kiprisPatentLookupClient.lookup(query).orElse(null);
+                    case "GOOGLE_PATENTS" -> googlePatentsLookupClient.lookup(query).orElse(null);
+                    default -> null;
+                };
+            } catch (PatentLookupException exception) {
+                if (lookupStatusFor(exception) == PatentLookupStatus.SOURCE_UNCONFIGURED) {
+                    log.warn("External patent lookup source is not configured. source={}, keyword={}",
+                            exception.source(), query.keyword());
+                } else {
+                    log.warn("External patent lookup source failed. source={}, keyword={}",
+                            exception.source(), query.keyword(), exception);
+                }
+                lastLookupException = exception;
+                continue;
+            }
             if (externalResult != null) {
                 return mergeBibliographicInfo(externalResult, knownPatent);
             }
         }
 
-        return knownPatent == null ? null : toBibliographicInfo(knownPatent);
+        if (knownPatent != null) {
+            PatentLookupStatus status = lastLookupException == null
+                    ? PatentLookupStatus.NOT_FOUND
+                    : lookupStatusFor(lastLookupException);
+            return toBibliographicInfo(knownPatent, status, lookupMessageFor(lastLookupException));
+        }
+        if (lastLookupException != null) {
+            return emptyLookupResult(lookupValue.trim(), lookupStatusFor(lastLookupException), emptyLookupMessageFor(lastLookupException));
+        }
+        return emptyLookupResult(lookupValue.trim(), PatentLookupStatus.NOT_FOUND, "외부 특허 정보와 내부 metadata에서 일치 항목을 찾지 못했습니다.");
     }
 
     // ── 컨텍스트 추천 ─────────────────────────────────────────
@@ -116,13 +146,18 @@ public class PatentLookupService {
 
     // ── 내부 유틸 ─────────────────────────────────────────────
 
-    private PatentBibliographicInfoResponse toBibliographicInfo(PatentDetailResponse patent) {
+    private PatentBibliographicInfoResponse toBibliographicInfo(
+            PatentDetailResponse patent,
+            PatentLookupStatus lookupStatus,
+            String lookupMessage
+    ) {
         return new PatentBibliographicInfoResponse(
                 patent.managementNumber(),
                 valueOrDefault(patent.title(), patent.draftTitle()),
                 patent.applicationDate(), patent.coApplicants(), patent.country(),
                 patent.registrationDate(), patent.applicationNumber(),
-                patent.registrationNumber(), patent.expectedExpirationDate(), "KIPRIS");
+                patent.registrationNumber(), patent.expectedExpirationDate(), "INTERNAL_METADATA",
+                lookupStatus, "LOW", lookupMessage);
     }
 
     private PatentBibliographicInfoResponse mergeBibliographicInfo(
@@ -140,7 +175,57 @@ public class PatentLookupService {
                 valueOrDefault(externalResult.applicationNumber(), knownPatent.applicationNumber()),
                 valueOrDefault(externalResult.registrationNumber(), knownPatent.registrationNumber()),
                 valueOrDefault(externalResult.expectedExpirationDate(), knownPatent.expectedExpirationDate()),
-                externalResult.source());
+                externalResult.source(),
+                externalResult.lookupStatus(),
+                externalResult.sourceConfidence(),
+                externalResult.lookupMessage());
+    }
+
+    private PatentBibliographicInfoResponse emptyLookupResult(
+            String lookupValue,
+            PatentLookupStatus lookupStatus,
+            String lookupMessage
+    ) {
+        return new PatentBibliographicInfoResponse(
+                lookupValue,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                lookupStatus,
+                "NONE",
+                lookupMessage);
+    }
+
+    private PatentLookupStatus lookupStatusFor(PatentLookupException exception) {
+        if (exception == null) {
+            return PatentLookupStatus.NOT_FOUND;
+        }
+        return exception.getMessage() != null && exception.getMessage().contains("not configured")
+                ? PatentLookupStatus.SOURCE_UNCONFIGURED
+                : PatentLookupStatus.SOURCE_ERROR;
+    }
+
+    private String lookupMessageFor(PatentLookupException exception) {
+        if (exception == null) {
+            return "외부 특허 정보에서 일치 항목을 찾지 못해 내부 metadata를 반환했습니다.";
+        }
+        if (lookupStatusFor(exception) == PatentLookupStatus.SOURCE_UNCONFIGURED) {
+            return "%s 조회 키가 설정되지 않아 내부 metadata를 반환했습니다.".formatted(exception.source());
+        }
+        return "%s 조회 중 오류가 발생해 내부 metadata를 반환했습니다.".formatted(exception.source());
+    }
+
+    private String emptyLookupMessageFor(PatentLookupException exception) {
+        if (lookupStatusFor(exception) == PatentLookupStatus.SOURCE_UNCONFIGURED) {
+            return "%s 조회 키가 설정되지 않아 외부 조회를 수행할 수 없습니다.".formatted(exception.source());
+        }
+        return "%s 조회 중 오류가 발생했고 내부 metadata에서도 일치 항목을 찾지 못했습니다.".formatted(exception.source());
     }
 
     private List<String> lookupPriority(String sourcePriority) {
@@ -192,6 +277,24 @@ public class PatentLookupService {
 
     private boolean lowerEquals(String value, String lowerKeyword) {
         return value != null && value.toLowerCase(Locale.ROOT).equals(lowerKeyword);
+    }
+
+    private boolean normalizedPatentNumberEquals(String country, String storedValue, String inputValue) {
+        String stored = normalizePatentNumber(country, storedValue);
+        String input = normalizePatentNumber(country, inputValue);
+        return !stored.isBlank() && stored.equals(input);
+    }
+
+    private String normalizePatentNumber(String country, String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        String normalizedCountry = country == null || country.isBlank() ? "KR" : country.trim().toUpperCase(Locale.ROOT);
+        String digits = value.replaceAll("[^0-9]", "");
+        if ("KR".equals(normalizedCountry) && digits.length() == 9 && digits.startsWith("10")) {
+            return "KR:" + digits.substring(0, 2) + "-" + digits.substring(2);
+        }
+        return normalizedCountry + ":" + digits;
     }
 
     private boolean lowerContains(String value, String token) {

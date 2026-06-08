@@ -2,6 +2,7 @@ package com.syuuk.patentflow.patent.client;
 
 import com.syuuk.patentflow.patent.config.PatentLookupProperties;
 import com.syuuk.patentflow.patent.dto.PatentBibliographicInfoResponse;
+import com.syuuk.patentflow.patent.dto.PatentLookupStatus;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -12,11 +13,14 @@ import java.time.Duration;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 @Component
 public class GooglePatentsLookupClient implements ExternalPatentLookupClient {
 
+    private static final Logger log = LoggerFactory.getLogger(GooglePatentsLookupClient.class);
     private static final Duration TIMEOUT = Duration.ofSeconds(5);
     private static final Pattern TITLE_PATTERN = Pattern.compile("<meta\\s+name=\"DC.title\"\\s+content=\"([^\"]+)\"", Pattern.CASE_INSENSITIVE);
     private static final Pattern PUBLICATION_PATTERN = Pattern.compile("<meta\\s+name=\"citation_patent_publication_number\"\\s+content=\"([^\"]+)\"", Pattern.CASE_INSENSITIVE);
@@ -48,13 +52,13 @@ public class GooglePatentsLookupClient implements ExternalPatentLookupClient {
     }
 
     private java.util.List<String> patentPageCandidates(PatentLookupQuery query) {
-        String registration = digitsOnly(query.registrationNumber());
+        String registration = externalPatentNumber(query.country(), query.registrationNumber());
         String application = digitsOnly(query.applicationNumber());
         String keyword = digitsOnly(query.keyword());
         java.util.ArrayList<String> candidates = new java.util.ArrayList<>();
         if (!registration.isBlank()) {
-            candidates.add("KR%sB1".formatted(registration));
-            candidates.add("KR%s".formatted(registration));
+            candidates.add("%sB1".formatted(registration));
+            candidates.add(registration);
         }
         if (!application.isBlank()) {
             candidates.add("KR%sA".formatted(application));
@@ -83,7 +87,8 @@ public class GooglePatentsLookupClient implements ExternalPatentLookupClient {
             }
             return parseHtml(response.body(), query);
         } catch (Exception exception) {
-            return Optional.empty();
+            log.warn("Google Patents lookup failed. candidate={}, keyword={}", candidate, query.keyword(), exception);
+            throw new PatentLookupException("GOOGLE_PATENTS", "Google Patents lookup failed", exception);
         }
     }
 
@@ -105,7 +110,10 @@ public class GooglePatentsLookupClient implements ExternalPatentLookupClient {
                 applicationNumber,
                 publicationNumber,
                 null,
-                "GOOGLE_PATENTS"));
+                "GOOGLE_PATENTS",
+                PatentLookupStatus.FOUND,
+                "MEDIUM",
+                null));
     }
 
     private Optional<String> metaContent(Pattern pattern, String html) {
@@ -127,6 +135,15 @@ public class GooglePatentsLookupClient implements ExternalPatentLookupClient {
             return "";
         }
         return value.replaceAll("[^0-9]", "");
+    }
+
+    private String externalPatentNumber(String country, String value) {
+        String digits = digitsOnly(value);
+        if (digits.isBlank()) {
+            return "";
+        }
+        String normalizedCountry = country == null || country.isBlank() ? "KR" : country.trim().toUpperCase();
+        return normalizedCountry + digits;
     }
 
     private String encodePath(String value) {

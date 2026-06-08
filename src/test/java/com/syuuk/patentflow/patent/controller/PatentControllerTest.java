@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import com.syuuk.patentflow.auth.dto.UserPrincipalResponse;
 import com.syuuk.patentflow.patent.client.AiReportAgentClient;
 import com.syuuk.patentflow.patent.client.AiReportAgentClient.AgentEvaluateResponse;
 import com.syuuk.patentflow.patent.client.AiReportAgentClient.AgentScoreItem;
@@ -17,6 +18,8 @@ import com.syuuk.patentflow.patent.dto.EvaluationCategory;
 import java.time.OffsetDateTime;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -24,6 +27,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 @SpringBootTest(properties = {
         "patentflow.lookup.google-patents.enabled=false"
@@ -37,6 +41,44 @@ class PatentControllerTest {
 
     @MockitoBean
     private AiReportAgentClient aiReportAgentClient;
+
+    private RequestPostProcessor businessAuth(String departmentId, String departmentName) {
+        UserPrincipalResponse principal = new UserPrincipalResponse(
+                departmentId.toLowerCase() + "@syuuk.test",
+                departmentName + " 담당자",
+                List.of("ROLE_BUSINESS"),
+                "USER-" + departmentId,
+                "BUSINESS",
+                departmentId,
+                departmentName);
+        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                principal,
+                "N/A",
+                List.of(new SimpleGrantedAuthority("ROLE_BUSINESS")));
+        return request -> {
+            request.setUserPrincipal(authentication);
+            return request;
+        };
+    }
+
+    private RequestPostProcessor adminAuth() {
+        UserPrincipalResponse principal = new UserPrincipalResponse(
+                "admin@syuuk.test",
+                "관리자",
+                List.of("ROLE_ADMIN"),
+                "USER-admin",
+                "ADMIN",
+                null,
+                null);
+        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                principal,
+                "N/A",
+                List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
+        return request -> {
+            request.setUserPrincipal(authentication);
+            return request;
+        };
+    }
 
     @Test
     void getPatentsReturnsPagedEnvelope() throws Exception {
@@ -168,15 +210,49 @@ class PatentControllerTest {
                 .andExpect(jsonPath("$.data.managementNumber").value("P202405001-KR0"))
                 .andExpect(jsonPath("$.data.applicationNumber").value("10-2024-0115774"))
                 .andExpect(jsonPath("$.data.registrationNumber").value("10-2932891"))
-                .andExpect(jsonPath("$.data.source").value("KIPRIS"));
+                .andExpect(jsonPath("$.data.source").value("INTERNAL_METADATA"))
+                .andExpect(jsonPath("$.data.lookupStatus").value("SOURCE_UNCONFIGURED"))
+                .andExpect(jsonPath("$.data.sourceConfidence").value("LOW"))
+                .andExpect(jsonPath("$.data.lookupMessage").exists());
     }
 
     @Test
-    void lookupBibliographicInfoReturnsNullWhenNotMatched() throws Exception {
+    void lookupBibliographicInfoDistinguishesNotFoundFromSourceError() throws Exception {
         mockMvc.perform(get("/api/v1/patents/external-lookup")
                 .param("managementNumber", "NO-MATCH"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").doesNotExist());
+                .andExpect(jsonPath("$.data.managementNumber").value("NO-MATCH"))
+                .andExpect(jsonPath("$.data.lookupStatus").value("SOURCE_UNCONFIGURED"))
+                .andExpect(jsonPath("$.data.sourceConfidence").value("NONE"));
+    }
+
+    @Test
+    void lookupBibliographicInfoPreservesKrRegistrationNumberFormatting() throws Exception {
+        mockMvc.perform(get("/api/v1/patents/external-lookup")
+                .param("registrationNumber", "102932891")
+                .param("sourcePriority", "KIPRIS"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.managementNumber").value("P202405001-KR0"))
+                .andExpect(jsonPath("$.data.registrationNumber").value("10-2932891"));
+    }
+
+    @Test
+    void getReviewTargetsFiltersByQuarterCountryAndDateInDatabaseBackedPath() throws Exception {
+        String response = mockMvc.perform(get("/api/v1/patents/review-targets")
+                .param("quarter", "Q3")
+                .param("country", "KR")
+                .param("dateFrom", "2026-08-01")
+                .param("dateTo", "2026-08-31"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data", hasSize(greaterThan(0))))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        List<String> countries = JsonPath.read(response, "$.data[*].country");
+        List<String> managementNumbers = JsonPath.read(response, "$.data[*].managementNumber");
+        org.assertj.core.api.Assertions.assertThat(countries).containsOnly("KR");
+        org.assertj.core.api.Assertions.assertThat(managementNumbers).contains("P202405001-KR0");
     }
 
     @Test
@@ -212,6 +288,7 @@ class PatentControllerTest {
     @Test
     void submitBusinessChecklistCreatesSubmissionHistory() throws Exception {
         mockMvc.perform(post("/api/v1/patents/PAT-2026-0003/business-submissions")
+                .with(businessAuth("DEPT-MFG", "제조사업부"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {
@@ -230,6 +307,18 @@ class PatentControllerTest {
                               "score": 3,
                               "aiSuggestedScore": 3,
                               "memo": "기술 차별성이 일부 확인됩니다."
+                            },
+                            {
+                              "itemId": "MARKETABILITY",
+                              "score": 3,
+                              "aiSuggestedScore": 3,
+                              "memo": "제조 분야 적용 시장성이 있습니다."
+                            },
+                            {
+                              "itemId": "EXPECTED_EFFECT",
+                              "score": 2,
+                              "aiSuggestedScore": 3,
+                              "memo": "운영 효율화 효과는 추가 확인이 필요합니다."
                             }
                           ],
                           "qualitativeScore": 2,
@@ -241,14 +330,17 @@ class PatentControllerTest {
                         """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.finalOpinion").value("MAINTAIN"))
-                .andExpect(jsonPath("$.data.responses", hasSize(2)));
+                .andExpect(jsonPath("$.data.version").value(1))
+                .andExpect(jsonPath("$.data.responses", hasSize(4)));
 
-        mockMvc.perform(get("/api/v1/patents/PAT-2026-0003/business-submissions"))
+        mockMvc.perform(get("/api/v1/patents/PAT-2026-0003/business-submissions")
+                .with(adminAuth()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data", hasSize(1)))
                 .andExpect(jsonPath("$.data[0].submissionId").value("PAT-2026-0003-SUB-01"))
                 .andExpect(jsonPath("$.data[0].decision").value("MAINTAIN"))
-                .andExpect(jsonPath("$.data[0].checklistTotal").value(9))
+                .andExpect(jsonPath("$.data[0].version").value(1))
+                .andExpect(jsonPath("$.data[0].checklistTotal").value(14))
                 .andExpect(jsonPath("$.data[0].aiRecommendation").value("ABANDON"));
 
         mockMvc.perform(get("/api/v1/patents/PAT-2026-0003"))
@@ -256,22 +348,40 @@ class PatentControllerTest {
                 .andExpect(jsonPath("$.data.reviewWorkflowStatus").value("BUSINESS_RESPONSE_RECEIVED"))
                 .andExpect(jsonPath("$.data.businessOpinionDecision").value("MAINTAIN"))
                 .andExpect(jsonPath("$.data.businessOpinion.decision").value("MAINTAIN"));
+
+        mockMvc.perform(post("/api/v1/patents/PAT-2026-0003/business-submissions")
+                .with(businessAuth("DEPT-MFG", "제조사업부"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                          "patentId": "PAT-2026-0003",
+                          "responses": [
+                            {"itemId": "TECH_COMPLETENESS", "score": 4, "aiSuggestedScore": 3},
+                            {"itemId": "TECH_ORIGINALITY", "score": 3, "aiSuggestedScore": 3},
+                            {"itemId": "MARKETABILITY", "score": 3, "aiSuggestedScore": 3},
+                            {"itemId": "EXPECTED_EFFECT", "score": 2, "aiSuggestedScore": 3}
+                          ],
+                          "qualitativeScore": 2,
+                          "finalOpinion": "MAINTAIN"
+                        }
+                        """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("INVALID_WORKFLOW_STATUS"));
     }
 
     @Test
     void submitBusinessChecklistRejectsInvalidWorkflowStatus() throws Exception {
         mockMvc.perform(post("/api/v1/patents/PAT-2026-0001/business-submissions")
+                .with(businessAuth("DEPT-RND", "R&D본부"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {
                           "patentId": "PAT-2026-0001",
                           "responses": [
-                            {
-                              "itemId": "TECH_COMPLETENESS",
-                              "score": 4,
-                              "aiSuggestedScore": 3,
-                              "memo": "제품 적용 가능성이 확인됩니다."
-                            }
+                            {"itemId": "TECH_COMPLETENESS", "score": 4, "aiSuggestedScore": 3},
+                            {"itemId": "TECH_ORIGINALITY", "score": 3, "aiSuggestedScore": 3},
+                            {"itemId": "MARKETABILITY", "score": 3, "aiSuggestedScore": 3},
+                            {"itemId": "EXPECTED_EFFECT", "score": 2, "aiSuggestedScore": 3}
                           ],
                           "qualitativeScore": 0,
                           "finalOpinion": "MAINTAIN"
@@ -305,8 +415,37 @@ class PatentControllerTest {
     }
 
     @Test
+    void submitBusinessChecklistRejectsMissingChecklistDefinitionItem() throws Exception {
+        mockMvc.perform(post("/api/v1/patents/PAT-2026-0003/business-submissions")
+                .with(businessAuth("DEPT-MFG", "제조사업부"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {
+                          "patentId": "PAT-2026-0003",
+                          "responses": [
+                            {"itemId": "TECH_COMPLETENESS", "score": 4, "aiSuggestedScore": 3},
+                            {"itemId": "TECH_ORIGINALITY", "score": 3, "aiSuggestedScore": 3},
+                            {"itemId": "MARKETABILITY", "score": 3, "aiSuggestedScore": 3}
+                          ],
+                          "qualitativeScore": 0,
+                          "finalOpinion": "MAINTAIN"
+                        }
+                        """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
+
+    @Test
+    void getBusinessSubmissionsRejectsMissingAuthentication() throws Exception {
+        mockMvc.perform(get("/api/v1/patents/PAT-2026-0003/business-submissions"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+    }
+
+    @Test
     void getBusinessSubmissionsForUnknownPatentReturnsNotFound() throws Exception {
-        mockMvc.perform(get("/api/v1/patents/UNKNOWN/business-submissions"))
+        mockMvc.perform(get("/api/v1/patents/UNKNOWN/business-submissions")
+                .with(adminAuth()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("PATENT_NOT_FOUND"));
     }

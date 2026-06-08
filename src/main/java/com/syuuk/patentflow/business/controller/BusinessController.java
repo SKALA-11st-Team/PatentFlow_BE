@@ -150,6 +150,9 @@ public class BusinessController {
     }
 
     private String getDepartmentId(Authentication authentication) {
+        if (authentication == null) {
+            throw new PatentFlowException(ErrorCode.UNAUTHORIZED);
+        }
         UserPrincipalResponse user = authService.currentUser(authentication);
         if (user.departmentId() == null) {
             throw new PatentFlowException(ErrorCode.UNAUTHORIZED);
@@ -159,8 +162,7 @@ public class BusinessController {
 
     private void assertCanAccessPatent(String patentId, Authentication authentication) {
         if (authentication == null) {
-            patentReviewService.getPatentDetail(patentId);
-            return;
+            throw new PatentFlowException(ErrorCode.UNAUTHORIZED);
         }
         UserPrincipalResponse user = authService.currentUser(authentication);
         if ("ADMIN".equals(user.role())) {
@@ -172,7 +174,7 @@ public class BusinessController {
 
     private void assertBusinessDepartmentPatent(String patentId, Authentication authentication) {
         if (authentication == null) {
-            return;
+            throw new PatentFlowException(ErrorCode.UNAUTHORIZED);
         }
         String departmentId = getDepartmentId(authentication);
         PatentDetailResponse detail = patentReviewService.getPatentDetail(patentId);
