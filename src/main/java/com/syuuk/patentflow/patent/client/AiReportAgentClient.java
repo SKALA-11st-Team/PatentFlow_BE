@@ -58,16 +58,16 @@ public class AiReportAgentClient {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) {
                 log.warn("FastAPI evaluate returned {} for patent {}", response.statusCode(), patentId);
-                return fallback(patentId);
+                return fallback(patentId, "AI 평가 서비스가 오류 응답을 반환했습니다. status=" + response.statusCode());
             }
             return objectMapper.readValue(response.body(), AgentEvaluateResponse.class);
         } catch (Exception e) {
             log.warn("FastAPI evaluate failed for patent {} (timeout={}): {}", patentId, timeout, e.getMessage());
-            return fallback(patentId);
+            return fallback(patentId, "AI 평가 서비스 연결 실패: " + e.getMessage());
         }
     }
 
-    private AgentEvaluateResponse fallback(String patentId) {
+    private AgentEvaluateResponse fallback(String patentId, String failureReason) {
         return new AgentEvaluateResponse(
                 patentId,
                 List.of(),
@@ -75,6 +75,12 @@ public class AiReportAgentClient {
                 "AI 평가 서비스 연결 실패 - 기본 응답",
                 null,
                 null,
+                null,
+                null,
+                null,
+                null,
+                true,
+                failureReason,
                 OffsetDateTime.now()
         );
     }
@@ -88,6 +94,12 @@ public class AiReportAgentClient {
             // Agent는 "valuationReportMarkdown" 필드명으로 전체 평가 레포트를 반환한다
             @JsonProperty("valuationReportMarkdown") String rawMarkdown,
             Integer totalScore,
+            Double averageScore,
+            String finalGrade,
+            String finalIndicator,
+            String artifactDir,
+            Boolean degraded,
+            String failureReason,
             OffsetDateTime generatedAt
     ) {
         public String summaryText() {
@@ -103,7 +115,7 @@ public class AiReportAgentClient {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record AgentScoreItem(String category, Integer score, String evidence) {}
+    public record AgentScoreItem(String category, Integer score, String grade, String evidence) {}
 
     /**
      * 특허 분야 추천 — 관리자 분류(taxonomy)를 함께 보내 에이전트에 추천을 요청한다.

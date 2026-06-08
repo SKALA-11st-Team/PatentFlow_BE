@@ -58,6 +58,21 @@ public class PatentReviewHistoryEntity extends BaseEntity {
     @Column(name = "ai_total_score")
     private Integer aiTotalScore;
 
+    @Column(name = "ai_average_score")
+    private Double aiAverageScore;
+
+    @Column(name = "ai_final_grade", length = 16)
+    private String aiFinalGrade;
+
+    @Column(name = "ai_final_indicator", length = 128)
+    private String aiFinalIndicator;
+
+    @Column(name = "ai_degraded")
+    private Boolean aiDegraded;
+
+    @Column(name = "ai_failure_reason", length = 2000)
+    private String aiFailureReason;
+
     @Column(name = "ai_scores_json", columnDefinition = "TEXT")
     private String aiScoresJson;
 
@@ -210,6 +225,46 @@ public class PatentReviewHistoryEntity extends BaseEntity {
 
     public void setAiTotalScore(Integer aiTotalScore) {
         this.aiTotalScore = aiTotalScore;
+    }
+
+    public Double getAiAverageScore() {
+        return aiAverageScore;
+    }
+
+    public void setAiAverageScore(Double aiAverageScore) {
+        this.aiAverageScore = aiAverageScore;
+    }
+
+    public String getAiFinalGrade() {
+        return aiFinalGrade;
+    }
+
+    public void setAiFinalGrade(String aiFinalGrade) {
+        this.aiFinalGrade = aiFinalGrade;
+    }
+
+    public String getAiFinalIndicator() {
+        return aiFinalIndicator;
+    }
+
+    public void setAiFinalIndicator(String aiFinalIndicator) {
+        this.aiFinalIndicator = aiFinalIndicator;
+    }
+
+    public Boolean getAiDegraded() {
+        return aiDegraded;
+    }
+
+    public void setAiDegraded(Boolean aiDegraded) {
+        this.aiDegraded = aiDegraded;
+    }
+
+    public String getAiFailureReason() {
+        return aiFailureReason;
+    }
+
+    public void setAiFailureReason(String aiFailureReason) {
+        this.aiFailureReason = aiFailureReason;
     }
 
     public String getAiScoresJson() {

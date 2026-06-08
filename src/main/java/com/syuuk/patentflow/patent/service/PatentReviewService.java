@@ -1138,12 +1138,17 @@ public class PatentReviewService {
                 recommendation,
                 "추가 자료 확인 후 유지 여부를 재검토하는 것이 적절합니다.",
                 72,
+                72.0,
+                null,
+                null,
+                false,
+                null,
                 List.of(
-                        new EvaluationScoreResponse(EvaluationCategory.RIGHTS, 70,
+                        new EvaluationScoreResponse(EvaluationCategory.RIGHTS, 70, null,
                                 "청구항 범위는 확인되나 일부 권리 범위 비교 자료가 부족합니다."),
-                        new EvaluationScoreResponse(EvaluationCategory.TECHNOLOGY, 78, "명세서상 기술적 차별 요소가 확인됩니다."),
-                        new EvaluationScoreResponse(EvaluationCategory.MARKET, null, "시장 규모 자료가 부족하여 추가 확인이 필요합니다."),
-                        new EvaluationScoreResponse(EvaluationCategory.BUSINESS_ALIGNMENT, 72,
+                        new EvaluationScoreResponse(EvaluationCategory.TECHNOLOGY, 78, null, "명세서상 기술적 차별 요소가 확인됩니다."),
+                        new EvaluationScoreResponse(EvaluationCategory.MARKET, null, null, "시장 규모 자료가 부족하여 추가 확인이 필요합니다."),
+                        new EvaluationScoreResponse(EvaluationCategory.BUSINESS_ALIGNMENT, 72, null,
                                 "관련사업 분야와 기술 영역은 연결되지만 실제 제품 적용 여부는 추가 확인이 필요합니다.")),
                 List.of("시장 규모 자료", "제품 적용 여부"),
                 null,
@@ -1292,6 +1297,11 @@ public class PatentReviewService {
                 recommendation,
                 state.getAiRecommendationReason(),
                 state.getAiTotalScore(),
+                state.getAiAverageScore(),
+                state.getAiFinalGrade(),
+                state.getAiFinalIndicator(),
+                Boolean.TRUE.equals(state.getAiDegraded()),
+                state.getAiFailureReason(),
                 readEvaluationScores(state.getAiScoresJson()),
                 readStringList(state.getAiMissingInformationJson()),
                 state.getAiReportMarkdown(),
@@ -1308,6 +1318,11 @@ public class PatentReviewService {
                 recommendation,
                 report.recommendationReason(),
                 report.totalScore(),
+                report.averageScore(),
+                report.finalGrade(),
+                report.finalIndicator(),
+                report.degraded(),
+                report.failureReason(),
                 report.scores(),
                 report.missingInformation(),
                 report.rawMarkdown(),
@@ -1320,6 +1335,11 @@ public class PatentReviewService {
         state.setAiRecommendation(report.recommendation());
         state.setAiRecommendationReason(report.recommendationReason());
         state.setAiTotalScore(report.totalScore());
+        state.setAiAverageScore(report.averageScore());
+        state.setAiFinalGrade(report.finalGrade());
+        state.setAiFinalIndicator(report.finalIndicator());
+        state.setAiDegraded(report.degraded());
+        state.setAiFailureReason(report.failureReason());
         state.setAiScoresJson(writeJson(report.scores()));
         state.setAiMissingInformationJson(writeJson(report.missingInformation()));
         state.setAiReportMarkdown(report.rawMarkdown());

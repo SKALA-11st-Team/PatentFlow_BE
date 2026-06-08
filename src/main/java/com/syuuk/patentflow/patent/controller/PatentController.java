@@ -3,6 +3,7 @@ package com.syuuk.patentflow.patent.controller;
 import com.syuuk.patentflow.common.response.ApiResponse;
 import com.syuuk.patentflow.common.response.PageResponse;
 import com.syuuk.patentflow.patent.dto.AssignDepartmentRequest;
+import com.syuuk.patentflow.patent.dto.AiReportJobResponse;
 import com.syuuk.patentflow.patent.dto.BatchPatentIdsRequest;
 import com.syuuk.patentflow.patent.dto.FinalDecisionRequest;
 import com.syuuk.patentflow.patent.dto.FinalDecisionResponse;
@@ -17,10 +18,13 @@ import com.syuuk.patentflow.patent.dto.PatentListItemResponse;
 import com.syuuk.patentflow.patent.dto.PatentUpsertRequest;
 import com.syuuk.patentflow.patent.dto.PatentUpsertResponse;
 import com.syuuk.patentflow.patent.dto.ReviewWorkflowStatus;
+import com.syuuk.patentflow.patent.service.AiReportJobService;
 import com.syuuk.patentflow.patent.service.PatentReviewService;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.util.List;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -36,9 +40,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class PatentController {
 
     private final PatentReviewService patentReviewService;
+    private final AiReportJobService aiReportJobService;
 
-    public PatentController(PatentReviewService patentReviewService) {
+    public PatentController(PatentReviewService patentReviewService, AiReportJobService aiReportJobService) {
         this.patentReviewService = patentReviewService;
+        this.aiReportJobService = aiReportJobService;
     }
 
     /**
@@ -184,11 +190,19 @@ public class PatentController {
     }
 
     /**
-     * @description AI 평가 레포트 생성 요청 — FastAPI agent 호출 후 상태를 MAIL_READY로 전환.
+     * @description AI 평가 레포트 생성을 비동기 잡으로 요청한다.
      */
     @PostMapping("/{patentId}/request-ai-report")
-    public ApiResponse<PatentDetailResponse> requestAiReport(@PathVariable String patentId) {
-        return ApiResponse.ok(patentReviewService.generateAiReport(patentId));
+    public ResponseEntity<ApiResponse<AiReportJobResponse>> requestAiReport(@PathVariable String patentId) {
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse.ok(aiReportJobService.requestAiReport(patentId)));
+    }
+
+    /**
+     * @description 최신 AI 평가 레포트 생성 잡 상태를 조회한다.
+     */
+    @GetMapping("/{patentId}/ai-report/status")
+    public ApiResponse<AiReportJobResponse> getAiReportStatus(@PathVariable String patentId) {
+        return ApiResponse.ok(aiReportJobService.latestStatus(patentId));
     }
 
     /**

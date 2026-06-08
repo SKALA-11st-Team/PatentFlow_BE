@@ -87,27 +87,31 @@ class PatentControllerTest {
     }
 
     @Test
-    void requestAiReportMovesPatentDirectlyToMailReady() throws Exception {
-        when(aiReportAgentClient.evaluate("PAT-2026-0001")).thenReturn(new AgentEvaluateResponse(
+    void requestAiReportCreatesAsyncJob() throws Exception {
+        when(aiReportAgentClient.evaluateForBatch("PAT-2026-0001")).thenReturn(new AgentEvaluateResponse(
                 "PAT-2026-0001",
-                List.of(new AgentScoreItem("권리성", 82, "청구항 보호 범위가 명확합니다.")),
+                List.of(new AgentScoreItem("권리성", 82, "A", "청구항 보호 범위가 명확합니다.")),
                 "MAINTAIN",
                 null,
                 "## AI 평가 레포트\n\n유지 검토가 가능합니다.",
                 82,
+                82.0,
+                "A",
+                "유지 권고",
+                null,
+                false,
+                null,
                 OffsetDateTime.parse("2026-05-22T00:00:00Z")
         ));
 
         mockMvc.perform(post("/api/v1/patents/PAT-2026-0001/request-ai-report"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.reviewWorkflowStatus").value("MAIL_READY"))
-                .andExpect(jsonPath("$.data.aiEvaluationReport.recommendation").value("MAINTAIN"))
-                .andExpect(jsonPath("$.data.aiEvaluationReport.scores[0].category")
-                        .value(EvaluationCategory.RIGHTS.name()));
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.data.jobId").exists())
+                .andExpect(jsonPath("$.data.patentId").value("PAT-2026-0001"));
 
-        mockMvc.perform(get("/api/v1/patents/PAT-2026-0001"))
+        mockMvc.perform(get("/api/v1/patents/PAT-2026-0001/ai-report/status"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.reviewWorkflowStatus").value("MAIL_READY"));
+                .andExpect(jsonPath("$.data.patentId").value("PAT-2026-0001"));
     }
 
     @Test

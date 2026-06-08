@@ -34,6 +34,7 @@ import java.util.List;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 특허 검토 워크플로우 상태 전이 서비스.
@@ -114,6 +115,7 @@ public class PatentWorkflowService {
         return updated;
     }
 
+    @Transactional
     public PatentReviewService.WorkflowBatchUpdateResult markMailingSent(List<String> patentIds) {
         List<String> updatedPatentIds = new ArrayList<>();
         List<String> skippedPatentIds = new ArrayList<>();
@@ -134,6 +136,7 @@ public class PatentWorkflowService {
 
     // ── 사업부 의견 / 최종 결정 ───────────────────────────────
 
+    @Transactional
     public void recordBusinessOpinion(
             String patentId,
             BusinessOpinionDecision decision,
@@ -144,6 +147,7 @@ public class PatentWorkflowService {
                 patent -> withBusinessOpinion(patent, decision, reason, submittedAt));
     }
 
+    @Transactional
     public FinalDecisionResponse patchFinalDecision(String patentId, PatchFinalDecisionRequest request) {
         OffsetDateTime decidedAt = OffsetDateTime.now(KST);
         PatentDetailResponse updated = patentReviewService.updatePatentInternal(patentId, patent -> {
@@ -156,6 +160,7 @@ public class PatentWorkflowService {
                 updated.legalActionResult(), updated.reviewWorkflowStatus());
     }
 
+    @Transactional
     public FinalDecisionResponse recordFinalDecision(String patentId, FinalDecisionRequest request) {
         OffsetDateTime decidedAt = OffsetDateTime.now(KST);
         PatentDetailResponse updated = patentReviewService.updatePatentInternal(patentId, patent -> {
@@ -170,6 +175,7 @@ public class PatentWorkflowService {
 
     // ── 분기 / 배치 관리 ─────────────────────────────────────
 
+    @Transactional
     public void bulkUpdateWorkflowStatus(List<String> patentIds, ReviewWorkflowStatus newStatus, String quarterKey) {
         if (patentIds == null || patentIds.isEmpty()) return;
         for (String patentId : patentIds) {
@@ -181,6 +187,7 @@ public class PatentWorkflowService {
         }
     }
 
+    @Transactional
     public List<String> createQuarterReviewTargets(
             String quarterKey,
             LocalDate paymentPeriodStart,
@@ -234,7 +241,8 @@ public class PatentWorkflowService {
                 patent.country(), patent.coApplicants(), patent.applicationDate(),
                 patent.registrationDate(), patent.expectedExpirationDate(),
                 patent.departmentId(), patent.departmentName(), patent.lifecycleStatus(),
-                ReviewWorkflowStatus.MAIL_READY, patent.feeDueDate(), patent.reviewReason(),
+                report.degraded() ? patent.reviewWorkflowStatus() : ReviewWorkflowStatus.MAIL_READY,
+                patent.feeDueDate(), patent.reviewReason(),
                 report.recommendation(), patent.businessOpinionDecision(), patent.legalActionResult(),
                 withAgentSummary(patent.summary(), agentSummary), report,
                 patent.finalDecisionRecord(), patent.businessOpinion(), true);
@@ -355,18 +363,63 @@ public class PatentWorkflowService {
         String reportId = "REPORT-" + patentId + "-" + System.currentTimeMillis();
         List<EvaluationScoreResponse> scores = agent.scores() == null ? List.of() :
                 agent.scores().stream()
-                        .map(s -> new EvaluationScoreResponse(toCategory(s.category()), s.score(), s.evidence()))
+                        .map(s -> new EvaluationScoreResponse(toCategory(s.category()), s.score(), s.grade(), s.evidence()))
                         .toList();
-        // agent가 직접 계산한 totalScore를 우선 사용하고, 없으면 scores 합계로 보완
-        Integer totalScore = agent.totalScore() != null
-                ? agent.totalScore()
-                : scores.stream().filter(s -> s.score() != null).mapToInt(EvaluationScoreResponse::score).sum();
+        Integer totalScore = totalScore(agent, scores);
+        Double averageScore = averageScore(agent, totalScore, scores);
+        boolean degraded = Boolean.TRUE.equals(agent.degraded()) || scores.stream().noneMatch(s -> s.score() != null);
+        String failureReason = failureReason(agent, degraded);
         String summary = agent.summaryText();
         String rawMarkdown = normalizeMarkdown(agent.reportMarkdown(), summary, scores, agent.recommendation());
         String markdownFilePath = aiReportStorageService.storeMarkdown(patentId, reportId, rawMarkdown);
-        return new AiEvaluationReportResponse(reportId, agent.generatedAt(),
+        OffsetDateTime generatedAt = agent.generatedAt() == null ? OffsetDateTime.now(KST) : agent.generatedAt();
+        return new AiEvaluationReportResponse(reportId, generatedAt,
                 toRecommendation(agent.recommendation()), summary,
-                totalScore == 0 ? null : totalScore, scores, List.of(), rawMarkdown, markdownFilePath);
+                totalScore, averageScore, agent.finalGrade(), agent.finalIndicator(), degraded, failureReason,
+                scores, List.of(), rawMarkdown, markdownFilePath);
+    }
+
+    private Integer totalScore(AgentEvaluateResponse agent, List<EvaluationScoreResponse> scores) {
+        if (agent.totalScore() != null) {
+            return agent.totalScore();
+        }
+        List<Integer> scoreValues = scores.stream()
+                .map(EvaluationScoreResponse::score)
+                .filter(score -> score != null)
+                .toList();
+        if (scoreValues.isEmpty()) {
+            return null;
+        }
+        return scoreValues.stream().mapToInt(Integer::intValue).sum();
+    }
+
+    private Double averageScore(AgentEvaluateResponse agent, Integer totalScore, List<EvaluationScoreResponse> scores) {
+        if (agent.averageScore() != null) {
+            return agent.averageScore();
+        }
+        long scoreCount = scores.stream().filter(score -> score.score() != null).count();
+        if (scoreCount > 0) {
+            double sum = scores.stream()
+                    .map(EvaluationScoreResponse::score)
+                    .filter(score -> score != null)
+                    .mapToInt(Integer::intValue)
+                    .sum();
+            return Math.round((sum / scoreCount) * 10.0) / 10.0;
+        }
+        if (totalScore != null) {
+            return Math.round((totalScore / 4.0) * 10.0) / 10.0;
+        }
+        return null;
+    }
+
+    private String failureReason(AgentEvaluateResponse agent, boolean degraded) {
+        if (agent.failureReason() != null && !agent.failureReason().isBlank()) {
+            return agent.failureReason();
+        }
+        if (degraded) {
+            return "AI 평가 점수 또는 근거가 충분히 생성되지 않았습니다.";
+        }
+        return null;
     }
 
     private String normalizeMarkdown(
@@ -383,6 +436,7 @@ public class PatentWorkflowService {
             for (EvaluationScoreResponse score : scores) {
                 md.append("- ").append(score.category()).append(": ")
                   .append(score.score() == null ? "N/A" : score.score())
+                  .append(score.grade() == null ? "" : " (" + score.grade() + ")")
                   .append(" - ").append(score.evidence()).append("\n");
             }
         }
