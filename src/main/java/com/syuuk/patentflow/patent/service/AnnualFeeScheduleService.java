@@ -33,7 +33,8 @@ public class AnnualFeeScheduleService {
             LocalDate expectedExpirationDate,
             LocalDate baseDate
     ) {
-        LocalDate base = applicationDate;
+        // 연차료 기준일은 출원일이 원칙이나, 출원일이 없는 데이터(마이그레이션·해외 등록 등)는 등록일로 폴백한다.
+        LocalDate base = applicationDate != null ? applicationDate : registrationDate;
         if (base == null) {
             return LocalDate.of(baseDate.getYear(), 12, 31);
         }
