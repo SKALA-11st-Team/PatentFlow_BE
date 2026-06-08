@@ -1,12 +1,20 @@
 package com.syuuk.patentflow.auth.config;
 
 import jakarta.annotation.PostConstruct;
+import java.util.Arrays;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
 @Component
 @ConfigurationProperties(prefix = "patentflow.auth")
 public class AuthProperties {
+
+    private static final String DEV_DEFAULT_JWT_SECRET = "dev-patentflow-jwt-secret-change-me-please-32bytes";
+
+    @Autowired
+    private Environment environment;
 
     private String jwtSecret;
     private long accessTokenExpirationSeconds = 3600;
@@ -105,6 +113,9 @@ public class AuthProperties {
         if (jwtSecret == null || jwtSecret.length() < 32) {
             throw new IllegalStateException("patentflow.auth.jwt-secret must be at least 32 characters.");
         }
+        if (usesUnsafeDefaultSecretOutsideLocalProfile()) {
+            throw new IllegalStateException("PATENTFLOW_JWT_SECRET must be configured outside local/test profiles.");
+        }
         if (accessTokenExpirationSeconds <= 0) {
             throw new IllegalStateException("patentflow.auth.access-token-expiration-seconds must be positive.");
         }
@@ -117,5 +128,17 @@ public class AuthProperties {
         if (loginLockSeconds <= 0) {
             throw new IllegalStateException("patentflow.auth.login-lock-seconds must be positive.");
         }
+    }
+
+    private boolean usesUnsafeDefaultSecretOutsideLocalProfile() {
+        if (!DEV_DEFAULT_JWT_SECRET.equals(jwtSecret)) {
+            return false;
+        }
+        String[] activeProfiles = environment == null ? new String[0] : environment.getActiveProfiles();
+        if (activeProfiles.length == 0) {
+            return false;
+        }
+        return Arrays.stream(activeProfiles)
+                .noneMatch(profile -> profile.equalsIgnoreCase("local") || profile.equalsIgnoreCase("test"));
     }
 }
