@@ -8,7 +8,7 @@ public class MailOAuth2Properties {
     private String clientId = "";
     private String clientSecret = "";
     // BE 콜백 URI — Google Cloud Console에 등록한 값과 일치해야 함
-    private String redirectUri = "http://localhost:8080/api/v1/settings/mail/oauth2/google/callback";
+    private String redirectUri = "http://localhost:8080/api/v1/admin/settings/mail/oauth2/google/callback";
     // 콜백 성공 후 관리자를 돌려보낼 FE 페이지
     private String frontendSettingsUri = "http://localhost:5173/admin/settings";
 

@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v1/settings/mail/oauth2/google")
+@RequestMapping("/api/v1/admin/settings/mail/oauth2/google")
 public class MailOAuth2Controller {
 
     private final MailOAuth2Service mailOAuth2Service;

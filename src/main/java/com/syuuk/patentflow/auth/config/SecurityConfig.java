@@ -75,13 +75,16 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout").permitAll()
-                        .requestMatchers("/api/v1/settings/mail/oauth2/google/callback").permitAll()
+                        .requestMatchers(
+                                "/api/v1/admin/settings/mail/oauth2/google/callback",
+                                "/api/v1/settings/mail/oauth2/google/callback").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers("/actuator/**", "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/settings/review-quarters/active").hasAnyRole("ADMIN", "BUSINESS")
                         .requestMatchers(HttpMethod.GET, "/api/v1/business/checklist-items").authenticated()
                         .requestMatchers("/api/v1/admin/**", "/api/v1/legal/**", "/api/v1/settings/**",
                                 "/api/v1/mailings/**", "/api/v1/departments/**").hasRole("ADMIN")
+                        .requestMatchers("/api/v1/annual-fees/**").hasRole("ADMIN")
                         .requestMatchers("/api/v1/business/**").hasRole("BUSINESS")
                         .requestMatchers(HttpMethod.POST, "/api/v1/patents/*/business-submissions").hasRole("BUSINESS")
                         .requestMatchers(HttpMethod.GET, "/api/v1/patents/*/business-submissions").authenticated()

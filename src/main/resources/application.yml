@@ -46,7 +46,7 @@ patentflow:
       # redirect-uri는 Google Cloud Console > 승인된 리디렉션 URI와 반드시 일치해야 함
       client-id: ${GOOGLE_OAUTH2_CLIENT_ID:}
       client-secret: ${GOOGLE_OAUTH2_CLIENT_SECRET:}
-      redirect-uri: ${GOOGLE_OAUTH2_REDIRECT_URI:http://localhost:8080/api/v1/settings/mail/oauth2/google/callback}
+      redirect-uri: ${GOOGLE_OAUTH2_REDIRECT_URI:http://localhost:8080/api/v1/admin/settings/mail/oauth2/google/callback}
       frontend-settings-uri: ${GOOGLE_OAUTH2_FRONTEND_URI:http://localhost:5173/admin/settings}
   bootstrap:
     admin:

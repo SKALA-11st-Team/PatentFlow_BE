@@ -6,6 +6,9 @@ public record MailingSendResponse(
         String mailingBatchId,
         int updatedCount,
         List<String> updatedPatentIds,
-        List<String> skippedPatentIds
+        List<String> skippedPatentIds,
+        int sentCount,
+        int failedCount,
+        int recordedCount
 ) {
 }

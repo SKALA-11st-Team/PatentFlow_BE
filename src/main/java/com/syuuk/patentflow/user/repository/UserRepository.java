@@ -13,6 +13,8 @@ public interface UserRepository extends JpaRepository<UserEntity, String> {
 
     Optional<UserEntity> findFirstByRoleOrderByCreatedAtAsc(String role);
 
+    List<UserEntity> findByRoleOrderByCreatedAtAsc(String role);
+
     List<UserEntity> findByRoleAndIdNot(String role, String id);
 
     boolean existsByEmail(String email);

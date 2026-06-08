@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.syuuk.patentflow.common.error.ErrorCode;
 import com.syuuk.patentflow.common.error.PatentFlowException;
+import com.syuuk.patentflow.common.response.PageInfo;
+import com.syuuk.patentflow.common.response.PageResponse;
 import com.syuuk.patentflow.common.service.SystemSettingsService;
 import com.syuuk.patentflow.mailing.domain.MailingHistoryEntity;
 import com.syuuk.patentflow.mailing.dto.BusinessReviewMailPatentSummary;
@@ -27,14 +29,26 @@ import jakarta.mail.internet.MimeMessage;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Properties;
+import java.util.UUID;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,6 +60,7 @@ public class MailingService {
     private static final String STATUS_SENT = "SENT";
     private static final String STATUS_FAILED = "FAILED";
     private static final String STATUS_RECORDED = "RECORDED";
+    private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\{\\{?[^}]*url[^}]*}?}", Pattern.CASE_INSENSITIVE);
 
     @Value("${spring.mail.username:}")
     private String envGmailUsername;
@@ -83,16 +98,19 @@ public class MailingService {
     public List<DepartmentRecipientMappingResponse> getRecipientMappings(String departmentId) {
         // users.department_id 기준으로 사업부별 수신자를 도출한다.
         // 같은 부서의 첫 번째 BUSINESS 계정(createdAt 오름차순) = 주 수신자, 나머지 = CC
+        Map<String, List<UserEntity>> businessUsersByDepartment = userRepository.findByRoleOrderByCreatedAtAsc("BUSINESS")
+                .stream()
+                .filter(user -> user.getDepartmentId() != null && !user.getDepartmentId().isBlank())
+                .collect(Collectors.groupingBy(
+                        UserEntity::getDepartmentId,
+                        LinkedHashMap::new,
+                        Collectors.toList()));
+
         return departmentRepository.findAll(Sort.by("departmentId")).stream()
                 .filter(dept -> departmentId == null || departmentId.isBlank()
                         || departmentId.equals(dept.getDepartmentId()))
                 .map(dept -> {
-                    List<UserEntity> members = userRepository
-                            .findAll(Sort.by("createdAt"))
-                            .stream()
-                            .filter(u -> "BUSINESS".equals(u.getRole())
-                                    && dept.getDepartmentId().equals(u.getDepartmentId()))
-                            .toList();
+                    List<UserEntity> members = businessUsersByDepartment.getOrDefault(dept.getDepartmentId(), List.of());
                     UserEntity primary = members.isEmpty() ? null : members.get(0);
                     List<String> ccEmails = members.stream().skip(1)
                             .map(UserEntity::getEmail).toList();
@@ -125,38 +143,66 @@ public class MailingService {
         boolean appPasswordConfigured = username != null && !username.isBlank()
                 && appPassword != null && !appPassword.isBlank();
 
-        String mailingBatchId = "MAIL-BATCH-" + System.currentTimeMillis();
+        request.drafts().forEach(this::validateDraft);
+
+        String mailingBatchId = "MAIL-BATCH-" + UUID.randomUUID().toString().substring(0, 8);
+        Map<String, String> departmentIdsByEmail = loadDepartmentIdsByEmail(request);
+        String sentBy = currentUsername();
+        List<BusinessReviewMailSendDraft> sentDrafts = new ArrayList<>();
+        int failedCount = 0;
+        int recordedCount = 0;
 
         if (oauth2Connected) {
             String senderEmail = systemSettingsService.getGmailOAuth2ConnectedEmail();
-            String accessToken = mailOAuth2Service.getValidAccessToken();
-            request.drafts().forEach(draft -> {
+            String accessToken;
+            try {
+                accessToken = mailOAuth2Service.getValidAccessToken();
+            } catch (PatentFlowException exception) {
+                for (BusinessReviewMailSendDraft draft : request.drafts()) {
+                    saveHistory(mailingBatchId, draft, STATUS_FAILED, departmentIdsByEmail, sentBy);
+                    failedCount++;
+                }
+                return new MailingSendResponse(
+                        mailingBatchId,
+                        0,
+                        List.of(),
+                        List.of(),
+                        0,
+                        failedCount,
+                        recordedCount);
+            }
+            for (BusinessReviewMailSendDraft draft : request.drafts()) {
                 try {
                     sendEmailOAuth2(senderEmail, accessToken, draft);
-                    saveHistory(mailingBatchId, draft, STATUS_SENT);
+                    saveHistory(mailingBatchId, draft, STATUS_SENT, departmentIdsByEmail, sentBy);
+                    sentDrafts.add(draft);
                 } catch (PatentFlowException exception) {
-                    saveHistory(mailingBatchId, draft, STATUS_FAILED);
-                    throw exception;
+                    saveHistory(mailingBatchId, draft, STATUS_FAILED, departmentIdsByEmail, sentBy);
+                    failedCount++;
                 }
-            });
+            }
         } else if (appPasswordConfigured) {
-            request.drafts().forEach(draft -> {
+            for (BusinessReviewMailSendDraft draft : request.drafts()) {
                 try {
                     sendEmail(username, appPassword, draft);
-                    saveHistory(mailingBatchId, draft, STATUS_SENT);
+                    saveHistory(mailingBatchId, draft, STATUS_SENT, departmentIdsByEmail, sentBy);
+                    sentDrafts.add(draft);
                 } catch (PatentFlowException exception) {
-                    saveHistory(mailingBatchId, draft, STATUS_FAILED);
-                    throw exception;
+                    saveHistory(mailingBatchId, draft, STATUS_FAILED, departmentIdsByEmail, sentBy);
+                    failedCount++;
                 }
-            });
+            }
         } else {
-            // OAuth2·앱비밀번호 모두 미연동 — 실제 발송 없이 이력만 기록(RECORDED) 해 워크플로우는 유지
+            // OAuth2·앱비밀번호 모두 미연동 — 실제 발송 없이 이력만 기록한다. RECORDED는 워크플로우 전이 대상이 아니다.
             log.info("Gmail credentials are not configured; recording mailing workflow without SMTP delivery.");
-            request.drafts().forEach(draft -> saveHistory(mailingBatchId, draft, STATUS_RECORDED));
+            for (BusinessReviewMailSendDraft draft : request.drafts()) {
+                saveHistory(mailingBatchId, draft, STATUS_RECORDED, departmentIdsByEmail, sentBy);
+                recordedCount++;
+            }
         }
 
-        // 발송 성공 후 상태 변경 및 이력 저장
-        List<String> patentIds = request.drafts().stream()
+        // 실제 발송 성공분만 사업부 회신 대기 상태로 전이한다. FAILED/RECORDED는 상태를 유지한다.
+        List<String> patentIds = sentDrafts.stream()
                 .flatMap(draft -> draft.patents().stream())
                 .map(BusinessReviewMailPatentSummary::patentId)
                 .distinct()
@@ -167,11 +213,14 @@ public class MailingService {
                 mailingBatchId,
                 updateResult.updatedPatentIds().size(),
                 updateResult.updatedPatentIds(),
-                updateResult.skippedPatentIds());
+                updateResult.skippedPatentIds(),
+                sentDrafts.size(),
+                failedCount,
+                recordedCount);
     }
 
     // OAuth2 XOAUTH2 방식 — access_token을 비밀번호로 사용해 Gmail SMTP 인증
-    private void sendEmailOAuth2(String senderEmail, String accessToken, BusinessReviewMailSendDraft draft) {
+    protected void sendEmailOAuth2(String senderEmail, String accessToken, BusinessReviewMailSendDraft draft) {
         Properties props = new Properties();
         props.put("mail.smtp.host", "smtp.gmail.com");
         props.put("mail.smtp.port", "587");
@@ -179,6 +228,9 @@ public class MailingService {
         props.put("mail.smtp.auth.mechanisms", "XOAUTH2");
         props.put("mail.smtp.starttls.enable", "true");
         props.put("mail.smtp.starttls.required", "true");
+        props.put("mail.smtp.connectiontimeout", "5000");
+        props.put("mail.smtp.timeout", "5000");
+        props.put("mail.smtp.writetimeout", "5000");
 
         try {
             Session session = Session.getInstance(props);
@@ -206,7 +258,7 @@ public class MailingService {
         }
     }
 
-    private void sendEmail(String username, String password, BusinessReviewMailSendDraft draft) {
+    protected void sendEmail(String username, String password, BusinessReviewMailSendDraft draft) {
         try {
             JavaMailSenderImpl sender = buildSender(username, password);
             MimeMessage message = sender.createMimeMessage();
@@ -241,27 +293,45 @@ public class MailingService {
         props.put("mail.smtp.auth", "true");
         props.put("mail.smtp.starttls.enable", "true");
         props.put("mail.smtp.starttls.required", "true");
+        props.put("mail.smtp.connectiontimeout", "5000");
+        props.put("mail.smtp.timeout", "5000");
+        props.put("mail.smtp.writetimeout", "5000");
         return sender;
     }
 
     @Transactional(readOnly = true)
-    public List<MailingHistoryItemResponse> getHistory(String patentId, String recipientEmail) {
-        return mailingHistoryRepository.findAll(Sort.by(Sort.Direction.DESC, "sentAt")).stream()
-                .map(this::toHistoryResponse)
-                .filter(history -> recipientEmail == null || recipientEmail.isBlank()
-                        || history.recipientEmail().equalsIgnoreCase(recipientEmail))
-                .filter(history -> patentId == null || patentId.isBlank()
-                        || history.patents().stream().anyMatch(patent -> patent.patentId().equals(patentId)))
-                .toList();
+    public PageResponse<MailingHistoryItemResponse> getHistory(String patentId, String recipientEmail, int page, int size) {
+        int normalizedPage = Math.max(page, 1);
+        int normalizedSize = Math.min(Math.max(size, 1), 100);
+        Pageable pageable = PageRequest.of(normalizedPage - 1, normalizedSize, Sort.by(Sort.Direction.DESC, "sentAt"));
+        boolean hasPatentId = patentId != null && !patentId.isBlank();
+        boolean hasRecipientEmail = recipientEmail != null && !recipientEmail.isBlank();
+        Page<MailingHistoryEntity> entityPage;
+        if (hasPatentId && hasRecipientEmail) {
+            entityPage = mailingHistoryRepository.findByRecipientEmailIgnoreCaseAndPatentsJsonContaining(
+                    recipientEmail.trim(), patentId.trim(), pageable);
+        } else if (hasRecipientEmail) {
+            entityPage = mailingHistoryRepository.findByRecipientEmailIgnoreCase(recipientEmail.trim(), pageable);
+        } else if (hasPatentId) {
+            entityPage = mailingHistoryRepository.findByPatentsJsonContaining(patentId.trim(), pageable);
+        } else {
+            entityPage = mailingHistoryRepository.findAll(pageable);
+        }
+
+        return PageResponse.ok(
+                entityPage.getContent().stream().map(this::toHistoryResponse).toList(),
+                new PageInfo(normalizedPage, normalizedSize, entityPage.getTotalElements(), entityPage.getTotalPages()));
     }
 
-    private void saveHistory(String mailingBatchId, BusinessReviewMailSendDraft draft, String status) {
-        // 배치ID + 수신자 해시로 이력 ID 생성 — 같은 배치 내 수신자별 고유성 보장
-        String mailingId = mailingBatchId + "-" + Math.abs(draft.recipientEmail().hashCode());
-        // 이력에 부서ID를 남기기 위해 users 테이블에서 수신자 이메일로 역조회
-        String departmentId = userRepository.findByEmail(draft.recipientEmail())
-                .map(u -> u.getDepartmentId())
-                .orElse(null);
+    private void saveHistory(
+            String mailingBatchId,
+            BusinessReviewMailSendDraft draft,
+            String status,
+            Map<String, String> departmentIdsByEmail,
+            String sentBy
+    ) {
+        String mailingId = mailingBatchId + "-" + UUID.randomUUID().toString().replace("-", "");
+        String departmentId = departmentIdsByEmail.get(normalizeEmail(draft.recipientEmail()));
         mailingHistoryRepository.save(new MailingHistoryEntity(
                 mailingId,
                 draft.body(),
@@ -272,9 +342,52 @@ public class MailingService {
                 draft.recipientName(),
                 departmentId,
                 OffsetDateTime.now(KST),
-                "PatentFlow",
+                sentBy,
                 status,
                 draft.subject()));
+    }
+
+    private Map<String, String> loadDepartmentIdsByEmail(MailingSendRequest request) {
+        Map<String, String> requestedEmails = request.drafts().stream()
+                .map(BusinessReviewMailSendDraft::recipientEmail)
+                .filter(email -> email != null && !email.isBlank())
+                .collect(Collectors.toMap(
+                        this::normalizeEmail,
+                        email -> email,
+                        (existing, ignored) -> existing,
+                        LinkedHashMap::new));
+        if (requestedEmails.isEmpty()) {
+            return Map.of();
+        }
+        return userRepository.findAll().stream()
+                .filter(user -> user.getEmail() != null && requestedEmails.containsKey(normalizeEmail(user.getEmail())))
+                .collect(Collectors.toMap(
+                        user -> normalizeEmail(user.getEmail()),
+                        UserEntity::getDepartmentId,
+                        (existing, ignored) -> existing));
+    }
+
+    private void validateDraft(BusinessReviewMailSendDraft draft) {
+        for (BusinessReviewMailPatentSummary patent : draft.patents()) {
+            String originalPatentUrl = patent.originalPatentUrl();
+            if (originalPatentUrl == null || originalPatentUrl.isBlank()
+                    || PLACEHOLDER_PATTERN.matcher(originalPatentUrl).find()) {
+                throw new PatentFlowException(ErrorCode.INVALID_REQUEST,
+                        "메일 특허 요약에는 실제 원문 URL이 필요합니다: " + patent.patentId());
+            }
+        }
+    }
+
+    private String currentUsername() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getName() == null || authentication.getName().isBlank()) {
+            return "PatentFlow";
+        }
+        return authentication.getName();
+    }
+
+    private String normalizeEmail(String email) {
+        return email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
     }
 
     private List<String> normalizedCcEmails(BusinessReviewMailSendDraft draft) {

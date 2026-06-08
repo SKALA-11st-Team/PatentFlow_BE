@@ -5,8 +5,10 @@ import com.syuuk.patentflow.common.error.PatentFlowException;
 import com.syuuk.patentflow.common.service.SystemSettingsService;
 import com.syuuk.patentflow.mailing.config.MailOAuth2Properties;
 import com.syuuk.patentflow.mailing.dto.MailOAuth2StatusResponse;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
+import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.ParameterizedTypeReference;
@@ -40,10 +42,14 @@ public class MailOAuth2Service {
     private Instant cachedTokenExpiry;
 
     public MailOAuth2Service(MailOAuth2Properties properties,
-            SystemSettingsService systemSettingsService) {
+            SystemSettingsService systemSettingsService,
+            RestTemplateBuilder restTemplateBuilder) {
         this.properties = properties;
         this.systemSettingsService = systemSettingsService;
-        this.restTemplate = new RestTemplate();
+        this.restTemplate = restTemplateBuilder
+                .connectTimeout(Duration.ofSeconds(5))
+                .readTimeout(Duration.ofSeconds(5))
+                .build();
     }
 
     // ── 인증 URL ──────────────────────────────────────────────

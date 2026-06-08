@@ -1,6 +1,7 @@
 package com.syuuk.patentflow.mailing.controller;
 
 import com.syuuk.patentflow.common.response.ApiResponse;
+import com.syuuk.patentflow.common.response.PageResponse;
 import com.syuuk.patentflow.mailing.dto.DepartmentRecipientMappingResponse;
 import com.syuuk.patentflow.mailing.dto.DepartmentRecipientMappingRequest;
 import com.syuuk.patentflow.mailing.dto.MailingHistoryItemResponse;
@@ -54,11 +55,13 @@ public class MailingController {
     }
 
     @GetMapping("/history")
-    public ApiResponse<List<MailingHistoryItemResponse>> getMailingHistory(
+    public PageResponse<MailingHistoryItemResponse> getMailingHistory(
             @RequestParam(required = false) String patentId,
-            @RequestParam(required = false) String recipientEmail
+            @RequestParam(required = false) String recipientEmail,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size
     ) {
-        return ApiResponse.ok(mailingService.getHistory(patentId, recipientEmail));
+        return mailingService.getHistory(patentId, recipientEmail, page, size);
     }
 
 
