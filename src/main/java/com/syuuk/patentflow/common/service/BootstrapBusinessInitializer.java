@@ -48,22 +48,26 @@ public class BootstrapBusinessInitializer implements ApplicationRunner {
         }
 
         String normalizedEmail = email.trim();
-        // upsert 방식 — 재기동 시마다 env에 설정된 비밀번호·부서·이름으로 덮어써 일관성 유지
-        UserEntity user = userRepository.findByEmail(normalizedEmail)
-                .orElseGet(() -> new UserEntity(
-                        "USER-business-demo",
-                        normalizedEmail,
-                        passwordEncoder.encode(password),
-                        "BUSINESS",
-                        normalizedDepartmentId(),
-                        normalizedDisplayName(normalizedEmail)));
+        try {
+            // upsert 방식 — 재기동 시마다 env에 설정된 비밀번호·부서·이름으로 덮어써 일관성 유지
+            UserEntity user = userRepository.findByEmail(normalizedEmail)
+                    .orElseGet(() -> new UserEntity(
+                            "USER-business-demo",
+                            normalizedEmail,
+                            passwordEncoder.encode(password),
+                            "BUSINESS",
+                            normalizedDepartmentId(),
+                            normalizedDisplayName(normalizedEmail)));
 
-        user.setPassword(passwordEncoder.encode(password));
-        user.setRole("BUSINESS");
-        user.setDepartmentId(normalizedDepartmentId());
-        user.setUsername(normalizedDisplayName(normalizedEmail));
-        userRepository.save(user);
-        log.info("Bootstrap business user upserted: {}", normalizedEmail);
+            user.setPassword(passwordEncoder.encode(password));
+            user.setRole("BUSINESS");
+            user.setDepartmentId(normalizedDepartmentId());
+            user.setUsername(normalizedDisplayName(normalizedEmail));
+            userRepository.save(user);
+            log.info("Bootstrap business user upserted: {}", normalizedEmail);
+        } catch (Exception exception) {
+            log.error("Bootstrap business upsert failed; continuing startup. Check the users table schema (email column).", exception);
+        }
     }
 
     private String normalizedDepartmentId() {
