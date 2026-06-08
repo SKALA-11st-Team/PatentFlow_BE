@@ -29,8 +29,16 @@ public class DashboardSummaryService {
         int pendingReview = countLatest(ReviewWorkflowStatus.MAIL_READY);
         int waitingBusiness = countLatest(ReviewWorkflowStatus.WAITING_BUSINESS_RESPONSE);
         int businessReceived = countLatest(ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED);
-        int pendingLegal = Math.toIntExact(reviewHistoryRepository.countLatestByLegalActionResultIsNotNull());
-        return new LegalDashboardSummaryResponse(total, pendingReview, waitingBusiness, businessReceived, pendingLegal);
+        int pendingFinalDecision = Math.toIntExact(reviewHistoryRepository.countLatestPendingLegalAction(
+                ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED));
+        int legalActionCompleted = Math.toIntExact(reviewHistoryRepository.countLatestByLegalActionResultIsNotNull());
+        return new LegalDashboardSummaryResponse(
+                total,
+                pendingReview,
+                waitingBusiness,
+                businessReceived,
+                pendingFinalDecision,
+                legalActionCompleted);
     }
 
     @Transactional(readOnly = true)
@@ -39,10 +47,9 @@ public class DashboardSummaryService {
         int pendingReview = Math.toIntExact(reviewHistoryRepository.countLatestByDepartmentIdAndReviewWorkflowStatus(
                 departmentId,
                 ReviewWorkflowStatus.WAITING_BUSINESS_RESPONSE));
-        int reviewed = Math.toIntExact(reviewHistoryRepository.countLatestByDepartmentIdAndReviewWorkflowStatusIn(
+        int reviewed = Math.toIntExact(reviewHistoryRepository.countLatestReviewedByDepartmentId(
                 departmentId,
-                List.of(ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED)))
-                + Math.toIntExact(reviewHistoryRepository.countLatestByDepartmentIdAndLegalActionResultIsNotNull(departmentId));
+                List.of(ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED)));
         int maintained = Math.toIntExact(reviewHistoryRepository.countLatestByDepartmentIdAndBusinessOpinionDecision(
                 departmentId,
                 BusinessOpinionDecision.MAINTAIN));

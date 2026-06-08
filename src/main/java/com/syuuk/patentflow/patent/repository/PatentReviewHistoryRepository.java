@@ -91,6 +91,34 @@ public interface PatentReviewHistoryRepository extends JpaRepository<PatentRevie
     @Query("""
             select count(h)
             from PatentReviewHistoryEntity h
+            where h.reviewWorkflowStatus = :status
+              and h.legalActionResult is null
+              and h.createdAt = (
+                  select max(latest.createdAt)
+                  from PatentReviewHistoryEntity latest
+                  where latest.patentId = h.patentId
+              )
+            """)
+    long countLatestPendingLegalAction(@Param("status") ReviewWorkflowStatus status);
+
+    @Query("""
+            select count(h)
+            from PatentReviewHistoryEntity h
+            where h.departmentId = :departmentId
+              and (h.reviewWorkflowStatus in :statuses or h.legalActionResult is not null)
+              and h.createdAt = (
+                  select max(latest.createdAt)
+                  from PatentReviewHistoryEntity latest
+                  where latest.patentId = h.patentId
+              )
+            """)
+    long countLatestReviewedByDepartmentId(
+            @Param("departmentId") String departmentId,
+            @Param("statuses") List<ReviewWorkflowStatus> statuses);
+
+    @Query("""
+            select count(h)
+            from PatentReviewHistoryEntity h
             where h.legalActionResult is not null
               and h.createdAt = (
                   select max(latest.createdAt)
