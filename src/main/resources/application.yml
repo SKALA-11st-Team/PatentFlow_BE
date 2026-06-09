@@ -53,6 +53,12 @@ patentflow:
   # 인증/세션 공유·영속 스토어(토큰 폐기·로그인 락아웃) 사용 여부. false면 인메모리(단일 인스턴스용)로 폴백.
   redis:
     enabled: ${PATENTFLOW_REDIS_ENABLED:false}
+  # P6 BE-RATELIMIT: 인증 엔드포인트 IP+경로 요청 한도(초과 429). 멀티레플리카는 redis.enabled=true로 공유.
+  ratelimit:
+    enabled: ${PATENTFLOW_RATELIMIT_ENABLED:true}
+    auth:
+      limit: ${PATENTFLOW_RATELIMIT_AUTH_LIMIT:30}
+      window-seconds: ${PATENTFLOW_RATELIMIT_AUTH_WINDOW_SECONDS:60}
   oauth2:
     google:
       # Google Cloud Console에 등록한 OAuth2 앱 자격증명

@@ -3,6 +3,7 @@ package com.syuuk.patentflow.auth.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import com.syuuk.patentflow.common.ratelimit.RedisRateLimitStore;
 import com.syuuk.patentflow.mailing.service.RedisOAuthStateStore;
 import java.time.Duration;
 import java.time.Instant;
@@ -94,6 +95,18 @@ class RedisStoresTest {
         assertThat(store.consume("state-1")).isTrue();   // 첫 소비 성공
         assertThat(store.consume("state-1")).isFalse();  // GETDEL 단발 — 재사용 거부
         assertThat(store.consume("never-issued")).isFalse();
+    }
+
+    @Test
+    void rateLimitStoreAllowsUpToLimitThenBlocks() {
+        RedisRateLimitStore store = new RedisRateLimitStore(redisTemplate);
+        Duration window = Duration.ofSeconds(60);
+
+        assertThat(store.tryConsume("1.1.1.1:/login", 2, window)).isTrue();
+        assertThat(store.tryConsume("1.1.1.1:/login", 2, window)).isTrue();
+        assertThat(store.tryConsume("1.1.1.1:/login", 2, window)).isFalse();   // 한도 초과
+        // 다른 키는 독립 한도
+        assertThat(store.tryConsume("2.2.2.2:/login", 2, window)).isTrue();
     }
 
     @Test

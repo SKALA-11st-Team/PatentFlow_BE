@@ -18,6 +18,8 @@ management:
 patentflow:
   redis:
     enabled: false
+  ratelimit:
+    enabled: false
   review:
     scheduler:
       enabled: false

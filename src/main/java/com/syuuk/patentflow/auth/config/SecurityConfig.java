@@ -3,9 +3,12 @@ package com.syuuk.patentflow.auth.config;
 import com.syuuk.patentflow.auth.security.CsrfCookieFilter;
 import com.syuuk.patentflow.auth.security.JwtAuthenticationFilter;
 import com.syuuk.patentflow.auth.security.SpaCsrfTokenRequestHandler;
+import com.syuuk.patentflow.common.ratelimit.RateLimitFilter;
 import java.util.Arrays;
 import java.util.List;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -60,7 +63,16 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http,
+            JwtAuthenticationFilter jwtAuthenticationFilter,
+            ObjectProvider<RateLimitFilter> rateLimitFilterProvider
+    ) throws Exception {
+        // P6 BE-RATELIMIT: 활성화된 경우에만 인증 처리 앞단에 레이트리밋 필터를 배치한다.
+        RateLimitFilter rateLimitFilter = rateLimitFilterProvider.getIfAvailable();
+        if (rateLimitFilter != null) {
+            http.addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class);
+        }
         return http
             .csrf(csrf -> csrf
                     .csrfTokenRepository(csrfTokenRepository())
@@ -114,6 +126,15 @@ public class SecurityConfig {
             JwtAuthenticationFilter jwtAuthenticationFilter
     ) {
         FilterRegistrationBean<JwtAuthenticationFilter> registration = new FilterRegistrationBean<>(jwtAuthenticationFilter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    // P6 BE-RATELIMIT: 시큐리티 체인에서만 실행하도록 서블릿 자동 등록을 비활성화(이중 실행 방지).
+    @Bean
+    @ConditionalOnProperty(name = "patentflow.ratelimit.enabled", havingValue = "true", matchIfMissing = true)
+    public FilterRegistrationBean<RateLimitFilter> rateLimitFilterRegistration(RateLimitFilter rateLimitFilter) {
+        FilterRegistrationBean<RateLimitFilter> registration = new FilterRegistrationBean<>(rateLimitFilter);
         registration.setEnabled(false);
         return registration;
     }
