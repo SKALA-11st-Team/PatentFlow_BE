@@ -75,9 +75,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout").permitAll()
+                        // AUTH-06: 실제 매핑된 콜백은 /admin/settings/... 하나뿐. 컨트롤러가 없는
+                        // orphan permitAll(/api/v1/settings/mail/oauth2/google/callback)을 제거해 미인증 표면을 축소한다.
                         .requestMatchers(
-                                "/api/v1/admin/settings/mail/oauth2/google/callback",
-                                "/api/v1/settings/mail/oauth2/google/callback").permitAll()
+                                "/api/v1/admin/settings/mail/oauth2/google/callback").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers("/actuator/**", "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/settings/review-quarters/active").hasAnyRole("ADMIN", "BUSINESS")
