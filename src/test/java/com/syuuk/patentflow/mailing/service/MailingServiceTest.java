@@ -202,9 +202,9 @@ class MailingServiceTest {
                 "admin@syuuk.test",
                 "SENT",
                 "subject");
-        when(mailingHistoryRepository.findByRecipientEmailIgnoreCaseAndPatentsJsonContaining(
+        when(mailingHistoryRepository.findByRecipientEmailAndPatentIdToken(
                 org.mockito.ArgumentMatchers.eq("recipient@example.com"),
-                org.mockito.ArgumentMatchers.eq("PAT-1"),
+                org.mockito.ArgumentMatchers.eq("%\"patentId\":\"PAT-1\"%"),
                 any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(entity), PageRequest.of(0, 10), 1));
 
@@ -215,6 +215,17 @@ class MailingServiceTest {
         assertThat(response.page().totalElements()).isEqualTo(1);
         assertThat(response.data().get(0).patents().get(0).originalPatentUrl())
                 .isEqualTo("https://patents.google.com/patent/KR1/ko");
+    }
+
+    @Test
+    void patentIdTokenPatternWrapsTokenBoundaryAndEscapesWildcards() {
+        // 토큰 경계("patentId":"<id>")로 감싸고 LIKE 와일드카드(%,_)와 escape 문자(!)를 무력화한다.
+        assertThat(MailingService.patentIdTokenPattern("PAT-1"))
+                .isEqualTo("%\"patentId\":\"PAT-1\"%");
+        assertThat(MailingService.patentIdTokenPattern("PAT_1%"))
+                .isEqualTo("%\"patentId\":\"PAT!_1!%\"%");
+        assertThat(MailingService.patentIdTokenPattern("a!b"))
+                .isEqualTo("%\"patentId\":\"a!!b\"%");
     }
 
     private static BusinessReviewMailSendDraft draft(String recipientEmail, String patentId) {

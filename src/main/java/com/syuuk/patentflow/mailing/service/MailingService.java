@@ -286,12 +286,12 @@ public class MailingService {
         boolean hasRecipientEmail = recipientEmail != null && !recipientEmail.isBlank();
         Page<MailingHistoryEntity> entityPage;
         if (hasPatentId && hasRecipientEmail) {
-            entityPage = mailingHistoryRepository.findByRecipientEmailIgnoreCaseAndPatentsJsonContaining(
-                    recipientEmail.trim(), patentId.trim(), pageable);
+            entityPage = mailingHistoryRepository.findByRecipientEmailAndPatentIdToken(
+                    recipientEmail.trim(), patentIdTokenPattern(patentId.trim()), pageable);
         } else if (hasRecipientEmail) {
             entityPage = mailingHistoryRepository.findByRecipientEmailIgnoreCase(recipientEmail.trim(), pageable);
         } else if (hasPatentId) {
-            entityPage = mailingHistoryRepository.findByPatentsJsonContaining(patentId.trim(), pageable);
+            entityPage = mailingHistoryRepository.findByPatentIdToken(patentIdTokenPattern(patentId.trim()), pageable);
         } else {
             entityPage = mailingHistoryRepository.findAll(pageable);
         }
@@ -299,6 +299,16 @@ public class MailingService {
         return PageResponse.ok(
                 entityPage.getContent().stream().map(this::toHistoryResponse).toList(),
                 new PageInfo(normalizedPage, normalizedSize, entityPage.getTotalElements(), entityPage.getTotalPages()));
+    }
+
+    // 회귀: patentsJson 안의 "patentId":"<id>" 토큰을 정확 매칭하기 위한 LIKE 패턴을 만든다.
+    // 닫는 따옴표까지 포함해 접두/교차필드 충돌을 막고, 입력의 LIKE 와일드카드(%,_)와 escape 문자(!)를 무력화한다.
+    static String patentIdTokenPattern(String patentId) {
+        String escaped = patentId
+                .replace("!", "!!")
+                .replace("%", "!%")
+                .replace("_", "!_");
+        return "%\"patentId\":\"" + escaped + "\"%";
     }
 
     private void saveHistory(
