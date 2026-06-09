@@ -104,19 +104,6 @@ public class PatentWorkflowService {
 
     // ── 메일 발송 처리 ────────────────────────────────────────
 
-    public List<String> markMailReady(List<String> patentIds) {
-        List<String> updated = new ArrayList<>();
-        for (String patentId : patentIds) {
-            try {
-                PatentDetailResponse patent = patentReviewService.findPatent(patentId);
-                if (patent.reviewWorkflowStatus() == ReviewWorkflowStatus.MAIL_READY) {
-                    updated.add(patentId);
-                }
-            } catch (Exception ignored) {}
-        }
-        return updated;
-    }
-
     @Transactional
     public PatentReviewService.WorkflowBatchUpdateResult markMailingSent(List<String> patentIds) {
         List<String> updatedPatentIds = new ArrayList<>();
@@ -155,44 +142,32 @@ public class PatentWorkflowService {
     }
 
     @Transactional
-    public FinalDecisionResponse patchFinalDecision(String patentId, PatchFinalDecisionRequest request) {
+    public FinalDecisionResponse patchFinalDecision(String patentId, PatchFinalDecisionRequest request, String actor) {
         OffsetDateTime decidedAt = OffsetDateTime.now(KST);
         PatentDetailResponse updated = patentReviewService.updatePatentInternal(patentId, patent -> {
             if (request.legalActionResult() == null && request.reason() == null) {
                 return withClearedFinalDecision(patent);
             }
-            return withPatchedFinalDecision(patent, request, decidedAt);
+            return withPatchedFinalDecision(patent, request, decidedAt, actor);
         });
         return new FinalDecisionResponse(updated.patentId(), updated.finalDecisionRecord(),
                 updated.legalActionResult(), updated.reviewWorkflowStatus());
     }
 
     @Transactional
-    public FinalDecisionResponse recordFinalDecision(String patentId, FinalDecisionRequest request) {
+    public FinalDecisionResponse recordFinalDecision(String patentId, FinalDecisionRequest request, String actor) {
         OffsetDateTime decidedAt = OffsetDateTime.now(KST);
         PatentDetailResponse updated = patentReviewService.updatePatentInternal(patentId, patent -> {
             if (!canRecordFinalDecision(patent.reviewWorkflowStatus())) {
                 throw new PatentFlowException(ErrorCode.INVALID_WORKFLOW_STATUS);
             }
-            return withFinalDecision(patent, request, decidedAt);
+            return withFinalDecision(patent, request, decidedAt, actor);
         });
         return new FinalDecisionResponse(updated.patentId(), updated.finalDecisionRecord(),
                 updated.legalActionResult(), updated.reviewWorkflowStatus());
     }
 
     // ── 분기 / 배치 관리 ─────────────────────────────────────
-
-    @Transactional
-    public void bulkUpdateWorkflowStatus(List<String> patentIds, ReviewWorkflowStatus newStatus, String quarterKey) {
-        if (patentIds == null || patentIds.isEmpty()) return;
-        for (String patentId : patentIds) {
-            PatentReviewHistoryEntity history = reviewHistoryRepository
-                    .findByPatentIdAndQuarterKey(patentId, quarterKey)
-                    .orElseGet(() -> new PatentReviewHistoryEntity(patentId, quarterKey));
-            history.setReviewWorkflowStatus(newStatus);
-            reviewHistoryRepository.save(history);
-        }
-    }
 
     @Transactional
     public List<String> createQuarterReviewTargets(
@@ -279,7 +254,7 @@ public class PatentWorkflowService {
     }
 
     private PatentDetailResponse withFinalDecision(
-            PatentDetailResponse patent, FinalDecisionRequest request, OffsetDateTime decidedAt
+            PatentDetailResponse patent, FinalDecisionRequest request, OffsetDateTime decidedAt, String actor
     ) {
         LocalDate newDueDate = request.legalActionResult() == LegalActionResult.MAINTAINED
                 ? annualFeeScheduleService.advanceAfterMaintenance(
@@ -300,7 +275,7 @@ public class PatentWorkflowService {
                         patent.finalDecisionRecord().decisionId() == null
                                 ? patent.patentId() + "-DEC-01"
                                 : patent.finalDecisionRecord().decisionId(),
-                        request.reason(), decidedAt),
+                        request.reason(), decidedAt, actor),
                 patent.businessOpinion(), false);
     }
 
@@ -315,11 +290,11 @@ public class PatentWorkflowService {
                 ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED, patent.feeDueDate(),
                 patent.reviewReason(), patent.currentRecommendation(), patent.businessOpinionDecision(),
                 null, patent.summary(), patent.aiEvaluationReport(),
-                new FinalDecisionRecordResponse(null, null, null), patent.businessOpinion(), true);
+                new FinalDecisionRecordResponse(null, null, null, null), patent.businessOpinion(), true);
     }
 
     private PatentDetailResponse withPatchedFinalDecision(
-            PatentDetailResponse patent, PatchFinalDecisionRequest request, OffsetDateTime decidedAt
+            PatentDetailResponse patent, PatchFinalDecisionRequest request, OffsetDateTime decidedAt, String actor
     ) {
         LegalActionResult legalActionResult = request.legalActionResult() != null
                 ? request.legalActionResult() : patent.legalActionResult();
@@ -345,11 +320,17 @@ public class PatentWorkflowService {
                         patent.finalDecisionRecord().decisionId() == null
                                 ? patent.patentId() + "-DEC-01"
                                 : patent.finalDecisionRecord().decisionId(),
-                        reason, decidedAt),
+                        reason, decidedAt, actor),
                 patent.businessOpinion(), false);
     }
 
     PatentDetailResponse withReviewWorkflowStatus(PatentDetailResponse patent, ReviewWorkflowStatus status) {
+        // REVIEW-09: 무검증 상태 강제를 막는다 — 중앙 전이표(ReviewWorkflowStatus.canTransitionTo)로 검증.
+        ReviewWorkflowStatus current = patent.reviewWorkflowStatus();
+        if (current != null && !current.canTransitionTo(status)) {
+            throw new PatentFlowException(ErrorCode.INVALID_WORKFLOW_STATUS,
+                    "허용되지 않은 워크플로우 전이입니다: %s → %s".formatted(current, status));
+        }
         return new PatentDetailResponse(
                 patent.patentId(), patent.managementNumber(), patent.applicationNumber(),
                 patent.registrationNumber(), patent.title(), patent.draftTitle(),

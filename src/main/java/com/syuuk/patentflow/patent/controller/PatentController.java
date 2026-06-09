@@ -1,10 +1,10 @@
 package com.syuuk.patentflow.patent.controller;
 
+import com.syuuk.patentflow.auth.dto.UserPrincipalResponse;
 import com.syuuk.patentflow.common.response.ApiResponse;
 import com.syuuk.patentflow.common.response.PageResponse;
 import com.syuuk.patentflow.patent.dto.AssignDepartmentRequest;
 import com.syuuk.patentflow.patent.dto.AiReportJobResponse;
-import com.syuuk.patentflow.patent.dto.BatchPatentIdsRequest;
 import com.syuuk.patentflow.patent.dto.FinalDecisionRequest;
 import com.syuuk.patentflow.patent.dto.FinalDecisionResponse;
 import com.syuuk.patentflow.patent.dto.PatchFinalDecisionRequest;
@@ -25,6 +25,7 @@ import java.time.LocalDate;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -160,9 +161,10 @@ public class PatentController {
     @PostMapping("/{patentId}/final-decision")
     public ApiResponse<FinalDecisionResponse> recordFinalDecision(
             @PathVariable String patentId,
-            @Valid @RequestBody FinalDecisionRequest request
+            @Valid @RequestBody FinalDecisionRequest request,
+            Authentication authentication
     ) {
-        return ApiResponse.ok(patentReviewService.recordFinalDecision(patentId, request));
+        return ApiResponse.ok(patentReviewService.recordFinalDecision(patentId, request, currentActor(authentication)));
     }
 
     /**
@@ -173,9 +175,10 @@ public class PatentController {
     @PatchMapping("/{patentId}/final-decision")
     public ApiResponse<FinalDecisionResponse> patchFinalDecision(
             @PathVariable String patentId,
-            @RequestBody PatchFinalDecisionRequest request
+            @RequestBody PatchFinalDecisionRequest request,
+            Authentication authentication
     ) {
-        return ApiResponse.ok(patentReviewService.patchFinalDecision(patentId, request));
+        return ApiResponse.ok(patentReviewService.patchFinalDecision(patentId, request, currentActor(authentication)));
     }
 
     /**
@@ -205,12 +208,22 @@ public class PatentController {
         return ApiResponse.ok(aiReportJobService.latestStatus(patentId));
     }
 
-    /**
-     * @description 복수 특허를 MAIL_READY 상태로 일괄 전환하는 API.
-     */
-    @PostMapping("/batch/mark-mail-ready")
-    public ApiResponse<List<String>> markMailReady(@Valid @RequestBody BatchPatentIdsRequest request) {
-        return ApiResponse.ok(patentReviewService.markMailReady(request.patentIds()));
+    // REVIEW-07: 최종 판단 행위자(인증 주체)를 추출한다. 미인증이면 '관리자'로 폴백.
+    private String currentActor(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return "관리자";
+        }
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof UserPrincipalResponse userPrincipal) {
+            if (userPrincipal.username() != null && !userPrincipal.username().isBlank()) {
+                return userPrincipal.username().trim();
+            }
+            if (userPrincipal.email() != null && !userPrincipal.email().isBlank()) {
+                return userPrincipal.email().trim();
+            }
+        }
+        String name = authentication.getName();
+        return name == null || name.isBlank() ? "관리자" : name.trim();
     }
 
 }

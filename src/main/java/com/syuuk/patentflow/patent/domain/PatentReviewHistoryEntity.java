@@ -162,6 +162,10 @@ public class PatentReviewHistoryEntity extends BaseEntity {
     @Column(name = "final_decision_decided_at")
     private OffsetDateTime finalDecisionDecidedAt;
 
+    // REVIEW-07: 최종 판단 행위자(인증 주체). 과거 시드/이력은 미상이라 nullable.
+    @Column(name = "final_decision_decided_by", length = 128)
+    private String finalDecisionDecidedBy;
+
     @Column(name = "annual_fee_due_date")
     private LocalDate annualFeeDueDate;
 
@@ -494,6 +498,14 @@ public class PatentReviewHistoryEntity extends BaseEntity {
 
     public void setFinalDecisionDecidedAt(OffsetDateTime finalDecisionDecidedAt) {
         this.finalDecisionDecidedAt = finalDecisionDecidedAt;
+    }
+
+    public String getFinalDecisionDecidedBy() {
+        return finalDecisionDecidedBy;
+    }
+
+    public void setFinalDecisionDecidedBy(String finalDecisionDecidedBy) {
+        this.finalDecisionDecidedBy = finalDecisionDecidedBy;
     }
 
     public LocalDate getAnnualFeeDueDate() {

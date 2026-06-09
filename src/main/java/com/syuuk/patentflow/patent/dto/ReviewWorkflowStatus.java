@@ -1,5 +1,10 @@
 package com.syuuk.patentflow.patent.dto;
 
+import java.util.EnumMap;
+import java.util.EnumSet;
+import java.util.Map;
+import java.util.Set;
+
 /**
  * 특허 검토 워크플로우 상태.
  *
@@ -16,5 +21,29 @@ public enum ReviewWorkflowStatus {
     REVIEW_QUARTER_STARTED,
     MAIL_READY,
     WAITING_BUSINESS_RESPONSE,
-    BUSINESS_RESPONSE_RECEIVED
+    BUSINESS_RESPONSE_RECEIVED;
+
+    // REVIEW-09: 허용 워크플로우 전이의 단일 정본(중앙 전이표). 분산된 가드가 산발적으로 상태를 강제하던 것을
+    // 한 곳에서 검증 가능하게 한다. 정상 순환: 분기시작 → 메일대기 → 회신대기 → 의견접수 → (최종결정)복귀.
+    private static final Map<ReviewWorkflowStatus, Set<ReviewWorkflowStatus>> ALLOWED_TRANSITIONS =
+            new EnumMap<>(ReviewWorkflowStatus.class);
+
+    static {
+        ALLOWED_TRANSITIONS.put(NOT_IN_REVIEW, EnumSet.of(REVIEW_QUARTER_STARTED));
+        ALLOWED_TRANSITIONS.put(REVIEW_QUARTER_STARTED, EnumSet.of(MAIL_READY));
+        ALLOWED_TRANSITIONS.put(MAIL_READY, EnumSet.of(WAITING_BUSINESS_RESPONSE));
+        ALLOWED_TRANSITIONS.put(WAITING_BUSINESS_RESPONSE, EnumSet.of(BUSINESS_RESPONSE_RECEIVED));
+        ALLOWED_TRANSITIONS.put(BUSINESS_RESPONSE_RECEIVED, EnumSet.of(NOT_IN_REVIEW));
+    }
+
+    /** 현재 상태에서 target 으로의 전이가 허용되는지. 동일 상태 재설정(멱등)은 허용한다. */
+    public boolean canTransitionTo(ReviewWorkflowStatus target) {
+        if (target == null) {
+            return false;
+        }
+        if (this == target) {
+            return true;
+        }
+        return ALLOWED_TRANSITIONS.getOrDefault(this, EnumSet.noneOf(ReviewWorkflowStatus.class)).contains(target);
+    }
 }

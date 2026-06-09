@@ -381,9 +381,6 @@ public class PatentReviewService {
         return workflowService.generateAiReportForBatch(patentId);
     }
 
-    public List<String> markMailReady(List<String> patentIds) {
-        return workflowService.markMailReady(patentIds);
-    }
 
     public void recordBusinessOpinion(
             String patentId,
@@ -446,13 +443,16 @@ public class PatentReviewService {
         }
 
         if (history.getLegalActionResult() != null || history.getFinalDecisionDecidedAt() != null) {
+            // REVIEW-07: 행위자를 '관리자' 하드코딩 대신 저장된 결정자(decidedBy)로 표기, 미상이면 폴백.
+            String finalActor = valueOrDefault(history.getFinalDecisionDecidedBy(), "관리자");
             responses.add(new PatentHistoryResponse(
                     history.getId() + "-FINAL",
                     "FINAL_DECISION_RECORDED",
                     "최종 판단 기록",
-                    "관리자가 %s 결과를 기록했습니다.".formatted(
+                    "%s가 %s 결과를 기록했습니다.".formatted(
+                            finalActor,
                             history.getLegalActionResult() == null ? "최종 판단" : history.getLegalActionResult().name()),
-                    "관리자",
+                    finalActor,
                     history.getFinalDecisionDecidedAt() != null ? history.getFinalDecisionDecidedAt() : createdAt));
         }
 
@@ -591,10 +591,6 @@ public class PatentReviewService {
         return workflowService.createQuarterReviewTargets(quarterKey, paymentPeriodStart, paymentPeriodEnd);
     }
 
-    public void bulkUpdateWorkflowStatus(List<String> patentIds, ReviewWorkflowStatus newStatus, String quarterKey) {
-        workflowService.bulkUpdateWorkflowStatus(patentIds, newStatus, quarterKey);
-    }
-
     public List<PatentReviewHistoryItemResponse> getReviewHistory(String patentId) {
         ensurePatentExists(patentId);
         return reviewHistoryRepository.findByPatentIdOrderByCreatedAtDesc(patentId).stream()
@@ -603,12 +599,12 @@ public class PatentReviewService {
     }
 
 
-    public FinalDecisionResponse patchFinalDecision(String patentId, PatchFinalDecisionRequest request) {
-        return workflowService.patchFinalDecision(patentId, request);
+    public FinalDecisionResponse patchFinalDecision(String patentId, PatchFinalDecisionRequest request, String actor) {
+        return workflowService.patchFinalDecision(patentId, request, actor);
     }
 
-    public FinalDecisionResponse recordFinalDecision(String patentId, FinalDecisionRequest request) {
-        return workflowService.recordFinalDecision(patentId, request);
+    public FinalDecisionResponse recordFinalDecision(String patentId, FinalDecisionRequest request, String actor) {
+        return workflowService.recordFinalDecision(patentId, request, actor);
     }
 
     PatentDetailResponse findPatent(String patentId) {
@@ -842,7 +838,7 @@ public class PatentReviewService {
                 null,
                 summaryFromMetadata(entity.getTitle(), entity.getTechnologyArea(), entity.getProductName()),
                 aiEvaluationReport(Recommendation.HOLD),
-                new FinalDecisionRecordResponse(null, null, null),
+                new FinalDecisionRecordResponse(null, null, null, null),
                 new BusinessOpinionResponse(null, null, null),
                 entity.isInReview());
         return applyPersistedState(basePatent, latestOrNull);
@@ -877,7 +873,7 @@ public class PatentReviewService {
                 null,
                 new PatentSummaryResponse("작성 필요", "작성 필요", List.of(), "작성 필요", List.of()),
                 aiEvaluationReport(Recommendation.HOLD),
-                new FinalDecisionRecordResponse(null, null, null),
+                new FinalDecisionRecordResponse(null, null, null, null),
                 new BusinessOpinionResponse(null, null, null),
                 false);
     }
@@ -1260,7 +1256,8 @@ public class PatentReviewService {
                 new FinalDecisionRecordResponse(
                         state.getFinalDecisionId(),
                         state.getFinalDecisionReason(),
-                        state.getFinalDecisionDecidedAt()),
+                        state.getFinalDecisionDecidedAt(),
+                        state.getFinalDecisionDecidedBy()),
                 new BusinessOpinionResponse(
                         state.getBusinessOpinionDecision(),
                         state.getBusinessOpinionReason(),
@@ -1428,6 +1425,7 @@ public class PatentReviewService {
         state.setFinalDecisionId(patent.finalDecisionRecord().decisionId());
         state.setFinalDecisionReason(patent.finalDecisionRecord().reason());
         state.setFinalDecisionDecidedAt(patent.finalDecisionRecord().decidedAt());
+        state.setFinalDecisionDecidedBy(patent.finalDecisionRecord().decidedBy());
         state.setAnnualFeeDueDate(patent.feeDueDate());
         state.setDepartmentId(patent.departmentId());
         state.setDepartmentName(patent.departmentName());
