@@ -5,6 +5,13 @@ spring:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/patentflow?currentSchema=patentflow}
     username: ${SPRING_DATASOURCE_USERNAME:patentflow}
     password: ${SPRING_DATASOURCE_PASSWORD:patentflow}
+  # 인증/세션 공유·영속 스토어. patentflow.redis.enabled=true일 때만 실제 사용한다(미사용 시 연결 안 함).
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2s
   mail:
     host: smtp.gmail.com
     port: 587
@@ -38,8 +45,14 @@ management:
   health:
     mail:
       enabled: false
+    # redis 비활성 시 헬스 인디케이터가 연결을 시도하지 않도록 동일 플래그로 끈다.
+    redis:
+      enabled: ${PATENTFLOW_REDIS_ENABLED:false}
 
 patentflow:
+  # 인증/세션 공유·영속 스토어(토큰 폐기·로그인 락아웃) 사용 여부. false면 인메모리(단일 인스턴스용)로 폴백.
+  redis:
+    enabled: ${PATENTFLOW_REDIS_ENABLED:false}
   oauth2:
     google:
       # Google Cloud Console에 등록한 OAuth2 앱 자격증명

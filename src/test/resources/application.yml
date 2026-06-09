@@ -9,7 +9,15 @@ spring:
       ddl-auto: create-drop
     open-in-view: false
 
+management:
+  health:
+    # 테스트는 인메모리 스토어(redis 비활성)이므로 redis 헬스 인디케이터가 연결을 시도하지 않게 끈다.
+    redis:
+      enabled: false
+
 patentflow:
+  redis:
+    enabled: false
   review:
     scheduler:
       enabled: false

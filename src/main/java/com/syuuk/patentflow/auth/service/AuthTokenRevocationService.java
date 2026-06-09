@@ -1,34 +1,26 @@
 package com.syuuk.patentflow.auth.service;
 
 import java.time.Instant;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Service;
 
+/**
+ * access 토큰 폐기 파사드. 저장은 RevokedTokenStore(인메모리/Redis)에 위임하므로 호출부
+ * (JwtAuthenticationFilter, AuthService)의 시그니처는 불변이고 구현만 선택된다.
+ */
 @Service
 public class AuthTokenRevocationService {
 
-    private final Map<String, Instant> revokedTokens = new ConcurrentHashMap<>();
+    private final RevokedTokenStore store;
+
+    public AuthTokenRevocationService(RevokedTokenStore store) {
+        this.store = store;
+    }
 
     public void revoke(String token, Instant expiresAt) {
-        purgeExpired();
-        revokedTokens.put(token, expiresAt);
+        store.revoke(token, expiresAt);
     }
 
     public boolean isRevoked(String token) {
-        Instant expiresAt = revokedTokens.get(token);
-        if (expiresAt == null) {
-            return false;
-        }
-        if (expiresAt.isBefore(Instant.now())) {
-            revokedTokens.remove(token);
-            return false;
-        }
-        return true;
-    }
-
-    private void purgeExpired() {
-        Instant now = Instant.now();
-        revokedTokens.entrySet().removeIf(entry -> entry.getValue().isBefore(now));
+        return store.isRevoked(token);
     }
 }
