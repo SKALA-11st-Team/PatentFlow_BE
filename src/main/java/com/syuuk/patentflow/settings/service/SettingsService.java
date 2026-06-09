@@ -57,7 +57,6 @@ public class SettingsService {
         this.aiReportBatchService = aiReportBatchService;
         this.systemSettingsService = systemSettingsService;
         this.eventPublisher = eventPublisher;
-        seedDefaultTemplatesIfNeeded();
     }
 
     @Transactional(readOnly = true)
@@ -132,20 +131,6 @@ public class SettingsService {
     }
 
     @Transactional
-    public List<QuarterSettingResponse> updateReviewSchedule(int year, int mailLeadMonths, LocalDate businessResponseDueDate) {
-        systemSettingsService.updateMailLeadMonths(mailLeadMonths);
-        List<QuarterSettingEntity> quarters = quarterSettingRepository.findByYearOrderByQuarterNumber(year);
-        if (businessResponseDueDate != null) {
-            quarters.forEach(quarter -> {
-                validateBusinessResponseDueDate(quarter, businessResponseDueDate);
-                quarter.setSubmissionDeadline(businessResponseDueDate);
-            });
-            quarterSettingRepository.saveAll(quarters);
-        }
-        return getQuarterSettings(year);
-    }
-
-    @Transactional
     public QuarterActivateResponse activateQuarter(String quarterKey) {
         synchronized (quarterActivationMonitor) {
             QuarterSettingEntity quarter = findOrCreateQuarterForUpdate(quarterKey);
@@ -171,22 +156,6 @@ public class SettingsService {
             doActivate(quarter);
             return true;
         }
-    }
-
-    @Transactional
-    public QuarterSettingResponse endQuarter(String quarterKey) {
-        QuarterSettingEntity quarter = findQuarter(quarterKey);
-        if (!quarter.isActivated()) {
-            throw new PatentFlowException(ErrorCode.INVALID_WORKFLOW_STATUS, "활성화된 분기만 종료할 수 있습니다.");
-        }
-        if (quarter.isEnded()) {
-            throw new PatentFlowException(ErrorCode.INVALID_WORKFLOW_STATUS, "이미 종료된 분기입니다.");
-        }
-        quarter.setEnded(true);
-        quarter.setEndedAt(OffsetDateTime.now(KST));
-        quarterSettingRepository.save(quarter);
-        return toResponse(quarter, quarter.getQuarterKey(), quarter.getYear(),
-                quarter.getQuarterNumber(), quarter.getStartDate(), quarter.getEndDate());
     }
 
     private void doActivate(QuarterSettingEntity quarter) {
@@ -418,7 +387,10 @@ public class SettingsService {
 
     private record QuarterParts(int year, int quarterNumber) {}
 
-    private void seedDefaultTemplatesIfNeeded() {
+    // SETTINGS-09: 생성자 내 트랜잭션 밖 쓰기 대신 @Transactional public으로 노출하고,
+    // 별도 ReviewPeriodTemplateSeeder(@PostConstruct)가 호출한다(프록시 적용 → 트랜잭션 보장).
+    @Transactional
+    public void seedDefaultTemplatesIfNeeded() {
         if (!periodTemplateRepository.findAll().isEmpty()) {
             return;
         }

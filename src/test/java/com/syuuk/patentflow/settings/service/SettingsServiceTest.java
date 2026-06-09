@@ -49,7 +49,7 @@ class SettingsServiceTest {
 
     @BeforeEach
     void setUp() {
-        when(periodTemplateRepository.findAll()).thenReturn(List.of(new ReviewPeriodTemplateEntity(3, 7, 1, 9, 30)));
+        // SETTINGS-09: 생성자가 더 이상 템플릿을 시드하지 않으므로 시드 stub 불필요.
         service = new SettingsService(
                 quarterSettingRepository,
                 periodTemplateRepository,

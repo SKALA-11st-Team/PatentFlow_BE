@@ -58,14 +58,19 @@ public class SystemSettingsService {
             "인증", "보안", "Network", "NFC", "AR", "VR (Avatar)", "사내시스템");
 
     private final SystemSettingsRepository repository;
+    // MAIL-08: 민감 시크릿(앱 비밀번호·refresh_token·client_secret) 저장/조회 시 AES-GCM 적용.
+    private final com.syuuk.patentflow.common.security.SecretCipher secretCipher;
     // env 폴백 — DB에 값이 없을 때 환경변수 값을 사용 (Docker 배포 시 편의)
     @Value("${GOOGLE_OAUTH2_CLIENT_ID:}")
     private String envGoogleClientId;
     @Value("${GOOGLE_OAUTH2_CLIENT_SECRET:}")
     private String envGoogleClientSecret;
 
-    public SystemSettingsService(SystemSettingsRepository repository) {
+    public SystemSettingsService(
+            SystemSettingsRepository repository,
+            com.syuuk.patentflow.common.security.SecretCipher secretCipher) {
         this.repository = repository;
+        this.secretCipher = secretCipher;
     }
 
     @Transactional(readOnly = true)
@@ -85,7 +90,7 @@ public class SystemSettingsService {
     }
 
     public String getGmailAppPassword() {
-        return get(KEY_GMAIL_APP_PASSWORD);
+        return secretCipher.decrypt(get(KEY_GMAIL_APP_PASSWORD));
     }
 
     @Transactional(readOnly = true)
@@ -104,14 +109,14 @@ public class SystemSettingsService {
     }
 
     public String getGmailOAuth2ClientSecret() {
-        String dbValue = get(KEY_GMAIL_OAUTH2_CLIENT_SECRET);
+        String dbValue = secretCipher.decrypt(get(KEY_GMAIL_OAUTH2_CLIENT_SECRET));
         return (dbValue != null && !dbValue.isBlank()) ? dbValue : envGoogleClientSecret;
     }
 
     // ── Gmail OAuth2 연동 토큰 ────────────────────────────────
 
     public String getGmailOAuth2RefreshToken() {
-        return get(KEY_GMAIL_OAUTH2_REFRESH_TOKEN);
+        return secretCipher.decrypt(get(KEY_GMAIL_OAUTH2_REFRESH_TOKEN));
     }
 
     public String getGmailOAuth2ConnectedEmail() {
@@ -119,7 +124,7 @@ public class SystemSettingsService {
     }
 
     public void saveGmailOAuth2(String refreshToken, String email) {
-        set(KEY_GMAIL_OAUTH2_REFRESH_TOKEN, refreshToken);
+        set(KEY_GMAIL_OAUTH2_REFRESH_TOKEN, secretCipher.encrypt(refreshToken));
         set(KEY_GMAIL_OAUTH2_CONNECTED_EMAIL, email);
         set(KEY_GMAIL_APP_PASSWORD, "");
     }
@@ -140,7 +145,7 @@ public class SystemSettingsService {
         if (request.gmailAppPassword() != null
                 && !request.gmailAppPassword().isBlank()
                 && !request.gmailAppPassword().contains("*")) {
-            set(KEY_GMAIL_APP_PASSWORD, request.gmailAppPassword().trim());
+            set(KEY_GMAIL_APP_PASSWORD, secretCipher.encrypt(request.gmailAppPassword().trim()));
         }
         return getMailSettings();
     }

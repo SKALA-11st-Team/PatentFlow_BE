@@ -13,6 +13,7 @@ import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -24,6 +25,8 @@ import org.springframework.stereotype.Component;
  *               AND 오늘 <= 납부 기간 종료일
  */
 @Component
+// SETTINGS-09: 시작 시(@PostConstruct) 검토 기간 템플릿에 의존하므로 시더 선행을 보장한다.
+@DependsOn("reviewPeriodTemplateSeeder")
 @ConditionalOnProperty(name = "patentflow.review.scheduler.enabled", havingValue = "true", matchIfMissing = true)
 public class QuarterActivationScheduler {
 

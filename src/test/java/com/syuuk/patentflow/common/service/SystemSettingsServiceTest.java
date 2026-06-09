@@ -31,7 +31,8 @@ class SystemSettingsServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new SystemSettingsService(repository);
+        // 키 미설정 SecretCipher = 평문 통과(기존 동작 유지). 암호화 경로는 SecretCipherTest에서 검증.
+        service = new SystemSettingsService(repository, new com.syuuk.patentflow.common.security.SecretCipher(""));
     }
 
     @Test
