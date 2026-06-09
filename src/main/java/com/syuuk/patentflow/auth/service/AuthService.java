@@ -40,6 +40,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final SecurityAuditLogger auditLogger;
+    private final PasswordChangeCache passwordChangeCache;
 
     public AuthService(
             AuthenticationManager authenticationManager,
@@ -50,7 +51,8 @@ public class AuthService {
             LoginAttemptService loginAttemptService,
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
-            SecurityAuditLogger auditLogger
+            SecurityAuditLogger auditLogger,
+            PasswordChangeCache passwordChangeCache
     ) {
         this.authenticationManager = authenticationManager;
         this.authSessionService = authSessionService;
@@ -61,6 +63,7 @@ public class AuthService {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.auditLogger = auditLogger;
+        this.passwordChangeCache = passwordChangeCache;
     }
 
     @Transactional
@@ -120,11 +123,14 @@ public class AuthService {
             throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "현재 비밀번호가 올바르지 않습니다.");
         }
         validateNewPassword(request.newPassword(), request.currentPassword(), user);
+        OffsetDateTime changedAt = OffsetDateTime.now(KST).withNano(0);
         user.setPassword(passwordEncoder.encode(request.newPassword()));
-        user.setPasswordChangedAt(OffsetDateTime.now(KST).withNano(0));
+        user.setPasswordChangedAt(changedAt);
         userRepository.save(user);
         // 비밀번호 변경 후 기존 세션 전체 무효화 — 재로그인 필요
         authSessionService.revokeAll(current.userId());
+        // AUTH-08: 변경 시각을 캐시에 write-through — JWT 필터가 stale 토큰을 즉시(공유 Redis면 전 레플리카) 거부한다.
+        passwordChangeCache.put(current.userId(), changedAt.toInstant());
         auditLogger.record(SecurityAuditLogger.Event.PASSWORD_CHANGED, current.email());
     }
 

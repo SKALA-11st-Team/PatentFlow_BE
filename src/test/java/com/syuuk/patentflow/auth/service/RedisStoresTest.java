@@ -95,4 +95,20 @@ class RedisStoresTest {
         assertThat(store.consume("state-1")).isFalse();  // GETDEL 단발 — 재사용 거부
         assertThat(store.consume("never-issued")).isFalse();
     }
+
+    @Test
+    void passwordChangeCacheStoresMillisAndNoChangeSentinel() {
+        RedisPasswordChangeCache cache = new RedisPasswordChangeCache(redisTemplate);
+
+        assertThat(cache.get("user-1")).isEmpty();   // 미스
+
+        // 변경 시각은 epoch millis로 무손실 라운드트립(DB는 항상 withNano(0) 초 정밀도)
+        Instant changedAt = Instant.ofEpochMilli(1_700_000_000_000L);
+        cache.put("user-1", changedAt);
+        assertThat(cache.get("user-1")).contains(changedAt);
+
+        // null → 0(EPOCH/NO_CHANGE) 센티넬로 저장/복원
+        cache.put("user-2", null);
+        assertThat(cache.get("user-2")).contains(PasswordChangeCache.NO_CHANGE);
+    }
 }

@@ -62,4 +62,19 @@ class AuthStoreTest {
 
         assertThat(store.isLocked("a@x.com")).isFalse();
     }
+
+    @Test
+    void passwordChangeCacheMissPutAndNoChangeSentinel() {
+        InMemoryPasswordChangeCache cache = new InMemoryPasswordChangeCache();
+
+        assertThat(cache.get("user-1")).isEmpty();   // 미스
+
+        Instant changedAt = Instant.ofEpochMilli(1_700_000_000_000L);
+        cache.put("user-1", changedAt);
+        assertThat(cache.get("user-1")).contains(changedAt);
+
+        // null → 변경 이력 없음(NO_CHANGE/EPOCH) 센티넬로 저장/복원
+        cache.put("user-2", null);
+        assertThat(cache.get("user-2")).contains(PasswordChangeCache.NO_CHANGE);
+    }
 }
