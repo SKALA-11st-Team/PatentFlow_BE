@@ -25,6 +25,11 @@ public class AiReportAgentClient {
     @Value("${agent.url:http://patentflow-agent:8000}")
     private String agentUrl;
 
+    // SEC-01: agent 인바운드 인증 키. 설정 시 모든 agent 호출에 X-API-Key로 동봉한다(미설정 시 미동봉).
+    // agent 측 AGENT_INBOUND_API_KEY와 동일 값이어야 한다(relaxed binding: AGENT_INBOUND_API_KEY).
+    @Value("${agent.inbound-api-key:}")
+    private String agentInboundApiKey;
+
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
 
@@ -35,6 +40,13 @@ public class AiReportAgentClient {
                 .version(HttpClient.Version.HTTP_1_1)
                 .build();
         this.objectMapper = objectMapper;
+    }
+
+    // SEC-01: 인바운드 키가 설정된 경우에만 X-API-Key 헤더를 동봉한다(미설정 시 미동봉 — 기존 배포 호환).
+    private void applyAgentAuth(HttpRequest.Builder builder) {
+        if (agentInboundApiKey != null && !agentInboundApiKey.isBlank()) {
+            builder.header("X-API-Key", agentInboundApiKey);
+        }
     }
 
     public AgentEvaluateResponse evaluate(String patentId) {
@@ -49,12 +61,13 @@ public class AiReportAgentClient {
     private AgentEvaluateResponse doEvaluate(String patentId, Duration timeout) {
         try {
             String url = agentUrl + "/api/v1/ai/patents/" + patentId + "/evaluate";
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest.Builder builder = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .timeout(timeout)
                     .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString("{}"))
-                    .build();
+                    .POST(HttpRequest.BodyPublishers.ofString("{}"));
+            applyAgentAuth(builder);
+            HttpRequest request = builder.build();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) {
                 log.warn("FastAPI evaluate returned {} for patent {}", response.statusCode(), patentId);
@@ -149,12 +162,13 @@ public class AiReportAgentClient {
     public AgentFieldRecommendation recommendFields(String patentId, Object requestBody) {
         try {
             String url = agentUrl + "/api/v1/ai/patents/" + patentId + "/recommend-fields";
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest.Builder builder = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .timeout(TIMEOUT)
                     .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(requestBody)))
-                    .build();
+                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(requestBody)));
+            applyAgentAuth(builder);
+            HttpRequest request = builder.build();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) {
                 log.warn("FastAPI recommend-fields returned {} for patent {}", response.statusCode(), patentId);
