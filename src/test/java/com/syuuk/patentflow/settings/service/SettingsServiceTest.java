@@ -42,6 +42,9 @@ class SettingsServiceTest {
     @Mock
     private SystemSettingsService systemSettingsService;
 
+    @Mock
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
+
     private SettingsService service;
 
     @BeforeEach
@@ -52,7 +55,8 @@ class SettingsServiceTest {
                 periodTemplateRepository,
                 patentReviewService,
                 aiReportBatchService,
-                systemSettingsService);
+                systemSettingsService,
+                eventPublisher);
     }
 
     @Test

@@ -75,6 +75,7 @@ public class MailingService {
     private final SystemSettingsService systemSettingsService;
     private final DepartmentRepository departmentRepository;
     private final MailOAuth2Service mailOAuth2Service;
+    private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     public MailingService(
             MailingHistoryRepository mailingHistoryRepository,
@@ -83,8 +84,10 @@ public class MailingService {
             UserRepository userRepository,
             SystemSettingsService systemSettingsService,
             DepartmentRepository departmentRepository,
-            MailOAuth2Service mailOAuth2Service
+            MailOAuth2Service mailOAuth2Service,
+            org.springframework.context.ApplicationEventPublisher eventPublisher
     ) {
+        this.eventPublisher = eventPublisher;
         this.mailingHistoryRepository = mailingHistoryRepository;
         this.patentReviewService = patentReviewService;
         this.objectMapper = objectMapper;
@@ -186,6 +189,20 @@ public class MailingService {
                 .distinct()
                 .toList();
         PatentReviewService.WorkflowBatchUpdateResult updateResult = patentReviewService.markMailingSent(patentIds);
+
+        // NOTI-04: 실제 발송분(SENT)이 있을 때만 알림 발행 — 관리자(발송 완료)·사업부(검토 요청 도착).
+        if (!sentDrafts.isEmpty()) {
+            eventPublisher.publishEvent(new com.syuuk.patentflow.notification.event.WorkflowNotificationEvent(
+                    "사업부 메일 발송 완료",
+                    "검토 요청 메일이 발송되었습니다(특허 %d건).".formatted(patentIds.size()),
+                    "ADMIN",
+                    "/admin/mailing"));
+            eventPublisher.publishEvent(new com.syuuk.patentflow.notification.event.WorkflowNotificationEvent(
+                    "검토 요청 도착",
+                    "연차료 검토 요청 메일이 도착했습니다. 배정 특허를 확인해주세요.",
+                    "BUSINESS",
+                    "/business/review-requests"));
+        }
 
         return new MailingSendResponse(
                 mailingBatchId,

@@ -258,7 +258,7 @@ class MailingServiceTest {
                 DepartmentRepository departmentRepository,
                 MailOAuth2Service mailOAuth2Service) {
             super(mailingHistoryRepository, patentReviewService, objectMapper, userRepository,
-                    systemSettingsService, departmentRepository, mailOAuth2Service);
+                    systemSettingsService, departmentRepository, mailOAuth2Service, event -> { });
         }
 
         @Override

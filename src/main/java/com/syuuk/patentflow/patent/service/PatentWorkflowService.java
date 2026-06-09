@@ -59,6 +59,8 @@ public class PatentWorkflowService {
     private final AnnualFeeScheduleService annualFeeScheduleService;
     private final ObjectMapper objectMapper;
 
+    private final org.springframework.context.ApplicationEventPublisher eventPublisher;
+
     public PatentWorkflowService(
             @Lazy PatentReviewService patentReviewService,
             PatentMetadataRepository patentMetadataRepository,
@@ -66,7 +68,8 @@ public class PatentWorkflowService {
             AiReportAgentClient aiReportAgentClient,
             AiReportStorageService aiReportStorageService,
             AnnualFeeScheduleService annualFeeScheduleService,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            org.springframework.context.ApplicationEventPublisher eventPublisher
     ) {
         this.patentReviewService = patentReviewService;
         this.patentMetadataRepository = patentMetadataRepository;
@@ -75,6 +78,7 @@ public class PatentWorkflowService {
         this.aiReportStorageService = aiReportStorageService;
         this.annualFeeScheduleService = annualFeeScheduleService;
         this.objectMapper = objectMapper;
+        this.eventPublisher = eventPublisher;
     }
 
     // ── AI 레포트 생성 ────────────────────────────────────────
@@ -163,6 +167,13 @@ public class PatentWorkflowService {
             }
             return withFinalDecision(patent, request, decidedAt, actor);
         });
+        // NOTI-04: 최종 판단 기록 알림(커밋 후 발행).
+        eventPublisher.publishEvent(new com.syuuk.patentflow.notification.event.WorkflowNotificationEvent(
+                "최종 판단 기록",
+                "%s 특허의 최종 판단(%s)이 기록되었습니다.".formatted(
+                        patentId, updated.legalActionResult() == null ? "결정" : updated.legalActionResult().name()),
+                "ADMIN",
+                "/admin/patents/" + patentId));
         return new FinalDecisionResponse(updated.patentId(), updated.finalDecisionRecord(),
                 updated.legalActionResult(), updated.reviewWorkflowStatus());
     }

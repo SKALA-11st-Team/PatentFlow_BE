@@ -8,6 +8,7 @@ import com.syuuk.patentflow.patent.dto.AiReportJobResponse;
 import com.syuuk.patentflow.patent.dto.AiReportJobStatus;
 import com.syuuk.patentflow.patent.dto.PatentDetailResponse;
 import com.syuuk.patentflow.patent.dto.ReviewWorkflowStatus;
+import com.syuuk.patentflow.notification.event.WorkflowNotificationEvent;
 import com.syuuk.patentflow.patent.repository.AiReportJobRepository;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -16,6 +17,7 @@ import java.util.concurrent.Executor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,17 +33,20 @@ public class AiReportJobService {
     private final PatentReviewService patentReviewService;
     private final PatentWorkflowService workflowService;
     private final Executor aiReportBatchExecutor;
+    private final ApplicationEventPublisher eventPublisher;
 
     public AiReportJobService(
             AiReportJobRepository jobRepository,
             PatentReviewService patentReviewService,
             PatentWorkflowService workflowService,
-            @Qualifier("aiReportBatchExecutor") Executor aiReportBatchExecutor
+            @Qualifier("aiReportBatchExecutor") Executor aiReportBatchExecutor,
+            ApplicationEventPublisher eventPublisher
     ) {
         this.jobRepository = jobRepository;
         this.patentReviewService = patentReviewService;
         this.workflowService = workflowService;
         this.aiReportBatchExecutor = aiReportBatchExecutor;
+        this.eventPublisher = eventPublisher;
     }
 
     public AiReportJobResponse requestAiReport(String patentId) {
@@ -99,6 +104,13 @@ public class AiReportJobService {
                 job.markSucceeded(now(), report.reportId());
             }
             jobRepository.save(job);
+            // NOTI-04: AI 레포트 생성 완료를 알림으로 발행(제한 생성=degraded도 결과물이 있으므로 발행).
+            String title = report.degraded() ? "AI 평가 레포트 생성 완료(제한)" : "AI 평가 레포트 생성 완료";
+            eventPublisher.publishEvent(new WorkflowNotificationEvent(
+                    title,
+                    "%s 특허의 AI 평가 레포트가 생성되었습니다.".formatted(job.getPatentId()),
+                    "ADMIN",
+                    "/admin/patents/" + job.getPatentId()));
         } catch (Exception exception) {
             log.warn("[AiReportJob] job failed: {} — {}", jobId, exception.getMessage());
             AiReportJobEntity failedJob = jobRepository.findById(jobId).orElse(job);

@@ -41,18 +41,22 @@ public class SettingsService {
     private final SystemSettingsService systemSettingsService;
     private final Object quarterActivationMonitor = new Object();
 
+    private final org.springframework.context.ApplicationEventPublisher eventPublisher;
+
     public SettingsService(
             QuarterSettingRepository quarterSettingRepository,
             ReviewPeriodTemplateRepository periodTemplateRepository,
             PatentReviewService patentReviewService,
             AiReportBatchService aiReportBatchService,
-            SystemSettingsService systemSettingsService
+            SystemSettingsService systemSettingsService,
+            org.springframework.context.ApplicationEventPublisher eventPublisher
     ) {
         this.quarterSettingRepository = quarterSettingRepository;
         this.periodTemplateRepository = periodTemplateRepository;
         this.patentReviewService = patentReviewService;
         this.aiReportBatchService = aiReportBatchService;
         this.systemSettingsService = systemSettingsService;
+        this.eventPublisher = eventPublisher;
         seedDefaultTemplatesIfNeeded();
     }
 
@@ -204,6 +208,13 @@ public class SettingsService {
         if (!reviewStartedIds.isEmpty()) {
             aiReportBatchService.generateReportsForQuarter(reviewStartedIds, quarter.getQuarterKey());
         }
+        // NOTI-04: 분기 검토 시작을 사업부에 알림(커밋 후 발행).
+        eventPublisher.publishEvent(new com.syuuk.patentflow.notification.event.WorkflowNotificationEvent(
+                "검토 분기 시작",
+                "%s 연차료 검토가 시작되었습니다. 배정 특허 %d건을 확인해주세요."
+                        .formatted(quarter.getQuarterKey(), reviewStartedIds.size()),
+                "BUSINESS",
+                "/business/review-requests"));
     }
 
     private QuarterActivateResponse buildActivateResponse(QuarterSettingEntity quarter) {

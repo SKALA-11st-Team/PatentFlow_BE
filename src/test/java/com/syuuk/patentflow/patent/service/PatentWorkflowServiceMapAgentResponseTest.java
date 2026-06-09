@@ -36,7 +36,8 @@ class PatentWorkflowServiceMapAgentResponseTest {
                 mock(AiReportAgentClient.class),
                 storage,
                 mock(AnnualFeeScheduleService.class),
-                new ObjectMapper());
+                new ObjectMapper(),
+                mock(org.springframework.context.ApplicationEventPublisher.class));
     }
 
     private AgentScoreItem score(String category, Integer value) {
