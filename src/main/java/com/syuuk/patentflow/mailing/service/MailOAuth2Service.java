@@ -5,8 +5,10 @@ import com.syuuk.patentflow.common.error.PatentFlowException;
 import com.syuuk.patentflow.common.service.SystemSettingsService;
 import com.syuuk.patentflow.mailing.config.MailOAuth2Properties;
 import com.syuuk.patentflow.mailing.dto.MailOAuth2StatusResponse;
+import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.Map;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.slf4j.Logger;
@@ -33,9 +35,14 @@ public class MailOAuth2Service {
     // Gmail 발송 + 이메일 주소 조회 (연동된 계정 표시용)
     private static final String GMAIL_SCOPE = "https://mail.google.com/ email";
 
+    // SEC-04/MAIL-07: OAuth2 CSRF 방어 state 유효시간(authorize→callback 왕복).
+    private static final Duration STATE_TTL = Duration.ofMinutes(10);
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
     private final MailOAuth2Properties properties;
     private final SystemSettingsService systemSettingsService;
     private final RestTemplate restTemplate;
+    private final OAuthStateStore stateStore;
 
     // access_token은 1시간 만료 — 55분 캐시해서 매 발송마다 토큰 교환 API 호출을 방지
     private String cachedAccessToken;
@@ -43,9 +50,11 @@ public class MailOAuth2Service {
 
     public MailOAuth2Service(MailOAuth2Properties properties,
             SystemSettingsService systemSettingsService,
-            RestTemplateBuilder restTemplateBuilder) {
+            RestTemplateBuilder restTemplateBuilder,
+            OAuthStateStore stateStore) {
         this.properties = properties;
         this.systemSettingsService = systemSettingsService;
+        this.stateStore = stateStore;
         this.restTemplate = restTemplateBuilder
                 .connectTimeout(Duration.ofSeconds(5))
                 .readTimeout(Duration.ofSeconds(5))
@@ -60,6 +69,9 @@ public class MailOAuth2Service {
             throw new PatentFlowException(ErrorCode.INVALID_REQUEST,
                     "Google OAuth2 Client ID가 설정되지 않았습니다. 설정 페이지에서 Client ID를 먼저 입력하세요.");
         }
+        // SEC-04/MAIL-07: CSRF 방어용 난수 state를 발급·저장하고 URL에 실어, 콜백에서 단발 검증한다.
+        String state = generateState();
+        stateStore.save(state, STATE_TTL);
         return UriComponentsBuilder.fromUriString(GOOGLE_AUTH_URL)
                 .queryParam("client_id", clientId)
                 .queryParam("redirect_uri", properties.getRedirectUri())
@@ -68,7 +80,19 @@ public class MailOAuth2Service {
                 // offline → refresh_token 발급, consent → 재연동 시에도 항상 refresh_token 재발급
                 .queryParam("access_type", "offline")
                 .queryParam("prompt", "consent")
+                .queryParam("state", state)
                 .build().toUriString();
+    }
+
+    /** 콜백의 state를 단발 검증한다(발급한 state와 일치하고 미만료·미사용일 때만 true). */
+    public boolean validateState(String state) {
+        return state != null && !state.isBlank() && stateStore.consume(state);
+    }
+
+    private static String generateState() {
+        byte[] bytes = new byte[32];
+        SECURE_RANDOM.nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
     // ── 코드 교환 및 저장 ─────────────────────────────────────

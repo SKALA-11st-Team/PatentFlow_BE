@@ -48,10 +48,16 @@ public class MailOAuth2Controller {
     public void callback(
             @RequestParam(required = false) String code,
             @RequestParam(required = false) String error,
+            @RequestParam(required = false) String state,
             HttpServletResponse response) throws IOException {
         String frontendUri = properties.getFrontendSettingsUri();
         if (error != null) {
             response.sendRedirect(frontendUri + "?oauth2_error=" + error);
+            return;
+        }
+        // SEC-04/MAIL-07: 발급한 state와 일치하지 않으면(위조/재사용) code 교환 전에 거부한다.
+        if (!mailOAuth2Service.validateState(state)) {
+            response.sendRedirect(frontendUri + "?oauth2_error=invalid_state");
             return;
         }
         if (code == null || code.isBlank()) {
