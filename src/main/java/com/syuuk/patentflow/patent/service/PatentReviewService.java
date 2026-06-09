@@ -358,6 +358,15 @@ public class PatentReviewService {
         return findPatent(patentId).aiEvaluationReport().totalScore();
     }
 
+    /**
+     * CONTRACT-02: 대표 종합 점수는 0~100 평균을 정본으로 한다(totalScore는 0~400 원문 합).
+     * 사업부 제출 스냅샷 등 단일 대표값이 필요한 곳은 이 평균(반올림)을 사용해 화면 전반의 척도를 통일한다.
+     */
+    public Integer getAiAverageScore(String patentId) {
+        Double averageScore = findPatent(patentId).aiEvaluationReport().averageScore();
+        return averageScore == null ? null : (int) Math.round(averageScore);
+    }
+
     public OffsetDateTime getAiReportCreatedAt(String patentId) {
         return findPatent(patentId).aiEvaluationReport().createdAt();
     }

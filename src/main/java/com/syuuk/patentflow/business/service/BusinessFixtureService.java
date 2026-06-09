@@ -231,7 +231,9 @@ public class BusinessFixtureService {
                 .mapToInt(BusinessSubmissionChecklistScoreResponse::score)
                 .sum() + request.qualitativeScore();
         Recommendation recommendation = patentReviewService.getCurrentRecommendation(patentId);
-        Integer aiTotalScore = patentReviewService.getAiTotalScore(patentId);
+        // CONTRACT-02: 사업부 제출 스냅샷의 AI 점수는 0~400 원문 합이 아니라 화면 정본인 0~100 평균을
+        // 사용해 다른 화면(AI 레포트 카드)과 척도를 통일한다.
+        Integer aiAverageScore = patentReviewService.getAiAverageScore(patentId);
 
         return new BusinessSubmissionVersionResponse(
                 submissionId(patentId),
@@ -242,7 +244,7 @@ public class BusinessFixtureService {
                 submittedAt,
                 patentReviewService.getAiReportCreatedAt(patentId),
                 recommendation,
-                aiTotalScore == null ? 0 : aiTotalScore,
+                aiAverageScore == null ? 0 : aiAverageScore,
                 checklistTotal,
                 checklistScores,
                 request.qualitativeScore());
