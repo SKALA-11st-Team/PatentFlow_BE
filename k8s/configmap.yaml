@@ -13,3 +13,8 @@ data:
   PATENTFLOW_AI_REPORT_STORAGE_DIR: "/app/storage/ai-reports"
   PATENTFLOW_COOKIE_SECURE: "true"
   PATENTFLOW_COOKIE_SAME_SITE: "None"
+  # 인증/세션 공유·영속 스토어(토큰 폐기·로그인 락아웃). Redis는 BE와 별도 StatefulSet 파드
+  # (redis-statefulset.yaml)로 뜨고 ClusterIP 서비스로 접근한다. 멀티레플리카·재시작에도 공유·영속.
+  PATENTFLOW_REDIS_ENABLED: "true"
+  REDIS_HOST: "team11-patentflow-redis-svc"
+  REDIS_PORT: "6379"
