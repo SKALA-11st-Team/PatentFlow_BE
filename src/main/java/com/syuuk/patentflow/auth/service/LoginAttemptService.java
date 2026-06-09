@@ -1,6 +1,7 @@
 package com.syuuk.patentflow.auth.service;
 
 import com.syuuk.patentflow.auth.config.AuthProperties;
+import com.syuuk.patentflow.common.audit.SecurityAuditLogger;
 import com.syuuk.patentflow.common.error.ErrorCode;
 import com.syuuk.patentflow.common.error.PatentFlowException;
 import java.time.Duration;
@@ -15,10 +16,12 @@ public class LoginAttemptService {
 
     private final AuthProperties properties;
     private final LoginAttemptStore store;
+    private final SecurityAuditLogger auditLogger;
 
-    public LoginAttemptService(AuthProperties properties, LoginAttemptStore store) {
+    public LoginAttemptService(AuthProperties properties, LoginAttemptStore store, SecurityAuditLogger auditLogger) {
         this.properties = properties;
         this.store = store;
+        this.auditLogger = auditLogger;
     }
 
     public void assertNotLocked(String email) {
@@ -37,6 +40,8 @@ public class LoginAttemptService {
         int failures = store.incrementFailures(key, window);
         if (failures >= properties.getMaxLoginFailures()) {
             store.setLock(key, Duration.ofSeconds(properties.getLoginLockSeconds()));
+            auditLogger.record(SecurityAuditLogger.Event.ACCOUNT_LOCKED, email,
+                    "failures=" + failures);
         }
     }
 

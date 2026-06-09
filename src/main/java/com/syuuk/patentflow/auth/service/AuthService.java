@@ -5,6 +5,7 @@ import com.syuuk.patentflow.auth.dto.LoginRequest;
 import com.syuuk.patentflow.auth.dto.LoginResponse;
 import com.syuuk.patentflow.auth.dto.UpdateProfileRequest;
 import com.syuuk.patentflow.auth.dto.UserPrincipalResponse;
+import com.syuuk.patentflow.common.audit.SecurityAuditLogger;
 import com.syuuk.patentflow.common.error.ErrorCode;
 import com.syuuk.patentflow.common.error.PatentFlowException;
 import com.syuuk.patentflow.user.domain.UserEntity;
@@ -38,6 +39,7 @@ public class AuthService {
     private final LoginAttemptService loginAttemptService;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final SecurityAuditLogger auditLogger;
 
     public AuthService(
             AuthenticationManager authenticationManager,
@@ -47,7 +49,8 @@ public class AuthService {
             JwtTokenProvider jwtTokenProvider,
             LoginAttemptService loginAttemptService,
             UserRepository userRepository,
-            PasswordEncoder passwordEncoder
+            PasswordEncoder passwordEncoder,
+            SecurityAuditLogger auditLogger
     ) {
         this.authenticationManager = authenticationManager;
         this.authSessionService = authSessionService;
@@ -57,6 +60,7 @@ public class AuthService {
         this.loginAttemptService = loginAttemptService;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.auditLogger = auditLogger;
     }
 
     @Transactional
@@ -68,9 +72,11 @@ public class AuthService {
                     new UsernamePasswordAuthenticationToken(request.email(), request.password()));
         } catch (BadCredentialsException exception) {
             loginAttemptService.recordFailure(request.email());
+            auditLogger.record(SecurityAuditLogger.Event.LOGIN_FAILURE, request.email());
             throw exception;
         }
         loginAttemptService.recordSuccess(request.email());
+        auditLogger.record(SecurityAuditLogger.Event.LOGIN_SUCCESS, request.email());
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();
         return issueTokens((UserDetailsImpl) userDetails);
     }
@@ -119,12 +125,14 @@ public class AuthService {
         userRepository.save(user);
         // 비밀번호 변경 후 기존 세션 전체 무효화 — 재로그인 필요
         authSessionService.revokeAll(current.userId());
+        auditLogger.record(SecurityAuditLogger.Event.PASSWORD_CHANGED, current.email());
     }
 
     @Transactional
     public void logout(String accessToken, String refreshToken) {
         revokeAccessToken(accessToken);
         authSessionService.revoke(refreshToken);
+        auditLogger.record(SecurityAuditLogger.Event.LOGOUT, null);
     }
 
     @Transactional
