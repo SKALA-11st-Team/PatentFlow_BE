@@ -11,6 +11,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -38,6 +39,12 @@ public class AnnualFeeScheduleController {
             @Valid @RequestBody AnnualFeeScheduleAdjustmentRequest request,
             Authentication authentication) {
         return ApiResponse.ok(service.adjustSchedule(patentId, request, currentAdjuster(authentication)));
+    }
+
+    // FEE-05: 저장된 과거 납부일을 국가 연장 개월 단위로 미래까지 전진 저장한다(전진된 특허 수 반환).
+    @PostMapping("/recompute")
+    public ApiResponse<Integer> recompute() {
+        return ApiResponse.ok(service.recomputeOverdueSchedules());
     }
 
     private String currentAdjuster(Authentication authentication) {

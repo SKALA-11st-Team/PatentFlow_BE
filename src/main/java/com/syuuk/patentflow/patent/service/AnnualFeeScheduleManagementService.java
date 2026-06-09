@@ -12,6 +12,7 @@ import com.syuuk.patentflow.patent.repository.AnnualFeeAdjustmentRepository;
 import com.syuuk.patentflow.patent.repository.PatentMetadataRepository;
 import com.syuuk.patentflow.patent.repository.PatentReviewHistoryRepository;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -24,6 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AnnualFeeScheduleManagementService {
+
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     private final AnnualFeeAdjustmentRepository adjustmentRepository;
     private final AnnualFeeScheduleService annualFeeScheduleService;
@@ -93,6 +96,30 @@ public class AnnualFeeScheduleManagementService {
                 .toList());
     }
 
+    /**
+     * FEE-05: 저장된 납부일이 과거인 특허를 국가 연장 개월 단위로 굴려 실제 저장값까지 전진시킨다.
+     * 조회 시점 effective 표기와 달리 이 경로는 영속화한다(관리자 수동/배치 트리거). 전진된 특허 수를 반환.
+     */
+    @Transactional
+    public int recomputeOverdueSchedules() {
+        LocalDate today = LocalDate.now(KST);
+        int updated = 0;
+        for (PatentMetadataEntity patent : patentMetadataRepository.findAll()) {
+            LocalDate stored = patent.getFeeDueDate();
+            if (stored == null || !stored.isBefore(today)) {
+                continue;
+            }
+            LocalDate rolled = annualFeeScheduleService.rollForwardToFuture(
+                    patent.getCountry(), stored, patent.getExpectedExpirationDate(), today);
+            if (rolled != null && rolled.isAfter(stored)) {
+                patent.setFeeDueDate(rolled);
+                patentMetadataRepository.save(patent);
+                updated++;
+            }
+        }
+        return updated;
+    }
+
     private Map<String, List<AnnualFeeAdjustmentHistoryResponse>> findAdjustmentHistoriesByPatentId(List<PatentMetadataEntity> patents) {
         if (patents.isEmpty()) {
             return Map.of();
@@ -119,7 +146,11 @@ public class AnnualFeeScheduleManagementService {
                 patent.getApplicationDate(),
                 patent.getRegistrationDate(),
                 patent.getExpectedExpirationDate());
-        LocalDate effectiveDueDate = patent.getFeeDueDate() != null ? patent.getFeeDueDate() : calculatedDueDate;
+        // FEE-05: 저장값(stored)이 과거이면 조회 시점에 미래로 굴린 값을 effective로 노출(저장은 불변).
+        LocalDate effectiveDueDate = patent.getFeeDueDate() != null
+                ? annualFeeScheduleService.rollForwardToFuture(
+                        patent.getCountry(), patent.getFeeDueDate(), patent.getExpectedExpirationDate())
+                : calculatedDueDate;
 
         return new AnnualFeeScheduleItemResponse(
                 patent.getPatentId(),
