@@ -87,6 +87,28 @@ class SettingsServiceTest {
     }
 
     @Test
+    void activateQuarterRejectsQuarterNumberOutOfRange() {
+        // 회귀: 분기 번호는 1~4로만 허용(Q5/Q0 거부).
+        assertThatThrownBy(() -> service.activateQuarter("2026-Q5"))
+                .isInstanceOf(PatentFlowException.class)
+                .hasMessageContaining("Q1부터 Q4");
+        assertThatThrownBy(() -> service.activateQuarter("2026-Q0"))
+                .isInstanceOf(PatentFlowException.class)
+                .hasMessageContaining("Q1부터 Q4");
+    }
+
+    @Test
+    void activateQuarterRejectsOutOfRangeYear() {
+        // 회귀: 연도 무경계 갭 보강 — 비정상 연도(과대/과소) 거부.
+        assertThatThrownBy(() -> service.activateQuarter("99999-Q1"))
+                .isInstanceOf(PatentFlowException.class)
+                .hasMessageContaining("유효하지 않은 분기 연도");
+        assertThatThrownBy(() -> service.activateQuarter("1900-Q1"))
+                .isInstanceOf(PatentFlowException.class)
+                .hasMessageContaining("유효하지 않은 분기 연도");
+    }
+
+    @Test
     void updateQuarterSettingRejectsResponseDueDateAfterQuarterEnd() {
         QuarterSettingEntity quarter = quarter("2026-Q3", 2026, 3, LocalDate.of(2026, 7, 1), LocalDate.of(2026, 9, 30));
 

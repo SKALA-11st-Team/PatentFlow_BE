@@ -339,6 +339,14 @@ public class SettingsService {
         }
     }
 
+    // 회귀: 분기 번호는 1~4로 clamp되지만 연도는 무경계(Integer.parseInt)라 99999/0/음수 같은 비정상 연도가
+    // 분기 엔티티로 생성될 수 있었다. 합리적 달력 범위로 clamp한다(시드/스케줄러와 충돌하지 않도록 넉넉히).
+    private void validateQuarterYear(int year) {
+        if (year < 2000 || year > 2100) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "유효하지 않은 분기 연도입니다: " + year);
+        }
+    }
+
     private QuarterParts parseQuarterKey(String quarterKey) {
         String[] parts = quarterKey == null ? new String[0] : quarterKey.split("-Q");
         if (parts.length != 2) {
@@ -347,6 +355,7 @@ public class SettingsService {
         try {
             int year = Integer.parseInt(parts[0]);
             int quarterNumber = Integer.parseInt(parts[1]);
+            validateQuarterYear(year);
             validatePeriodNumber(quarterNumber);
             return new QuarterParts(year, quarterNumber);
         } catch (NumberFormatException e) {
