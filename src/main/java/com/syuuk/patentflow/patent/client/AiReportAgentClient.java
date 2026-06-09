@@ -142,11 +142,12 @@ public class AiReportAgentClient {
         }
     }
 
+    // CONTRACT-04: 에이전트 분야 추천 응답은 사업/기술 분야만 반환한다. productName은 에이전트가
+    // 산출하지 않고 BE에서 읽는 곳도 없던 dead 필드여서 제거해 계약을 응답 실제와 일치시킨다.
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record AgentFieldRecommendation(
             String businessArea,
             String technologyArea,
-            String productName,
             Double confidence,
             String confidenceText,
             String reason

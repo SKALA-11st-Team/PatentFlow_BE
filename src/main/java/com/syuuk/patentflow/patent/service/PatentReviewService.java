@@ -478,7 +478,8 @@ public class PatentReviewService {
         body.put("applicationNumber", request.applicationNumber());
         body.put("technologyArea", request.technologyArea());
         body.put("businessArea", request.businessArea());
-        body.put("productName", request.productName());
+        // CONTRACT-04: productName은 에이전트 추천 계약(분야 추천=사업/기술 분야)의 입력이 아니다.
+        // 과거에는 본문/taxonomy로 보냈으나 에이전트가 묵살(FastAPI 미선언)하던 dead path여서 제거한다.
         body.put("taxonomy", buildClassificationTaxonomy());
 
         String patentRef = request.managementNumber() != null && !request.managementNumber().isBlank()
@@ -502,13 +503,13 @@ public class PatentReviewService {
     }
 
     /**
-     * 관리자 관리 분류값을 에이전트가 이해하는 taxonomy 형태로 변환한다. (제품명은 자유 입력 허용 → 빈 목록)
+     * 관리자 관리 분류값을 에이전트가 이해하는 taxonomy 형태로 변환한다.
+     * (CONTRACT-04: 추천 대상은 사업/기술 분야뿐 — productName 분류는 에이전트가 쓰지 않아 제외)
      */
     private Map<String, List<String>> buildClassificationTaxonomy() {
         Map<String, List<String>> taxonomy = new HashMap<>();
         taxonomy.put("businessArea", List.of());
         taxonomy.put("technologyArea", List.of());
-        taxonomy.put("productName", List.of());
         for (ClassificationResponse classification : systemSettingsService.getClassifications()) {
             if ("BUSINESS".equals(classification.type())) {
                 taxonomy.put("businessArea", classification.values());
