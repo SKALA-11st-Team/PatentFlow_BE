@@ -12,6 +12,8 @@ import com.syuuk.patentflow.patent.dto.BusinessOpinionDecision;
 import com.syuuk.patentflow.patent.dto.BusinessOpinionResponse;
 import com.syuuk.patentflow.patent.dto.EvaluationCategory;
 import com.syuuk.patentflow.patent.dto.EvaluationScoreResponse;
+import com.syuuk.patentflow.patent.dto.EvidenceDetailResponse;
+import com.syuuk.patentflow.patent.dto.SourceResponse;
 import com.syuuk.patentflow.patent.dto.FinalDecisionRecordResponse;
 import com.syuuk.patentflow.patent.dto.FinalDecisionRequest;
 import com.syuuk.patentflow.patent.dto.FinalDecisionResponse;
@@ -368,7 +370,8 @@ public class PatentWorkflowService {
         String reportId = "REPORT-" + patentId + "-" + System.currentTimeMillis();
         List<EvaluationScoreResponse> scores = agent.scores() == null ? List.of() :
                 agent.scores().stream()
-                        .map(s -> new EvaluationScoreResponse(toCategory(s.category()), s.score(), s.grade(), s.evidence()))
+                        .map(s -> new EvaluationScoreResponse(toCategory(s.category()), s.score(), s.grade(), s.evidence(),
+                                toEvidenceDetails(s.evidenceDetails())))
                         .toList();
         Integer totalScore = totalScore(agent, scores);
         Double averageScore = averageScore(agent, totalScore, scores);
@@ -378,10 +381,37 @@ public class PatentWorkflowService {
         String rawMarkdown = normalizeMarkdown(agent.reportMarkdown(), summary, scores, agent.recommendation());
         String markdownFilePath = aiReportStorageService.storeMarkdown(patentId, reportId, rawMarkdown);
         OffsetDateTime generatedAt = agent.generatedAt() == null ? OffsetDateTime.now(KST) : agent.generatedAt();
+        // ORCH-06/AIREPORT-02: 에이전트가 산출한 리치 근거를 폐기하지 않고 DTO로 풀스루한다.
         return new AiEvaluationReportResponse(reportId, generatedAt,
                 toRecommendation(agent.recommendation()), summary,
                 totalScore, averageScore, agent.finalGrade(), agent.finalIndicator(), degraded, failureReason,
-                scores, List.of(), rawMarkdown, markdownFilePath);
+                scores, nullSafeList(agent.missingInformation()), rawMarkdown, markdownFilePath,
+                agent.keyEvidence(), nullSafeList(agent.judgementGrounds()),
+                nullSafeList(agent.businessCheckRequests()), toSourceResponses(agent.externalSources()));
+    }
+
+    private static <T> List<T> nullSafeList(List<T> value) {
+        return value == null ? List.of() : value;
+    }
+
+    private static List<EvidenceDetailResponse> toEvidenceDetails(List<AiReportAgentClient.EvidenceDetailItem> items) {
+        if (items == null) {
+            return List.of();
+        }
+        return items.stream()
+                .map(item -> new EvidenceDetailResponse(item.text(), toSourceResponse(item.source())))
+                .toList();
+    }
+
+    private static SourceResponse toSourceResponse(AiReportAgentClient.AgentSourceRef source) {
+        return source == null ? null : new SourceResponse(source.title(), source.url());
+    }
+
+    private static List<SourceResponse> toSourceResponses(List<AiReportAgentClient.AgentSourceRef> sources) {
+        if (sources == null) {
+            return List.of();
+        }
+        return sources.stream().map(PatentWorkflowService::toSourceResponse).toList();
     }
 
     private Integer totalScore(AgentEvaluateResponse agent, List<EvaluationScoreResponse> scores) {

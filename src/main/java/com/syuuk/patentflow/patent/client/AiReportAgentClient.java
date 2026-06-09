@@ -81,7 +81,13 @@ public class AiReportAgentClient {
                 null,
                 true,
                 failureReason,
-                OffsetDateTime.now()
+                OffsetDateTime.now(),
+                // ORCH-06/AIREPORT-02: 폴백은 리치 근거가 없으므로 빈 값.
+                List.of(),
+                null,
+                List.of(),
+                List.of(),
+                List.of()
         );
     }
 
@@ -100,7 +106,13 @@ public class AiReportAgentClient {
             String artifactDir,
             Boolean degraded,
             String failureReason,
-            OffsetDateTime generatedAt
+            OffsetDateTime generatedAt,
+            // ORCH-06/AIREPORT-02: 에이전트가 산출하는 리포트 레벨 리치 근거(그동안 record 미정의로 폐기되던 필드).
+            List<String> missingInformation,
+            String keyEvidence,
+            List<String> judgementGrounds,
+            List<String> businessCheckRequests,
+            List<AgentSourceRef> externalSources
     ) {
         public String summaryText() {
             return summaryMarkdown;
@@ -115,7 +127,20 @@ public class AiReportAgentClient {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record AgentScoreItem(String category, Integer score, String grade, String evidence) {}
+    public record AgentScoreItem(
+            String category,
+            Integer score,
+            String grade,
+            String evidence,
+            // ORCH-06/AIREPORT-02: 축별 세부 근거(클릭형 출처 포함).
+            List<EvidenceDetailItem> evidenceDetails
+    ) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record EvidenceDetailItem(String text, AgentSourceRef source) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record AgentSourceRef(String title, String url) {}
 
     /**
      * 특허 분야 추천 — 관리자 분류(taxonomy)를 함께 보내 에이전트에 추천을 요청한다.

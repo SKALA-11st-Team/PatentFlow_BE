@@ -79,6 +79,19 @@ public class PatentReviewHistoryEntity extends BaseEntity {
     @Column(name = "ai_missing_information_json", columnDefinition = "TEXT")
     private String aiMissingInformationJson;
 
+    // ORCH-06/AIREPORT-02: 리포트 레벨 리치 근거 저장(재조회 시 유실 방지). JSON/긴 텍스트라 TEXT 컬럼.
+    @Column(name = "ai_key_evidence", columnDefinition = "TEXT")
+    private String aiKeyEvidence;
+
+    @Column(name = "ai_judgement_grounds_json", columnDefinition = "TEXT")
+    private String aiJudgementGroundsJson;
+
+    @Column(name = "ai_business_check_requests_json", columnDefinition = "TEXT")
+    private String aiBusinessCheckRequestsJson;
+
+    @Column(name = "ai_external_sources_json", columnDefinition = "TEXT")
+    private String aiExternalSourcesJson;
+
     @Column(name = "ai_report_markdown", columnDefinition = "TEXT")
     private String aiReportMarkdown;
 
@@ -281,6 +294,38 @@ public class PatentReviewHistoryEntity extends BaseEntity {
 
     public void setAiMissingInformationJson(String aiMissingInformationJson) {
         this.aiMissingInformationJson = aiMissingInformationJson;
+    }
+
+    public String getAiKeyEvidence() {
+        return aiKeyEvidence;
+    }
+
+    public void setAiKeyEvidence(String aiKeyEvidence) {
+        this.aiKeyEvidence = aiKeyEvidence;
+    }
+
+    public String getAiJudgementGroundsJson() {
+        return aiJudgementGroundsJson;
+    }
+
+    public void setAiJudgementGroundsJson(String aiJudgementGroundsJson) {
+        this.aiJudgementGroundsJson = aiJudgementGroundsJson;
+    }
+
+    public String getAiBusinessCheckRequestsJson() {
+        return aiBusinessCheckRequestsJson;
+    }
+
+    public void setAiBusinessCheckRequestsJson(String aiBusinessCheckRequestsJson) {
+        this.aiBusinessCheckRequestsJson = aiBusinessCheckRequestsJson;
+    }
+
+    public String getAiExternalSourcesJson() {
+        return aiExternalSourcesJson;
+    }
+
+    public void setAiExternalSourcesJson(String aiExternalSourcesJson) {
+        this.aiExternalSourcesJson = aiExternalSourcesJson;
     }
 
     public String getAiReportMarkdown() {

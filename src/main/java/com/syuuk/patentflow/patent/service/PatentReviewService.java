@@ -9,6 +9,7 @@ import com.syuuk.patentflow.common.response.PageResponse;
 import com.syuuk.patentflow.patent.domain.PatentMetadataEntity;
 import com.syuuk.patentflow.patent.domain.PatentReviewHistoryEntity;
 import com.syuuk.patentflow.patent.dto.AiEvaluationReportResponse;
+import com.syuuk.patentflow.patent.dto.SourceResponse;
 import com.syuuk.patentflow.patent.dto.BusinessOpinionDecision;
 import com.syuuk.patentflow.patent.dto.BusinessOpinionResponse;
 import com.syuuk.patentflow.patent.dto.EvaluationCategory;
@@ -1125,14 +1126,18 @@ public class PatentReviewService {
                 null,
                 List.of(
                         new EvaluationScoreResponse(EvaluationCategory.RIGHTS, 70, null,
-                                "청구항 범위는 확인되나 일부 권리 범위 비교 자료가 부족합니다."),
-                        new EvaluationScoreResponse(EvaluationCategory.TECHNOLOGY, 78, null, "명세서상 기술적 차별 요소가 확인됩니다."),
-                        new EvaluationScoreResponse(EvaluationCategory.MARKET, null, null, "시장 규모 자료가 부족하여 추가 확인이 필요합니다."),
+                                "청구항 범위는 확인되나 일부 권리 범위 비교 자료가 부족합니다.", List.of()),
+                        new EvaluationScoreResponse(EvaluationCategory.TECHNOLOGY, 78, null, "명세서상 기술적 차별 요소가 확인됩니다.", List.of()),
+                        new EvaluationScoreResponse(EvaluationCategory.MARKET, null, null, "시장 규모 자료가 부족하여 추가 확인이 필요합니다.", List.of()),
                         new EvaluationScoreResponse(EvaluationCategory.BUSINESS_ALIGNMENT, 72, null,
-                                "관련사업 분야와 기술 영역은 연결되지만 실제 제품 적용 여부는 추가 확인이 필요합니다.")),
+                                "관련사업 분야와 기술 영역은 연결되지만 실제 제품 적용 여부는 추가 확인이 필요합니다.", List.of())),
                 List.of("시장 규모 자료", "제품 적용 여부"),
                 null,
-                null);
+                null,
+                null,
+                List.of(),
+                List.of(),
+                List.of());
     }
 
     private PatentListItemResponse toListItem(PatentDetailResponse detail) {
@@ -1285,7 +1290,12 @@ public class PatentReviewService {
                 readEvaluationScores(state.getAiScoresJson()),
                 readStringList(state.getAiMissingInformationJson()),
                 state.getAiReportMarkdown(),
-                state.getAiReportMarkdownPath());
+                state.getAiReportMarkdownPath(),
+                // ORCH-06/AIREPORT-02: 저장된 리치 근거를 복원한다.
+                state.getAiKeyEvidence(),
+                readStringList(state.getAiJudgementGroundsJson()),
+                readStringList(state.getAiBusinessCheckRequestsJson()),
+                readSourceList(state.getAiExternalSourcesJson()));
     }
 
     private AiEvaluationReportResponse withAiRecommendation(
@@ -1306,7 +1316,12 @@ public class PatentReviewService {
                 report.scores(),
                 report.missingInformation(),
                 report.rawMarkdown(),
-                report.markdownFilePath());
+                report.markdownFilePath(),
+                // ORCH-06/AIREPORT-02: 권고만 바꾸고 리치 근거는 그대로 패스스루.
+                report.keyEvidence(),
+                report.judgementGrounds(),
+                report.businessCheckRequests(),
+                report.externalSources());
     }
 
     private void applyAiReportToHistory(PatentReviewHistoryEntity state, AiEvaluationReportResponse report) {
@@ -1324,6 +1339,11 @@ public class PatentReviewService {
         state.setAiMissingInformationJson(writeJson(report.missingInformation()));
         state.setAiReportMarkdown(report.rawMarkdown());
         state.setAiReportMarkdownPath(report.markdownFilePath());
+        // ORCH-06/AIREPORT-02: 리치 근거를 저장해 재조회 시 유실되지 않게 한다.
+        state.setAiKeyEvidence(report.keyEvidence());
+        state.setAiJudgementGroundsJson(writeJson(report.judgementGrounds()));
+        state.setAiBusinessCheckRequestsJson(writeJson(report.businessCheckRequests()));
+        state.setAiExternalSourcesJson(writeJson(report.externalSources()));
     }
 
     private PatentSummaryResponse summaryFromHistory(PatentReviewHistoryEntity state, PatentSummaryResponse fallback) {
@@ -1359,6 +1379,19 @@ public class PatentReviewService {
     }
 
     private List<String> readStringList(String value) {
+        if (value == null || value.isBlank()) {
+            return List.of();
+        }
+        try {
+            return objectMapper.readValue(value, new TypeReference<>() {
+            });
+        } catch (Exception exception) {
+            return List.of();
+        }
+    }
+
+    // ORCH-06/AIREPORT-02: 외부 출처(externalSources) JSON 역직렬화.
+    private List<SourceResponse> readSourceList(String value) {
         if (value == null || value.isBlank()) {
             return List.of();
         }

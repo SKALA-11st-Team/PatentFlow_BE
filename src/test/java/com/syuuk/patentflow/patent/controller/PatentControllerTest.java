@@ -132,7 +132,7 @@ class PatentControllerTest {
     void requestAiReportCreatesAsyncJob() throws Exception {
         when(aiReportAgentClient.evaluateForBatch("PAT-2026-0001")).thenReturn(new AgentEvaluateResponse(
                 "PAT-2026-0001",
-                List.of(new AgentScoreItem("권리성", 82, "A", "청구항 보호 범위가 명확합니다.")),
+                List.of(new AgentScoreItem("권리성", 82, "A", "청구항 보호 범위가 명확합니다.", List.of())),
                 "MAINTAIN",
                 null,
                 "## AI 평가 레포트\n\n유지 검토가 가능합니다.",
@@ -143,7 +143,12 @@ class PatentControllerTest {
                 null,
                 false,
                 null,
-                OffsetDateTime.parse("2026-05-22T00:00:00Z")
+                OffsetDateTime.parse("2026-05-22T00:00:00Z"),
+                List.of(),
+                null,
+                List.of(),
+                List.of(),
+                List.of()
         ));
 
         mockMvc.perform(post("/api/v1/patents/PAT-2026-0001/request-ai-report"))
