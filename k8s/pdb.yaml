@@ -1,0 +1,13 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: team11-patentflow-be-pdb
+  namespace: patentflow
+  labels:
+    app: team11-patentflow-be
+# INFRA-09: 노드 드레인·롤링 업데이트 중에도 최소 1개 파드를 유지해 전면 다운타임을 막는다.
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: team11-patentflow-be

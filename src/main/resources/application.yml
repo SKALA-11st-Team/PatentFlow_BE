@@ -41,7 +41,18 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        # INFRA-07: 관측성 — Prometheus 메트릭 스크레이프(/actuator/prometheus) 노출. (보안: actuator/**는 ROLE_ADMIN)
+        include: health,info,prometheus
+  endpoint:
+    health:
+      # INFRA-07: liveness/readiness 프로브 그룹 분리 — readiness는 의존성(db) 포함, liveness는 프로세스 생존(ping)만.
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: ping
+        readiness:
+          include: readinessState,db
   health:
     mail:
       enabled: false

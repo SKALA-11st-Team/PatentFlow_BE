@@ -297,16 +297,32 @@ jobs:
             --from-literal=PATENTFLOW_CORS_ALLOWED_ORIGINS="${PATENTFLOW_CORS_ALLOWED_ORIGINS}" \
             --from-literal=PATENTFLOW_AGENT_URL="${PATENTFLOW_AGENT_URL}" \
             --from-literal=PATENTFLOW_AI_REPORT_STORAGE_DIR="${PATENTFLOW_AI_REPORT_STORAGE_DIR}" \
+            --from-literal=PATENTFLOW_REDIS_ENABLED="true" \
+            --from-literal=REDIS_HOST="team11-patentflow-redis-svc" \
+            --from-literal=REDIS_PORT="6379" \
             --from-literal=PATENTFLOW_COOKIE_SECURE="${PATENTFLOW_COOKIE_SECURE}" \
             --from-literal=PATENTFLOW_COOKIE_SAME_SITE="${PATENTFLOW_COOKIE_SAME_SITE}" \
             --from-literal=PATENTFLOW_COOKIE_DOMAIN="${PATENTFLOW_COOKIE_DOMAIN}" \
             --dry-run=client -o yaml | kubectl apply -f -
 
+      # INFRA-09: 멀티레플리카에서 토큰폐기·락아웃·레이트리밋 인메모리 스토어가 레플리카별로 분산되지 않도록
+      # Redis(공유 스토어)를 먼저 띄운다. configmap의 PATENTFLOW_REDIS_ENABLED=true가 Redis 구현을 선택한다.
+      - name: Apply Redis manifests
+        run: |
+          kubectl apply -f /tmp/patentflow-k8s/redis-service.yaml
+          kubectl apply -f /tmp/patentflow-k8s/redis-statefulset.yaml
+          kubectl rollout status statefulset/team11-patentflow-redis-statefulset --namespace="${KUBE_NAMESPACE}" --timeout=180s
+
       - name: Apply Kubernetes manifests
         run: |
+          # INFRA-03: AI 리포트 PVC를 디플로이먼트보다 먼저 적용(볼륨 마운트 의존).
+          kubectl apply -f /tmp/patentflow-k8s/pvc.yaml
           kubectl apply -f /tmp/patentflow-k8s/deployment.yaml
           kubectl apply -f /tmp/patentflow-k8s/service.yaml
           kubectl apply -f /tmp/patentflow-k8s/ingress.yaml
+          # INFRA-09: 자동 확장·중단 예산.
+          kubectl apply -f /tmp/patentflow-k8s/hpa.yaml
+          kubectl apply -f /tmp/patentflow-k8s/pdb.yaml
 
       - name: Rollout status
         id: backend_rollout

@@ -6,7 +6,9 @@ metadata:
   labels:
     app: team11-patentflow-be
 spec:
-  replicas: 1
+  # INFRA-09: 다중 replica(무중단 배포·노드 드레인 내성). JWT stateless + Redis 외부화로 BE는 수평 확장 가능.
+  # HPA(hpa.yaml)가 실제 replica 수를 관리하며, AI 리포트 저장은 RWX(EFS)/S3여야 replica 간 정합이 유지된다(INFRA-03).
+  replicas: 2
   revisionHistoryLimit: 3
   selector:
     matchLabels:
@@ -30,9 +32,10 @@ spec:
                 name: team11-patentflow-be-config
             - secretRef:
                 name: team11-patentflow-be-secret
+          # INFRA-07: readiness=의존성(db) 포함 → 트래픽 차단만, liveness=프로세스 생존(ping)만 → 의존성 장애로 불필요 재시작 방지.
           readinessProbe:
             httpGet:
-              path: /actuator/health
+              path: /actuator/health/readiness
               port: http
             initialDelaySeconds: 30
             periodSeconds: 10
@@ -40,7 +43,7 @@ spec:
             failureThreshold: 6
           livenessProbe:
             httpGet:
-              path: /actuator/health
+              path: /actuator/health/liveness
               port: http
             initialDelaySeconds: 60
             periodSeconds: 20
@@ -53,3 +56,12 @@ spec:
             limits:
               cpu: "1"
               memory: 1Gi
+          # INFRA-03: AI 리포트 파일을 영속 볼륨에 저장(파드 재시작 시 소실 방지). configmap의
+          # PATENTFLOW_AI_REPORT_STORAGE_DIR=/app/storage/ai-reports와 정합. 다중 replica면 RWX(EFS) 필수.
+          volumeMounts:
+            - name: ai-report-storage
+              mountPath: /app/storage
+      volumes:
+        - name: ai-report-storage
+          persistentVolumeClaim:
+            claimName: team11-patentflow-be-ai-reports-pvc
