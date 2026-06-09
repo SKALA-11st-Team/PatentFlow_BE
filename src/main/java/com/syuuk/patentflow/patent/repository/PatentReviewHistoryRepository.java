@@ -46,6 +46,19 @@ public interface PatentReviewHistoryRepository extends JpaRepository<PatentRevie
             """)
     long countLatestByReviewWorkflowStatus(@Param("status") ReviewWorkflowStatus status);
 
+    // DASH-01: 이번 분기 검토 대상 수 — 최신 상태가 NOT_IN_REVIEW가 아닌 특허(검토 workflow 진행 중) 카운트.
+    @Query("""
+            select count(h)
+            from PatentReviewHistoryEntity h
+            where h.reviewWorkflowStatus <> :status
+              and h.createdAt = (
+                  select max(latest.createdAt)
+                  from PatentReviewHistoryEntity latest
+                  where latest.patentId = h.patentId
+              )
+            """)
+    long countLatestByReviewWorkflowStatusNot(@Param("status") ReviewWorkflowStatus status);
+
     @Query("""
             select count(h)
             from PatentReviewHistoryEntity h

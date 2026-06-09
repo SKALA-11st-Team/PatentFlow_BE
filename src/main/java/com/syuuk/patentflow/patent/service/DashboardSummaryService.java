@@ -26,6 +26,9 @@ public class DashboardSummaryService {
     @Transactional(readOnly = true)
     public LegalDashboardSummaryResponse getLegalSummary() {
         int total = Math.toIntExact(patentMetadataRepository.count());
+        // DASH-01: 이번 분기 검토 대상 수(NOT_IN_REVIEW 제외 최신 상태) — KPI 분모 단일 출처.
+        int quarterlyTargetCount = Math.toIntExact(
+                reviewHistoryRepository.countLatestByReviewWorkflowStatusNot(ReviewWorkflowStatus.NOT_IN_REVIEW));
         int pendingReview = countLatest(ReviewWorkflowStatus.MAIL_READY);
         int waitingBusiness = countLatest(ReviewWorkflowStatus.WAITING_BUSINESS_RESPONSE);
         int businessReceived = countLatest(ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED);
@@ -34,6 +37,7 @@ public class DashboardSummaryService {
         int legalActionCompleted = Math.toIntExact(reviewHistoryRepository.countLatestByLegalActionResultIsNotNull());
         return new LegalDashboardSummaryResponse(
                 total,
+                quarterlyTargetCount,
                 pendingReview,
                 waitingBusiness,
                 businessReceived,
