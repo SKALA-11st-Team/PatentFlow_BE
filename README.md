@@ -1,4 +1,4 @@
-# PatentFlow BE
+# PatentFlow BE README
 
 PatentFlow backend MVP scaffold for FE API integration.
 
