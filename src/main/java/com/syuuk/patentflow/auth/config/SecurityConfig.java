@@ -105,6 +105,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/patents/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/v1/patents/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/patents/**").hasRole("ADMIN")
+                        // DELETE 규칙 부재 시 anyRequest().authenticated()로 흘러 BUSINESS도 통과하던 구멍을 막는다
+                        // (레포트 편집 되돌리기 DELETE /api/v1/patents/*/ai-report/edits 추가에 맞춰 명시).
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/patents/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterAfter(new CsrfCookieFilter(), JwtAuthenticationFilter.class)

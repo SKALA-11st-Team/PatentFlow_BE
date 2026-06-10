@@ -4,6 +4,8 @@ import com.syuuk.patentflow.auth.dto.UserPrincipalResponse;
 import com.syuuk.patentflow.common.response.ApiResponse;
 import com.syuuk.patentflow.common.response.PageResponse;
 import com.syuuk.patentflow.patent.dto.AssignDepartmentRequest;
+import com.syuuk.patentflow.patent.dto.AiEvaluationReportResponse;
+import com.syuuk.patentflow.patent.dto.AiReportEditRequest;
 import com.syuuk.patentflow.patent.dto.AiReportJobResponse;
 import com.syuuk.patentflow.patent.dto.FinalDecisionRequest;
 import com.syuuk.patentflow.patent.dto.FinalDecisionResponse;
@@ -20,6 +22,7 @@ import com.syuuk.patentflow.patent.dto.PatentListItemResponse;
 import com.syuuk.patentflow.patent.dto.PatentUpsertRequest;
 import com.syuuk.patentflow.patent.dto.PatentUpsertResponse;
 import com.syuuk.patentflow.patent.dto.ReviewWorkflowStatus;
+import com.syuuk.patentflow.patent.service.AiReportEditService;
 import com.syuuk.patentflow.patent.service.AiReportJobService;
 import com.syuuk.patentflow.patent.service.PatentReviewService;
 import jakarta.validation.Valid;
@@ -28,6 +31,7 @@ import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -44,10 +48,16 @@ public class PatentController {
 
     private final PatentReviewService patentReviewService;
     private final AiReportJobService aiReportJobService;
+    private final AiReportEditService aiReportEditService;
 
-    public PatentController(PatentReviewService patentReviewService, AiReportJobService aiReportJobService) {
+    public PatentController(
+            PatentReviewService patentReviewService,
+            AiReportJobService aiReportJobService,
+            AiReportEditService aiReportEditService
+    ) {
         this.patentReviewService = patentReviewService;
         this.aiReportJobService = aiReportJobService;
+        this.aiReportEditService = aiReportEditService;
     }
 
     /**
@@ -222,6 +232,42 @@ public class PatentController {
     @PostMapping("/{patentId}/request-ai-report")
     public ResponseEntity<ApiResponse<AiReportJobResponse>> requestAiReport(@PathVariable String patentId) {
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(ApiResponse.ok(aiReportJobService.requestAiReport(patentId)));
+    }
+
+    /**
+     * @relatedFR FR-LEGAL-09
+     * @relatedUI UI-LEGAL-04
+     * @description 법무팀이 AI 평가 레포트(권고/사유/축별 점수/판단근거/markdown)를 편집한다.
+     *     AI 원본은 불변 보존되고 편집은 오버라이드로 분리 저장된다(부분 PATCH 누적).
+     */
+    @PatchMapping("/{patentId}/ai-report")
+    public ApiResponse<AiEvaluationReportResponse> editAiReport(
+            @PathVariable String patentId,
+            @Valid @RequestBody AiReportEditRequest request,
+            Authentication authentication
+    ) {
+        return ApiResponse.ok(aiReportEditService.editAiReport(patentId, request, currentActor(authentication)));
+    }
+
+    /**
+     * @relatedFR FR-LEGAL-09
+     * @description 법무 편집을 모두 폐기하고 AI 원본 레포트로 되돌린다.
+     */
+    @DeleteMapping("/{patentId}/ai-report/edits")
+    public ApiResponse<AiEvaluationReportResponse> revertAiReportEdits(
+            @PathVariable String patentId,
+            Authentication authentication
+    ) {
+        return ApiResponse.ok(aiReportEditService.revertAiReport(patentId, currentActor(authentication)));
+    }
+
+    /**
+     * @relatedFR FR-LEGAL-09
+     * @description 'AI 원본 보기' — 법무 편집을 반영하지 않은 순수 AI 레포트를 조회한다.
+     */
+    @GetMapping("/{patentId}/ai-report/original")
+    public ApiResponse<AiEvaluationReportResponse> getOriginalAiReport(@PathVariable String patentId) {
+        return ApiResponse.ok(patentReviewService.getOriginalAiReport(patentId));
     }
 
     /**

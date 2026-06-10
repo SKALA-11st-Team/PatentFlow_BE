@@ -9,6 +9,7 @@ import com.syuuk.patentflow.common.response.PageResponse;
 import com.syuuk.patentflow.patent.domain.PatentMetadataEntity;
 import com.syuuk.patentflow.patent.domain.PatentReviewHistoryEntity;
 import com.syuuk.patentflow.patent.dto.AiEvaluationReportResponse;
+import com.syuuk.patentflow.patent.dto.AiReportOverrides;
 import com.syuuk.patentflow.patent.dto.SourceResponse;
 import com.syuuk.patentflow.patent.dto.BusinessOpinionDecision;
 import com.syuuk.patentflow.patent.dto.BusinessOpinionResponse;
@@ -1304,10 +1305,14 @@ public class PatentReviewService {
     }
 
     private PatentDetailResponse applyHistoryState(PatentDetailResponse patent, PatentReviewHistoryEntity state) {
-        Recommendation currentRecommendation = state.getAiRecommendation() != null
+        Recommendation baseRecommendation = state.getAiRecommendation() != null
                 ? state.getAiRecommendation()
                 : patent.currentRecommendation();
-        AiEvaluationReportResponse aiReport = aiReportFromHistory(state, patent.aiEvaluationReport(), currentRecommendation);
+        AiEvaluationReportResponse aiReport = aiReportFromHistory(state, patent.aiEvaluationReport(), baseRecommendation);
+        // 법무 편집이 권고를 바꿨다면 목록/상세의 현재 권고도 유효(편집 반영) 값을 따른다.
+        Recommendation currentRecommendation = aiReport.recommendation() != null
+                ? aiReport.recommendation()
+                : baseRecommendation;
         PatentSummaryResponse summary = summaryFromHistory(state, patent.summary());
         return new PatentDetailResponse(
                 patent.patentId(),
@@ -1352,29 +1357,74 @@ public class PatentReviewService {
             AiEvaluationReportResponse fallback,
             Recommendation recommendation
     ) {
+        AiEvaluationReportResponse original = originalAiReportFromHistory(state, fallback, recommendation);
+        // FR-LEGAL-09: AI 원본 위에 법무 편집 오버라이드를 오버레이한 '유효 레포트'를 돌려준다.
+        // 합성 결과는 조회 전용이며, persistPatentState의 동일 reportId 가드로 ai_* 컬럼에 역류하지 않는다.
+        AiReportOverrides overrides = AiReportOverridesSupport.readOverrides(objectMapper, state.getAiEditOverridesJson());
+        return AiReportOverridesSupport.applyOverrides(original, overrides, state);
+    }
+
+    /** AI 원본 레포트(편집 미반영). 'AI 원본 보기'와 편집 충돌 검증이 사용한다. */
+    AiEvaluationReportResponse originalAiReportFromHistory(
+            PatentReviewHistoryEntity state,
+            AiEvaluationReportResponse fallback,
+            Recommendation recommendation
+    ) {
         if (state.getAiReportId() == null) {
             return withAiRecommendation(fallback, recommendation);
         }
-        return new AiEvaluationReportResponse(
-                state.getAiReportId(),
-                state.getAiReportCreatedAt(),
-                recommendation,
-                state.getAiRecommendationReason(),
-                state.getAiTotalScore(),
-                state.getAiAverageScore(),
-                state.getAiFinalGrade(),
-                state.getAiFinalIndicator(),
-                Boolean.TRUE.equals(state.getAiDegraded()),
-                state.getAiFailureReason(),
-                readEvaluationScores(state.getAiScoresJson()),
-                readStringList(state.getAiMissingInformationJson()),
-                state.getAiReportMarkdown(),
-                state.getAiReportMarkdownPath(),
-                // ORCH-06/AIREPORT-02: 저장된 리치 근거를 복원한다.
-                state.getAiKeyEvidence(),
-                readStringList(state.getAiJudgementGroundsJson()),
-                readStringList(state.getAiBusinessCheckRequestsJson()),
-                readSourceList(state.getAiExternalSourcesJson()));
+        return AiReportOverridesSupport.withAppliedCriteria(
+                new AiEvaluationReportResponse(
+                        state.getAiReportId(),
+                        state.getAiReportCreatedAt(),
+                        recommendation,
+                        state.getAiRecommendationReason(),
+                        state.getAiTotalScore(),
+                        state.getAiAverageScore(),
+                        state.getAiFinalGrade(),
+                        state.getAiFinalIndicator(),
+                        Boolean.TRUE.equals(state.getAiDegraded()),
+                        state.getAiFailureReason(),
+                        readEvaluationScores(state.getAiScoresJson()),
+                        readStringList(state.getAiMissingInformationJson()),
+                        state.getAiReportMarkdown(),
+                        state.getAiReportMarkdownPath(),
+                        // ORCH-06/AIREPORT-02: 저장된 리치 근거를 복원한다.
+                        state.getAiKeyEvidence(),
+                        readStringList(state.getAiJudgementGroundsJson()),
+                        readStringList(state.getAiBusinessCheckRequestsJson()),
+                        readSourceList(state.getAiExternalSourcesJson())),
+                readCriteriaMap(state.getAiAppliedCriteriaJson()));
+    }
+
+    /**
+     * @relatedFR FR-LEGAL-09
+     * @description 'AI 원본 보기' — 법무 편집을 반영하지 않은 순수 AI 레포트를 조회한다.
+     */
+    @Transactional
+    public AiEvaluationReportResponse getOriginalAiReport(String patentId) {
+        PatentDetailResponse patent = findPatent(patentId);
+        PatentReviewHistoryEntity state = latestHistoryOrNull(patentId);
+        if (state == null) {
+            return patent.aiEvaluationReport();
+        }
+        Recommendation recommendation = state.getAiRecommendation() != null
+                ? state.getAiRecommendation()
+                : patent.currentRecommendation();
+        // fallback 인자는 원본 조회에서 의미가 없어 현재 detail의 레포트를 그대로 쓴다(aiReportId 없을 때만 사용됨).
+        return originalAiReportFromHistory(state, patent.aiEvaluationReport(), recommendation);
+    }
+
+    private java.util.Map<String, Object> readCriteriaMap(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(value, new TypeReference<>() {
+            });
+        } catch (Exception exception) {
+            return null;
+        }
     }
 
     private AiEvaluationReportResponse withAiRecommendation(
@@ -1404,6 +1454,12 @@ public class PatentReviewService {
     }
 
     private void applyAiReportToHistory(PatentReviewHistoryEntity state, AiEvaluationReportResponse report) {
+        // 동일 reportId의 재영속은 스킵한다. 레포트 내용은 reportId 단위로 불변이며, 조회 경로가
+        // 법무 편집 오버라이드를 오버레이한 '유효 레포트'를 돌려주므로(aiReportFromHistory),
+        // 이를 다시 쓰면 편집 값이 AI 원본(ai_*) 컬럼을 오염시킨다.
+        if (report.reportId() != null && report.reportId().equals(state.getAiReportId())) {
+            return;
+        }
         state.setAiReportId(report.reportId());
         state.setAiReportCreatedAt(report.createdAt());
         state.setAiRecommendation(report.recommendation());
@@ -1497,7 +1553,11 @@ public class PatentReviewService {
                 ? new PatentReviewHistoryEntity(patent.patentId(), "UNQUARTERED")
                 : history.get(0);
         state.setReviewWorkflowStatus(patent.reviewWorkflowStatus());
-        state.setAiRecommendation(patent.currentRecommendation());
+        // ai_recommendation은 applyAiReportToHistory가 레포트와 함께 기록한다. 여기서
+        // currentRecommendation(법무 편집이 반영된 유효 값)을 쓰면 AI 원본 권고가 오염된다.
+        if (state.getAiReportId() == null) {
+            state.setAiRecommendation(patent.currentRecommendation());
+        }
         applyAiReportToHistory(state, patent.aiEvaluationReport());
         applySummaryToHistory(state, patent.summary());
         state.setBusinessOpinionDecision(patent.businessOpinionDecision());

@@ -33,6 +33,7 @@ class PatentWorkflowServiceMapAgentResponseTest {
                 mock(PatentReviewHistoryRepository.class),
                 mock(AiReportAgentClient.class),
                 mock(AnnualFeeScheduleService.class),
+                mock(AiReportEditService.class),
                 new ObjectMapper(),
                 mock(org.springframework.context.ApplicationEventPublisher.class));
     }

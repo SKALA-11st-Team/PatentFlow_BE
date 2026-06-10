@@ -56,6 +56,7 @@ public class PatentWorkflowService {
     private final PatentReviewHistoryRepository reviewHistoryRepository;
     private final AiReportAgentClient aiReportAgentClient;
     private final AnnualFeeScheduleService annualFeeScheduleService;
+    private final AiReportEditService aiReportEditService;
     private final ObjectMapper objectMapper;
 
     private final org.springframework.context.ApplicationEventPublisher eventPublisher;
@@ -66,6 +67,7 @@ public class PatentWorkflowService {
             PatentReviewHistoryRepository reviewHistoryRepository,
             AiReportAgentClient aiReportAgentClient,
             AnnualFeeScheduleService annualFeeScheduleService,
+            AiReportEditService aiReportEditService,
             ObjectMapper objectMapper,
             org.springframework.context.ApplicationEventPublisher eventPublisher
     ) {
@@ -74,6 +76,7 @@ public class PatentWorkflowService {
         this.reviewHistoryRepository = reviewHistoryRepository;
         this.aiReportAgentClient = aiReportAgentClient;
         this.annualFeeScheduleService = annualFeeScheduleService;
+        this.aiReportEditService = aiReportEditService;
         this.objectMapper = objectMapper;
         this.eventPublisher = eventPublisher;
     }
@@ -88,6 +91,8 @@ public class PatentWorkflowService {
         }
         AgentEvaluateResponse agentResponse = aiReportAgentClient.evaluate(patentId);
         AiEvaluationReportResponse report = mapAgentResponse(agentResponse, patentId);
+        // 기존 법무 편집 위에서 재생성되면 편집은 보존(stale 처리)하고 감사 로그만 남긴다.
+        aiReportEditService.logRegeneratedOverEdit(patentId, "SYSTEM");
         return patentReviewService.updatePatentInternal(patentId, p -> withAiReport(p, report, agentResponse.summaryText()));
     }
 
@@ -100,6 +105,7 @@ public class PatentWorkflowService {
         }
         AgentEvaluateResponse agentResponse = aiReportAgentClient.evaluateForBatch(patentId);
         AiEvaluationReportResponse report = mapAgentResponse(agentResponse, patentId);
+        aiReportEditService.logRegeneratedOverEdit(patentId, "SYSTEM");
         return patentReviewService.updatePatentInternal(patentId, p -> withAiReport(p, report, agentResponse.summaryText()));
     }
 

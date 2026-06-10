@@ -98,6 +98,30 @@ public class PatentReviewHistoryEntity extends BaseEntity {
     @Column(name = "ai_report_markdown_path", length = 1000)
     private String aiReportMarkdownPath;
 
+    // ── 법무 편집 오버라이드(FR-LEGAL-09: AI 초안과 사람 수정의 분리 보존) ──
+    // AI 원본(ai_* 컬럼)은 불변으로 두고, 법무팀이 수정한 필드만 JSON으로 분리 저장한다.
+    // 조회 시 ai_* 위에 오버레이되어 '유효 레포트'가 되고, null이면 원본 그대로다.
+    @Column(name = "ai_edit_overrides_json", columnDefinition = "TEXT")
+    private String aiEditOverridesJson;
+
+    @Column(name = "ai_edited_by", length = 128)
+    private String aiEditedBy;
+
+    @Column(name = "ai_edited_at")
+    private OffsetDateTime aiEditedAt;
+
+    // 낙관적 락 토큰 — 동시 편집 시 expectedEditVersion 불일치로 409를 돌려준다.
+    @Column(name = "ai_edit_version")
+    private Integer aiEditVersion;
+
+    // 편집이 기준으로 삼은 레포트 ID. ai_report_id와 다르면 편집 이후 레포트가 재생성된 것(stale).
+    @Column(name = "ai_edit_base_report_id", length = 128)
+    private String aiEditBaseReportId;
+
+    // 이 레포트 생성에 적용된 가치평가 기준(valuationConfig) 스냅샷 — 기준 변경 이력 추적용.
+    @Column(name = "ai_applied_criteria_json", columnDefinition = "TEXT")
+    private String aiAppliedCriteriaJson;
+
     @Column(name = "summary_text", length = 2000)
     private String summaryText;
 
@@ -351,6 +375,54 @@ public class PatentReviewHistoryEntity extends BaseEntity {
 
     public void setAiReportMarkdownPath(String aiReportMarkdownPath) {
         this.aiReportMarkdownPath = aiReportMarkdownPath;
+    }
+
+    public String getAiEditOverridesJson() {
+        return aiEditOverridesJson;
+    }
+
+    public void setAiEditOverridesJson(String aiEditOverridesJson) {
+        this.aiEditOverridesJson = aiEditOverridesJson;
+    }
+
+    public String getAiEditedBy() {
+        return aiEditedBy;
+    }
+
+    public void setAiEditedBy(String aiEditedBy) {
+        this.aiEditedBy = aiEditedBy;
+    }
+
+    public OffsetDateTime getAiEditedAt() {
+        return aiEditedAt;
+    }
+
+    public void setAiEditedAt(OffsetDateTime aiEditedAt) {
+        this.aiEditedAt = aiEditedAt;
+    }
+
+    public Integer getAiEditVersion() {
+        return aiEditVersion;
+    }
+
+    public void setAiEditVersion(Integer aiEditVersion) {
+        this.aiEditVersion = aiEditVersion;
+    }
+
+    public String getAiEditBaseReportId() {
+        return aiEditBaseReportId;
+    }
+
+    public void setAiEditBaseReportId(String aiEditBaseReportId) {
+        this.aiEditBaseReportId = aiEditBaseReportId;
+    }
+
+    public String getAiAppliedCriteriaJson() {
+        return aiAppliedCriteriaJson;
+    }
+
+    public void setAiAppliedCriteriaJson(String aiAppliedCriteriaJson) {
+        this.aiAppliedCriteriaJson = aiAppliedCriteriaJson;
     }
 
     public String getSummaryText() {
