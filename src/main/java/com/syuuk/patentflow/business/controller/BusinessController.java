@@ -12,6 +12,7 @@ import com.syuuk.patentflow.common.error.PatentFlowException;
 import com.syuuk.patentflow.common.response.ApiResponse;
 import com.syuuk.patentflow.common.response.PageResponse;
 import com.syuuk.patentflow.patent.dto.PatentDetailResponse;
+import com.syuuk.patentflow.patent.dto.PatentListFilter;
 import com.syuuk.patentflow.patent.dto.PatentListItemResponse;
 import com.syuuk.patentflow.patent.dto.ReviewWorkflowStatus;
 import com.syuuk.patentflow.patent.service.DashboardSummaryService;
@@ -96,7 +97,8 @@ public class BusinessController {
             Authentication authentication
     ) {
         String departmentId = getDepartmentId(authentication);
-        return patentReviewService.getPatents(page, size, keyword, departmentId, reviewWorkflowStatus, null);
+        return patentReviewService.getPatents(page, size, null, new PatentListFilter(
+                keyword, departmentId, reviewWorkflowStatus, null, null, null, null, null, null, null, null));
     }
 
     /**

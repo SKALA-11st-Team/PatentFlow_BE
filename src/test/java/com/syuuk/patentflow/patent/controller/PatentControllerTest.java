@@ -261,6 +261,56 @@ class PatentControllerTest {
     }
 
     @Test
+    void getPatentsAppliesCountryAndInReviewFiltersServerSide() throws Exception {
+        // CONTRACT-09/DASH-08: 페이징 엔드포인트가 국가/검토여부를 DB 레벨에서 필터링한다.
+        String krResponse = mockMvc.perform(get("/api/v1/patents")
+                .param("country", "KR")
+                .param("size", "100"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        List<String> countries = JsonPath.read(krResponse, "$.data[*].country");
+        org.assertj.core.api.Assertions.assertThat(countries).isNotEmpty().containsOnly("KR");
+
+        String inReviewResponse = mockMvc.perform(get("/api/v1/patents")
+                .param("inReview", "true")
+                .param("size", "100"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        List<Boolean> inReviewFlags = JsonPath.read(inReviewResponse, "$.data[*].inReview");
+        // 시드에 inReview=true 가 없을 수 있으므로(빈 결과 허용) false 누출만 없으면 필터가 동작한 것이다.
+        org.assertj.core.api.Assertions.assertThat(inReviewFlags).doesNotContain(false);
+    }
+
+    @Test
+    void filterOptionsExposesDistinctValuesAndDrivesServerContextFilter() throws Exception {
+        // CONTRACT-09/DASH-08: 드롭다운 옵션(전체 distinct) + 그 값으로 서버 영역 필터가 동작한다.
+        String options = mockMvc.perform(get("/api/v1/patents/filter-options"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.countries", hasSize(greaterThan(0))))
+                .andExpect(jsonPath("$.data.businessAreas", hasSize(greaterThan(0))))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        org.assertj.core.api.Assertions.assertThat(JsonPath.<List<String>>read(options, "$.data.countries"))
+                .contains("KR");
+
+        String firstBusinessArea = JsonPath.<List<String>>read(options, "$.data.businessAreas").get(0);
+        String filtered = mockMvc.perform(get("/api/v1/patents")
+                .param("businessArea", firstBusinessArea)
+                .param("size", "100"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        List<String> businessAreas = JsonPath.read(filtered, "$.data[*].businessArea");
+        org.assertj.core.api.Assertions.assertThat(businessAreas).isNotEmpty().containsOnly(firstBusinessArea);
+    }
+
+    @Test
     void suggestContextReturnsClosestBusinessAndTechnologyArea() throws Exception {
         mockMvc.perform(post("/api/v1/patents/context-suggestions")
                 .contentType(MediaType.APPLICATION_JSON)

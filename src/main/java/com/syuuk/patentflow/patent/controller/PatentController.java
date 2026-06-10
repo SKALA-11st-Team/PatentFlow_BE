@@ -12,7 +12,9 @@ import com.syuuk.patentflow.patent.dto.PatentBibliographicInfoResponse;
 import com.syuuk.patentflow.patent.dto.PatentContextSuggestionRequest;
 import com.syuuk.patentflow.patent.dto.PatentContextSuggestionResponse;
 import com.syuuk.patentflow.patent.dto.PatentDetailResponse;
+import com.syuuk.patentflow.patent.dto.PatentFilterOptionsResponse;
 import com.syuuk.patentflow.patent.dto.PatentHistoryResponse;
+import com.syuuk.patentflow.patent.dto.PatentListFilter;
 import com.syuuk.patentflow.patent.dto.PatentListItemResponse;
 
 import com.syuuk.patentflow.patent.dto.PatentUpsertRequest;
@@ -60,8 +62,30 @@ public class PatentController {
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String departmentId,
             @RequestParam(required = false) ReviewWorkflowStatus reviewWorkflowStatus,
-            @RequestParam(required = false) String sort) {
-        return patentReviewService.getPatents(page, size, keyword, departmentId, reviewWorkflowStatus, sort);
+            @RequestParam(required = false) String sort,
+            @RequestParam(required = false) String quarter,
+            @RequestParam(required = false) String country,
+            @RequestParam(required = false) LocalDate dateFrom,
+            @RequestParam(required = false) LocalDate dateTo,
+            @RequestParam(required = false) String businessArea,
+            @RequestParam(required = false) String technologyArea,
+            @RequestParam(required = false) String productName,
+            @RequestParam(required = false) Boolean inReview) {
+        // CONTRACT-09/DASH-08: 분기/국가/날짜/영역/검토여부까지 서버 필터로 위임받아 페이징 결과를 반환한다.
+        return patentReviewService.getPatents(page, size, sort, new PatentListFilter(
+                keyword, departmentId, reviewWorkflowStatus, quarter, country, dateFrom, dateTo,
+                businessArea, technologyArea, productName, inReview));
+    }
+
+    /**
+     * @relatedFR FR-LEGAL-01, FR-LEGAL-02
+     * @relatedUI UI-LEGAL-01, UI-COM-02
+     * @description CONTRACT-09/DASH-08: 검토 대상 목록 화면의 필터 드롭다운(국가·사업·기술·제품) 옵션을
+     *     전체 특허 기준 distinct 값으로 제공한다(서버 필터로 목록이 좁혀져도 옵션 불변).
+     */
+    @GetMapping("/filter-options")
+    public ApiResponse<PatentFilterOptionsResponse> getFilterOptions() {
+        return ApiResponse.ok(patentReviewService.getFilterOptions());
     }
 
     /**

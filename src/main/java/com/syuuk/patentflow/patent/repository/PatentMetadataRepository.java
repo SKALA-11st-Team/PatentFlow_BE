@@ -26,4 +26,22 @@ public interface PatentMetadataRepository extends JpaRepository<PatentMetadataEn
      * 목록 조회 시 과기 특허를 포기 상태로 일괄 보정하기 위한 용도.
      */
     List<PatentMetadataEntity> findByPatentStatusAndFeeDueDateBefore(PatentLifecycleStatus status, LocalDate date);
+
+    // CONTRACT-09/DASH-08: 필터 드롭다운 옵션용 distinct 값(공백 제외, 정렬). 전체 특허 기준이라 서버 필터로
+    // 목록이 좁혀져도 옵션은 줄지 않는다.
+    @Query("select distinct p.country from PatentMetadataEntity p "
+            + "where p.country is not null and trim(p.country) <> '' order by p.country")
+    List<String> findDistinctCountries();
+
+    @Query("select distinct p.businessArea from PatentMetadataEntity p "
+            + "where p.businessArea is not null and trim(p.businessArea) <> '' order by p.businessArea")
+    List<String> findDistinctBusinessAreas();
+
+    @Query("select distinct p.technologyArea from PatentMetadataEntity p "
+            + "where p.technologyArea is not null and trim(p.technologyArea) <> '' order by p.technologyArea")
+    List<String> findDistinctTechnologyAreas();
+
+    @Query("select distinct p.productName from PatentMetadataEntity p "
+            + "where p.productName is not null and trim(p.productName) <> '' order by p.productName")
+    List<String> findDistinctProductNames();
 }

@@ -23,8 +23,10 @@ import com.syuuk.patentflow.patent.dto.PatentBibliographicInfoResponse;
 import com.syuuk.patentflow.patent.dto.PatentContextSuggestionRequest;
 import com.syuuk.patentflow.patent.dto.PatentContextSuggestionResponse;
 import com.syuuk.patentflow.patent.dto.PatentDetailResponse;
+import com.syuuk.patentflow.patent.dto.PatentFilterOptionsResponse;
 import com.syuuk.patentflow.patent.dto.PatentHistoryResponse;
 import com.syuuk.patentflow.patent.dto.PatentLifecycleStatus;
+import com.syuuk.patentflow.patent.dto.PatentListFilter;
 import com.syuuk.patentflow.patent.dto.PatentListItemResponse;
 import com.syuuk.patentflow.patent.dto.PatentReviewHistoryItemResponse;
 import com.syuuk.patentflow.patent.dto.PatentSummaryResponse;
@@ -41,6 +43,7 @@ import com.syuuk.patentflow.common.dto.ClassificationResponse;
 import com.syuuk.patentflow.common.service.SystemSettingsService;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
@@ -132,13 +135,7 @@ public class PatentReviewService {
      * @description DB 기반 페이징 및 필터링을 제공한다.
      */
     @Transactional
-    public PageResponse<PatentListItemResponse> getPatents(
-            int page,
-            int size,
-            String keyword,
-            String departmentId,
-            ReviewWorkflowStatus reviewWorkflowStatus,
-            String sort) {
+    public PageResponse<PatentListItemResponse> getPatents(int page, int size, String sort, PatentListFilter filter) {
         int normalizedPage = Math.max(page, 1);
         int normalizedSize = Math.min(Math.max(size, 1), 100);
 
@@ -147,7 +144,7 @@ public class PatentReviewService {
 
         Pageable pageable = PageRequest.of(normalizedPage - 1, normalizedSize, listSort(sort));
         Page<PatentMetadataEntity> entityPage = patentMetadataRepository.findAll(
-                patentListSpecification(keyword, departmentId, reviewWorkflowStatus), pageable);
+                patentListSpecification(filter), pageable);
 
         Map<String, PatentReviewHistoryEntity> latestHistory = loadLatestHistory(entityPage.getContent());
         List<PatentListItemResponse> items = entityPage.getContent().stream()
@@ -163,32 +160,119 @@ public class PatentReviewService {
     }
 
     /**
-     * 목록 검색/필터를 DB 레벨에서 처리하는 Specification.
-     * keyword는 metadata 컬럼(title/관리·출원·등록번호)으로, departmentId·reviewWorkflowStatus는
-     * 특허별 최신 이력 행을 가리키는 EXISTS 서브쿼리로 필터링한다.
+     * CONTRACT-09/DASH-08: 검토 대상 목록 화면 드롭다운용 필터 옵션. 전체 특허 기준 distinct 값이라
+     * 서버 필터링으로 목록이 부분집합이 되어도 옵션은 줄지 않는다.
      */
-    private Specification<PatentMetadataEntity> patentListSpecification(
-            String keyword, String departmentId, ReviewWorkflowStatus reviewWorkflowStatus) {
+    @Transactional(readOnly = true)
+    public PatentFilterOptionsResponse getFilterOptions() {
+        return new PatentFilterOptionsResponse(
+                patentMetadataRepository.findDistinctCountries(),
+                patentMetadataRepository.findDistinctBusinessAreas(),
+                patentMetadataRepository.findDistinctTechnologyAreas(),
+                patentMetadataRepository.findDistinctProductNames());
+    }
+
+    /**
+     * 목록 검색/필터를 DB 레벨에서 처리하는 Specification.
+     * keyword/영역(사업·기술·제품)/국가/분기/날짜/검토여부는 metadata 컬럼으로, departmentId·
+     * reviewWorkflowStatus는 특허별 최신 이력 행을 가리키는 EXISTS 서브쿼리로 필터링한다.
+     */
+    private Specification<PatentMetadataEntity> patentListSpecification(PatentListFilter filter) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
-            if (keyword != null && !keyword.isBlank()) {
-                String like = "%" + keyword.trim().toLowerCase(Locale.ROOT) + "%";
-                predicates.add(cb.or(
-                        cb.like(cb.lower(cb.coalesce(root.get("title"), "")), like),
-                        cb.like(cb.lower(cb.coalesce(root.get("managementNumber"), "")), like),
-                        cb.like(cb.lower(cb.coalesce(root.get("applicationNumber"), "")), like),
-                        cb.like(cb.lower(cb.coalesce(root.get("registrationNumber"), "")), like)));
+            addKeywordPredicate(predicates, cb, root, filter.keyword());
+            if (filter.departmentId() != null && !filter.departmentId().isBlank()) {
+                predicates.add(latestHistoryMatches(root, query, cb, "departmentId", filter.departmentId()));
             }
-            if (departmentId != null && !departmentId.isBlank()) {
-                predicates.add(latestHistoryMatches(root, query, cb, "departmentId", departmentId));
+            if (filter.reviewWorkflowStatus() != null) {
+                predicates.add(latestHistoryMatches(root, query, cb, "reviewWorkflowStatus", filter.reviewWorkflowStatus()));
             }
-            if (reviewWorkflowStatus != null) {
-                predicates.add(latestHistoryMatches(root, query, cb, "reviewWorkflowStatus", reviewWorkflowStatus));
+            addCountryPredicate(predicates, cb, root, filter.country());
+            addDatePredicates(predicates, cb, root, filter.dateFrom(), filter.dateTo());
+            addQuarterPredicate(predicates, cb, root, filter.quarter());
+            addContextPredicate(predicates, cb, root, "businessArea", filter.businessArea());
+            addContextPredicate(predicates, cb, root, "technologyArea", filter.technologyArea());
+            addContextPredicate(predicates, cb, root, "productName", filter.productName());
+            if (filter.inReview() != null) {
+                predicates.add(cb.equal(root.get("inReview"), filter.inReview()));
             }
 
             return predicates.isEmpty() ? cb.conjunction() : cb.and(predicates.toArray(new Predicate[0]));
         };
+    }
+
+    private void addKeywordPredicate(
+            List<Predicate> predicates, CriteriaBuilder cb, Root<PatentMetadataEntity> root, String keyword) {
+        if (keyword == null || keyword.isBlank()) {
+            return;
+        }
+        String like = "%" + keyword.trim().toLowerCase(Locale.ROOT) + "%";
+        predicates.add(cb.or(
+                cb.like(cb.lower(cb.coalesce(root.get("title"), "")), like),
+                cb.like(cb.lower(cb.coalesce(root.get("managementNumber"), "")), like),
+                cb.like(cb.lower(cb.coalesce(root.get("applicationNumber"), "")), like),
+                cb.like(cb.lower(cb.coalesce(root.get("registrationNumber"), "")), like)));
+    }
+
+    private void addCountryPredicate(
+            List<Predicate> predicates, CriteriaBuilder cb, Root<PatentMetadataEntity> root, String country) {
+        if (country == null) {
+            return;
+        }
+        String normalized = country.trim().toUpperCase(Locale.ROOT);
+        if (normalized.isBlank() || "ALL".equals(normalized)) {
+            return;
+        }
+        predicates.add(cb.equal(cb.upper(cb.coalesce(root.get("country"), "")), normalized));
+    }
+
+    private void addDatePredicates(
+            List<Predicate> predicates, CriteriaBuilder cb, Root<PatentMetadataEntity> root,
+            LocalDate dateFrom, LocalDate dateTo) {
+        if (dateFrom != null) {
+            predicates.add(cb.greaterThanOrEqualTo(root.get("feeDueDate"), dateFrom));
+        }
+        if (dateTo != null) {
+            predicates.add(cb.lessThanOrEqualTo(root.get("feeDueDate"), dateTo));
+        }
+    }
+
+    private void addQuarterPredicate(
+            List<Predicate> predicates, CriteriaBuilder cb, Root<PatentMetadataEntity> root, String quarter) {
+        if (quarter == null) {
+            return;
+        }
+        String normalized = quarter.trim().toUpperCase(Locale.ROOT);
+        if (normalized.isBlank() || "ALL".equals(normalized)) {
+            return;
+        }
+        int quarterNumber = quarterNumber(normalized);
+        if (quarterNumber > 0) {
+            LocalDate quarterStart = LocalDate.of(LocalDate.now(KST).getYear(), (quarterNumber - 1) * 3 + 1, 1);
+            LocalDate quarterEnd = quarterStart.plusMonths(3).minusDays(1);
+            predicates.add(cb.between(root.get("feeDueDate"), quarterStart, quarterEnd));
+        } else {
+            predicates.add(cb.or(
+                    cb.equal(root.get("currentQuarterKey"), normalized),
+                    cb.like(root.get("currentQuarterKey"), "%-" + normalized)));
+        }
+    }
+
+    /** 영역 정확 일치 필터. "미분류"는 FE 표시 정규화와 동일하게 공백/"N/A"/null 을 매칭한다. */
+    private void addContextPredicate(
+            List<Predicate> predicates, CriteriaBuilder cb, Root<PatentMetadataEntity> root,
+            String field, String value) {
+        if (value == null || value.isBlank() || "ALL".equalsIgnoreCase(value.trim())) {
+            return;
+        }
+        String trimmed = value.trim();
+        if ("미분류".equals(trimmed)) {
+            Expression<String> normalized = cb.trim(cb.coalesce(root.get(field), ""));
+            predicates.add(cb.or(cb.equal(normalized, ""), cb.equal(cb.upper(normalized), "N/A")));
+        } else {
+            predicates.add(cb.equal(root.get(field), trimmed));
+        }
     }
 
     /**
@@ -335,7 +419,9 @@ public class PatentReviewService {
             int size,
             String departmentId
     ) {
-        return getPatents(page, size, null, departmentId, ReviewWorkflowStatus.WAITING_BUSINESS_RESPONSE, null);
+        return getPatents(page, size, null, new PatentListFilter(
+                null, departmentId, ReviewWorkflowStatus.WAITING_BUSINESS_RESPONSE,
+                null, null, null, null, null, null, null, null));
     }
 
     /**

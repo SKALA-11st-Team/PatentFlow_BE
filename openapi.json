@@ -644,6 +644,72 @@
             "schema" : {
               "type" : "string"
             }
+          },
+          {
+            "name" : "quarter",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "country",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "dateFrom",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string",
+              "format" : "date"
+            }
+          },
+          {
+            "name" : "dateTo",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string",
+              "format" : "date"
+            }
+          },
+          {
+            "name" : "businessArea",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "technologyArea",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "productName",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "inReview",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "boolean"
+            }
           }
         ],
         "responses" : {
@@ -1767,6 +1833,26 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/ApiResponseListPatentListItemResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patents/filter-options" : {
+      "get" : {
+        "tags" : [
+          "patent-controller"
+        ],
+        "operationId" : "getFilterOptions",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePatentFilterOptionsResponse"
                 }
               }
             }
@@ -4552,6 +4638,50 @@
           "timestamp" : {
             "type" : "string",
             "format" : "date-time"
+          }
+        }
+      },
+      "ApiResponsePatentFilterOptionsResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/PatentFilterOptionsResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "PatentFilterOptionsResponse" : {
+        "type" : "object",
+        "properties" : {
+          "countries" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "businessAreas" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "technologyAreas" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "productNames" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
           }
         }
       },
