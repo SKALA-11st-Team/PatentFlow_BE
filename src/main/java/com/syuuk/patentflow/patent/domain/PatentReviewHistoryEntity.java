@@ -52,7 +52,8 @@ public class PatentReviewHistoryEntity extends BaseEntity {
     @Column(name = "ai_report_created_at")
     private OffsetDateTime aiReportCreatedAt;
 
-    @Column(name = "ai_recommendation_reason", length = 2000)
+    // LLM 생성 텍스트(요약 markdown이 그대로 들어옴) — varchar(2000) 초과 시 저장 실패하던 결함 수정
+    @Column(name = "ai_recommendation_reason", columnDefinition = "TEXT")
     private String aiRecommendationReason;
 
     @Column(name = "ai_total_score")
@@ -70,7 +71,7 @@ public class PatentReviewHistoryEntity extends BaseEntity {
     @Column(name = "ai_degraded")
     private Boolean aiDegraded;
 
-    @Column(name = "ai_failure_reason", length = 2000)
+    @Column(name = "ai_failure_reason", columnDefinition = "TEXT")
     private String aiFailureReason;
 
     @Column(name = "ai_scores_json", columnDefinition = "TEXT")
@@ -122,16 +123,17 @@ public class PatentReviewHistoryEntity extends BaseEntity {
     @Column(name = "ai_applied_criteria_json", columnDefinition = "TEXT")
     private String aiAppliedCriteriaJson;
 
-    @Column(name = "summary_text", length = 2000)
+    // LLM 생성 요약 — 길이 상한이 없어 TEXT로 저장
+    @Column(name = "summary_text", columnDefinition = "TEXT")
     private String summaryText;
 
-    @Column(name = "summary_problem_solved", length = 2000)
+    @Column(name = "summary_problem_solved", columnDefinition = "TEXT")
     private String summaryProblemSolved;
 
     @Column(name = "summary_core_technical_points_json", columnDefinition = "TEXT")
     private String summaryCoreTechnicalPointsJson;
 
-    @Column(name = "summary_claims", length = 2000)
+    @Column(name = "summary_claims", columnDefinition = "TEXT")
     private String summaryClaims;
 
     @Column(name = "summary_missing_fields_json", columnDefinition = "TEXT")
@@ -141,7 +143,8 @@ public class PatentReviewHistoryEntity extends BaseEntity {
     @Column(name = "business_opinion_decision", length = 64)
     private BusinessOpinionDecision businessOpinionDecision;
 
-    @Column(name = "business_opinion_reason", length = 2000)
+    // 사용자 자유 입력 — FE에 길이 제한이 없어 TEXT로 저장
+    @Column(name = "business_opinion_reason", columnDefinition = "TEXT")
     private String businessOpinionReason;
 
     @Column(name = "business_opinion_submitted_by", length = 128)
@@ -185,7 +188,7 @@ public class PatentReviewHistoryEntity extends BaseEntity {
     @Column(name = "final_decision_id", length = 64)
     private String finalDecisionId;
 
-    @Column(name = "final_decision_reason", length = 2000)
+    @Column(name = "final_decision_reason", columnDefinition = "TEXT")
     private String finalDecisionReason;
 
     @Column(name = "final_decision_decided_at")

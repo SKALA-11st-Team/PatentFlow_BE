@@ -39,7 +39,8 @@ public class AiReportJobEntity extends BaseEntity {
     @Column(name = "finished_at")
     private OffsetDateTime finishedAt;
 
-    @Column(length = 2000)
+    // agent 실패 사유(예외 메시지 체인)가 길 수 있어 TEXT로 저장
+    @Column(columnDefinition = "TEXT")
     private String message;
 
     @Column(name = "report_id", length = 128)

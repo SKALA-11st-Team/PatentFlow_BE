@@ -55,34 +55,51 @@ Table patent_review_history {
   patent_id varchar(32) [not null]
   quarter_key varchar(16) [not null]
   review_workflow_status varchar(64) [note: "ReviewWorkflowStatus enum: NOT_IN_REVIEW | REVIEW_QUARTER_STARTED | MAIL_READY | WAITING_BUSINESS_RESPONSE | BUSINESS_RESPONSE_RECEIVED"]
-  ai_recommendation varchar(64) [note: "Recommendation enum: MAINTAIN | REVIEW_AGAIN | ABANDON | HOLD"]
+  ai_recommendation varchar(64) [note: "Recommendation enum: MAINTAIN | REVIEW_AGAIN | ABANDON | HOLD (AI 원본 — 법무 편집 미반영)"]
   ai_report_id varchar(128)
   ai_report_created_at timestamptz
-  ai_recommendation_reason varchar(2000)
+  ai_recommendation_reason text [note: "LLM 생성 텍스트(요약 markdown) — varchar(2000) 오버플로 결함 수정"]
   ai_total_score int
+  ai_average_score double [note: "0~100 평균(가중치 적용 시 가중 평균)"]
+  ai_final_grade varchar(16)
+  ai_final_indicator varchar(128)
+  ai_degraded boolean [note: "부분/폴백 생성 여부"]
+  ai_failure_reason text
   ai_scores_json text [note: "JSON text: evaluation scores by category"]
   ai_missing_information_json text [note: "JSON text: missing information list"]
+  ai_key_evidence text [note: "리포트 레벨 핵심 근거 (ORCH-06/AIREPORT-02)"]
+  ai_judgement_grounds_json text [note: "JSON text: 판단 근거 목록"]
+  ai_business_check_requests_json text [note: "JSON text: 사업부 확인 요청 목록"]
+  ai_external_sources_json text [note: "JSON text: [{title, url}]"]
   ai_report_markdown text [note: "Full AI report markdown cache"]
-  ai_report_markdown_path varchar(1000) [note: "Filesystem/object path for stored report markdown"]
-  summary_text varchar(2000)
-  summary_problem_solved varchar(2000)
+  ai_report_markdown_path varchar(1000) [note: "deprecated(AIREPORT-03/04) — 항상 null"]
+  ai_edit_overrides_json text [note: "FR-LEGAL-09: 법무 편집 오버라이드(수정 필드만). null이면 원본 그대로"]
+  ai_edited_by varchar(128)
+  ai_edited_at timestamptz
+  ai_edit_version int [note: "낙관적 락 토큰(동시 편집 409)"]
+  ai_edit_base_report_id varchar(128) [note: "ai_report_id와 다르면 편집 이후 재생성됨(stale)"]
+  ai_applied_criteria_json text [note: "이 레포트에 적용된 가치평가 기준(valuationConfig) 스냅샷"]
+  summary_text text
+  summary_problem_solved text
   summary_core_technical_points_json text [note: "JSON text: core technical point list"]
-  summary_claims varchar(2000)
+  summary_claims text
   summary_missing_fields_json text [note: "JSON text: missing field list"]
   business_opinion_decision varchar(64) [note: "BusinessOpinionDecision enum: MAINTAIN | ABANDON"]
-  business_opinion_reason varchar(2000)
+  business_opinion_reason text
   business_opinion_submitted_by varchar(128)
   business_opinion_submitted_at timestamptz
   business_checklist_total int
   business_qualitative_score int
   business_checklist_scores_json text [note: "JSON text: [{itemId, score, memo}]"]
   business_ai_report_created_at timestamptz [note: "AI report timestamp snapshot at business submission time"]
+  business_ai_report_snapshot_json text [note: "제출 시점에 사업부가 실제로 본 레포트 전체(JSON) — 편집/재생성 후 복원용"]
   business_ai_recommendation varchar(64) [note: "Recommendation snapshot at business submission time"]
-  business_ai_total_score int [note: "AI total score snapshot at business submission time"]
+  business_ai_total_score int [note: "AI score snapshot at business submission time (0~100 평균, CONTRACT-02)"]
   legal_action_result varchar(64) [note: "LegalActionResult enum: MAINTAINED | ABANDONED"]
   final_decision_id varchar(64)
-  final_decision_reason varchar(2000)
+  final_decision_reason text
   final_decision_decided_at timestamptz
+  final_decision_decided_by varchar(128) [note: "REVIEW-07: 최종 판단 행위자"]
   annual_fee_due_date date [note: "Per-quarter annual-fee due date snapshot"]
   department_id varchar(64) [note: "Assigned business department id"]
   department_name varchar(128) [note: "Department name snapshot"]
@@ -91,7 +108,46 @@ Table patent_review_history {
 
   indexes {
     (patent_id, quarter_key) [unique]
+    (patent_id, created_at)
+    review_workflow_status
+    department_id
+    (department_id, review_workflow_status)
+    (department_id, business_opinion_decision)
   }
+}
+
+Table ai_report_edit_logs {
+  id varchar(64) [pk]
+  patent_id varchar(32) [not null]
+  quarter_key varchar(16)
+  editor varchar(128)
+  edited_at timestamptz [not null]
+  action varchar(32) [not null, note: "EDIT | REVERT | REGENERATED_OVER_EDIT (append-only 감사 로그)"]
+  overrides_json text [note: "해당 시점의 누적 오버라이드 전체"]
+  base_report_id varchar(128)
+
+  indexes {
+    (patent_id, edited_at)
+  }
+}
+
+Table valuation_criteria_configs {
+  id varchar(64) [pk]
+  version int [not null, unique, note: "최신 버전이 활성 설정 (append-only)"]
+  config_json text [not null, note: "계약 C1 valuationConfig 형태(camelCase) 그대로 — agent 무변환 전달"]
+  created_by varchar(128)
+  created_at timestamptz [not null]
+}
+
+Table patent_ai_report_jobs {
+  job_id varchar(128) [pk]
+  patent_id varchar(32) [not null]
+  status varchar(32) [not null, note: "PENDING | RUNNING | SUCCEEDED | DEGRADED | FAILED"]
+  requested_at timestamptz
+  started_at timestamptz
+  finished_at timestamptz
+  message text
+  report_id varchar(128)
 }
 
 Table quarter_settings {
@@ -222,3 +278,19 @@ Ref: mailing_history.department_id > departments.department_id
 Ref: users.department_id > departments.department_id
 Ref: auth_sessions.user_id > users.id
 Ref: annual_fee_adjustments.patent_id > patents.patent_id
+
+Table notifications {
+  notification_id varchar(64) [pk]
+  title varchar(200) [not null]
+  message text [not null, note: "특허 제목이 삽입되어 길어질 수 있음 — varchar(1000) 오버플로 결함 수정"]
+  target_role varchar(32) [not null, note: "ADMIN | BUSINESS"]
+  link varchar(500)
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+}
+
+Table notification_read_states {
+  id varchar(160) [pk, note: "{notification_id}|{user_id}"]
+  notification_id varchar(64) [not null]
+  user_id varchar(64) [not null]
+}

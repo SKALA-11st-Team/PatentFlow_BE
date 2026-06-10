@@ -21,7 +21,8 @@ public class NotificationEntity {
     @Column(nullable = false, length = 200)
     private String title;
 
-    @Column(nullable = false, length = 1000)
+    // 특허 제목(최대 1000자)이 삽입되는 메시지라 1000자 제한 초과 가능 — TEXT로 저장
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String message;
 
     @Column(name = "target_role", nullable = false, length = 32)
