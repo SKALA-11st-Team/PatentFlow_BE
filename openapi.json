@@ -1998,6 +1998,77 @@
         }
       }
     },
+    "/api/v1/legal/dashboard/area-distribution" : {
+      "get" : {
+        "tags" : [
+          "legal-controller"
+        ],
+        "operationId" : "getAreaDistribution",
+        "parameters" : [
+          {
+            "name" : "quarter",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "country",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "dateFrom",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string",
+              "format" : "date"
+            }
+          },
+          {
+            "name" : "dateTo",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string",
+              "format" : "date"
+            }
+          },
+          {
+            "name" : "reviewWorkflowStatus",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string",
+              "enum" : [
+                "NOT_IN_REVIEW",
+                "REVIEW_QUARTER_STARTED",
+                "MAIL_READY",
+                "WAITING_BUSINESS_RESPONSE",
+                "BUSINESS_RESPONSE_RECEIVED"
+              ]
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseAreaDistributionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/departments" : {
       "get" : {
         "tags" : [
@@ -4729,6 +4800,66 @@
           "legalActionCompleted" : {
             "type" : "integer",
             "format" : "int32"
+          }
+        }
+      },
+      "ApiResponseAreaDistributionResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/AreaDistributionResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "AreaDistributionResponse" : {
+        "type" : "object",
+        "properties" : {
+          "totalCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "businessArea" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/AreaGroupResponse"
+            }
+          },
+          "technologyArea" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/AreaGroupResponse"
+            }
+          },
+          "product" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/AreaGroupResponse"
+            }
+          }
+        }
+      },
+      "AreaGroupResponse" : {
+        "type" : "object",
+        "properties" : {
+          "value" : {
+            "type" : "string"
+          },
+          "count" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "relatedLabels" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
           }
         }
       },
