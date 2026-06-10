@@ -265,6 +265,74 @@
         }
       }
     },
+    "/api/v1/settings/business-checklist-items/{itemId}" : {
+      "put" : {
+        "tags" : [
+          "settings-controller"
+        ],
+        "operationId" : "updateBusinessChecklistItem",
+        "parameters" : [
+          {
+            "name" : "itemId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/BusinessChecklistItemRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseBusinessChecklistItemResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [
+          "settings-controller"
+        ],
+        "operationId" : "deleteBusinessChecklistItem",
+        "parameters" : [
+          {
+            "name" : "itemId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/patents/{patentId}" : {
       "get" : {
         "tags" : [
@@ -620,6 +688,54 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/ApiResponseClassificationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/business-checklist-items" : {
+      "get" : {
+        "tags" : [
+          "settings-controller"
+        ],
+        "operationId" : "getBusinessChecklistItems",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListBusinessChecklistItemResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [
+          "settings-controller"
+        ],
+        "operationId" : "createBusinessChecklistItem",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/BusinessChecklistItemRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseBusinessChecklistItemResponse"
                 }
               }
             }
@@ -2983,6 +3099,96 @@
           }
         }
       },
+      "BusinessChecklistItemRequest" : {
+        "type" : "object",
+        "properties" : {
+          "category" : {
+            "type" : "string",
+            "minLength" : 1
+          },
+          "title" : {
+            "type" : "string",
+            "minLength" : 1
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "score4Label" : {
+            "type" : "string",
+            "minLength" : 1
+          },
+          "score3Label" : {
+            "type" : "string",
+            "minLength" : 1
+          },
+          "score2Label" : {
+            "type" : "string",
+            "minLength" : 1
+          },
+          "score1Label" : {
+            "type" : "string",
+            "minLength" : 1
+          }
+        },
+        "required" : [
+          "category",
+          "score1Label",
+          "score2Label",
+          "score3Label",
+          "score4Label",
+          "title"
+        ]
+      },
+      "ApiResponseBusinessChecklistItemResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/BusinessChecklistItemResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "BusinessChecklistItemResponse" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "category" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "options" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BusinessChecklistScoreOptionResponse"
+            }
+          }
+        }
+      },
+      "BusinessChecklistScoreOptionResponse" : {
+        "type" : "object",
+        "properties" : {
+          "score" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "label" : {
+            "type" : "string"
+          }
+        }
+      },
       "PatentUpsertRequest" : {
         "type" : "object",
         "properties" : {
@@ -4812,6 +5018,24 @@
           }
         }
       },
+      "ApiResponseListBusinessChecklistItemResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BusinessChecklistItemResponse"
+            }
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
       "PageInfo" : {
         "type" : "object",
         "properties" : {
@@ -5463,59 +5687,6 @@
           "abandoned" : {
             "type" : "integer",
             "format" : "int32"
-          }
-        }
-      },
-      "ApiResponseListBusinessChecklistItemResponse" : {
-        "type" : "object",
-        "properties" : {
-          "data" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/BusinessChecklistItemResponse"
-            }
-          },
-          "message" : {
-            "type" : "string"
-          },
-          "timestamp" : {
-            "type" : "string",
-            "format" : "date-time"
-          }
-        }
-      },
-      "BusinessChecklistItemResponse" : {
-        "type" : "object",
-        "properties" : {
-          "id" : {
-            "type" : "string"
-          },
-          "category" : {
-            "type" : "string"
-          },
-          "title" : {
-            "type" : "string"
-          },
-          "description" : {
-            "type" : "string"
-          },
-          "options" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/BusinessChecklistScoreOptionResponse"
-            }
-          }
-        }
-      },
-      "BusinessChecklistScoreOptionResponse" : {
-        "type" : "object",
-        "properties" : {
-          "score" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "label" : {
-            "type" : "string"
           }
         }
       },

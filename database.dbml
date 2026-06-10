@@ -294,3 +294,19 @@ Table notification_read_states {
   notification_id varchar(64) [not null]
   user_id varchar(64) [not null]
 }
+
+Table business_checklist_items {
+  id varchar(64) [pk, note: "시드 항목은 기존 하드코딩 ID(TECH_COMPLETENESS 등), 신규는 CHK-XXXXXXXX"]
+  category varchar(128) [not null, note: "기술적 가치 | 경제적 가치 등"]
+  title varchar(256) [not null]
+  description text
+  score4_label varchar(500) [not null, note: "4점(최고) 선택지 설명"]
+  score3_label varchar(500) [not null]
+  score2_label varchar(500) [not null]
+  score1_label varchar(500) [not null, note: "1점(최저) 선택지 설명"]
+  sort_order int [not null]
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+
+  Note: "사업부 평가 체크리스트 항목(리걸팀 편집 가능). 과거 제출은 patent_review_history.business_checklist_scores_json 스냅샷이라 항목 변경에 영향받지 않음"
+}

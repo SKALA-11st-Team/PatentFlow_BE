@@ -6,6 +6,9 @@ import com.syuuk.patentflow.common.dto.CountryExtensionRequest;
 import com.syuuk.patentflow.common.dto.CountryExtensionResponse;
 import com.syuuk.patentflow.common.dto.MailLeadMonthsResponse;
 import com.syuuk.patentflow.common.dto.ResponseDeadlineResponse;
+import com.syuuk.patentflow.business.dto.BusinessChecklistItemRequest;
+import com.syuuk.patentflow.business.dto.BusinessChecklistItemResponse;
+import com.syuuk.patentflow.business.service.BusinessChecklistItemService;
 import com.syuuk.patentflow.common.response.ApiResponse;
 import com.syuuk.patentflow.common.service.SystemSettingsService;
 import com.syuuk.patentflow.settings.dto.QuarterActivateResponse;
@@ -40,15 +43,46 @@ public class SettingsController {
     private final SettingsService settingsService;
     private final SystemSettingsService systemSettingsService;
     private final ValuationCriteriaService valuationCriteriaService;
+    private final BusinessChecklistItemService businessChecklistItemService;
 
     public SettingsController(
             SettingsService settingsService,
             SystemSettingsService systemSettingsService,
-            ValuationCriteriaService valuationCriteriaService
+            ValuationCriteriaService valuationCriteriaService,
+            BusinessChecklistItemService businessChecklistItemService
     ) {
         this.settingsService = settingsService;
         this.systemSettingsService = systemSettingsService;
         this.valuationCriteriaService = valuationCriteriaService;
+        this.businessChecklistItemService = businessChecklistItemService;
+    }
+
+    // ── 사업부 체크리스트 항목 관리 (리걸팀) ──────────────────
+    // 기존 하드코딩 항목을 DB로 이전 — 항목/설명/점수 라벨을 운영 중 조정한다.
+    // 변경은 이후 제출부터 적용되고 과거 제출 이력(JSON 스냅샷)은 영향받지 않는다.
+
+    @GetMapping("/business-checklist-items")
+    public ApiResponse<List<BusinessChecklistItemResponse>> getBusinessChecklistItems() {
+        return ApiResponse.ok(businessChecklistItemService.getItems());
+    }
+
+    @PostMapping("/business-checklist-items")
+    public ApiResponse<BusinessChecklistItemResponse> createBusinessChecklistItem(
+            @Valid @RequestBody BusinessChecklistItemRequest request) {
+        return ApiResponse.ok(businessChecklistItemService.createItem(request));
+    }
+
+    @PutMapping("/business-checklist-items/{itemId}")
+    public ApiResponse<BusinessChecklistItemResponse> updateBusinessChecklistItem(
+            @PathVariable String itemId,
+            @Valid @RequestBody BusinessChecklistItemRequest request) {
+        return ApiResponse.ok(businessChecklistItemService.updateItem(itemId, request));
+    }
+
+    @DeleteMapping("/business-checklist-items/{itemId}")
+    public ApiResponse<Void> deleteBusinessChecklistItem(@PathVariable String itemId) {
+        businessChecklistItemService.deleteItem(itemId);
+        return ApiResponse.ok(null);
     }
 
     // ── AI 가치평가 기준 (UI-008) ─────────────────────────────
