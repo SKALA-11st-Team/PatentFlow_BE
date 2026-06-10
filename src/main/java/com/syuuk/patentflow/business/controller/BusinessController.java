@@ -146,7 +146,8 @@ public class BusinessController {
             throw new PatentFlowException(ErrorCode.INVALID_REQUEST);
         }
         assertBusinessDepartmentPatent(patentId, authentication);
-        return ApiResponse.ok(businessFixtureService.submit(patentId, request));
+        // BIZ-09: 인증 사용자명을 제출자(submittedBy)로 전달해 검증된 작성자를 기록한다.
+        return ApiResponse.ok(businessFixtureService.submit(patentId, request, authService.currentUser(authentication).username()));
     }
 
     private String getDepartmentId(Authentication authentication) {

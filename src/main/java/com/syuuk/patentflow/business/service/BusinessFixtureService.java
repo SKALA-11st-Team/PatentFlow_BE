@@ -126,7 +126,8 @@ public class BusinessFixtureService {
      * @description 사업부 의견/체크리스트 제출을 저장하고 제출 이력 응답을 반환한다.
      */
     @Transactional
-    public BusinessSubmissionVersionResponse submit(String patentId, BusinessChecklistSubmissionRequest request) {
+    public BusinessSubmissionVersionResponse submit(
+            String patentId, BusinessChecklistSubmissionRequest request, String actor) {
         patentReviewService.ensurePatentExists(patentId);
         validateChecklistResponses(request);
         String quarterKey = quarterSettingRepository.findAll().stream()
@@ -136,7 +137,7 @@ public class BusinessFixtureService {
                 .map(q -> q.getQuarterKey())
                 .orElse(null);
         OffsetDateTime submittedAt = OffsetDateTime.now(KST);
-        BusinessSubmissionVersionResponse submission = toVersion(patentId, request, submittedAt);
+        BusinessSubmissionVersionResponse submission = toVersion(patentId, request, submittedAt, actor);
         patentReviewService.recordBusinessOpinion(
                 patentId,
                 request.finalOpinion(),
@@ -219,7 +220,8 @@ public class BusinessFixtureService {
     private BusinessSubmissionVersionResponse toVersion(
             String patentId,
             BusinessChecklistSubmissionRequest request,
-            OffsetDateTime submittedAt
+            OffsetDateTime submittedAt,
+            String actor
     ) {
         List<BusinessSubmissionChecklistScoreResponse> checklistScores = request.responses().stream()
                 .map(response -> new BusinessSubmissionChecklistScoreResponse(
@@ -240,7 +242,8 @@ public class BusinessFixtureService {
                 SUBMISSION_VERSION,
                 request.finalOpinion(),
                 valueOrDefault(request.finalReason(), defaultReason(request.finalOpinion())),
-                valueOrDefault(request.evaluatorName(), "사업부 담당자"),
+                // BIZ-09: 제출자명을 클라이언트 입력(evaluatorName)이 아니라 인증 주체로 기록(검증된 작성자 추적).
+                valueOrDefault(actor, valueOrDefault(request.evaluatorName(), "사업부 담당자")),
                 submittedAt,
                 patentReviewService.getAiReportCreatedAt(patentId),
                 recommendation,
