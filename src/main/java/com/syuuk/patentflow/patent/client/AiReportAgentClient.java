@@ -132,10 +132,10 @@ public class AiReportAgentClient {
         }
 
         public String reportMarkdown() {
-            if (rawMarkdown != null && !rawMarkdown.isBlank()) {
-                return rawMarkdown;
-            }
-            return summaryMarkdown;
+            // 전체 평가 레포트가 없을 때 요약문(summaryMarkdown)으로 폴백하면 요약이 레포트로 둔갑해
+            // 표시된다. 폴백은 PatentWorkflowService.normalizeMarkdown 한 곳에서 합성 레포트(요약+점수+권고)
+            // 형태로만 수행한다.
+            return rawMarkdown != null && !rawMarkdown.isBlank() ? rawMarkdown : null;
         }
     }
 

@@ -145,6 +145,10 @@ public class BusinessFixtureService {
                 submittedAt);
         PatentReviewHistoryEntity history = findBusinessSubmissionState(patentId, quarterKey);
         applySubmission(history, submission);
+        // 제출 시점에 사업부가 실제로 본 레포트(유효본 전체)를 보존한다 — 이후 법무 편집/재생성이
+        // ai_* 컬럼을 바꿔도 "사업부가 어떤 레포트를 보고 의견을 냈는지"는 복원 가능해야 한다.
+        history.setBusinessAiReportSnapshotJson(
+                writeAiReportSnapshot(patentReviewService.getPatentDetail(patentId).aiEvaluationReport()));
         reviewHistoryRepository.save(history);
         PatentDetailResponse patent = patentReviewService.getPatentDetail(patentId);
         String deptName = patent.departmentName() != null ? patent.departmentName() : "사업부";
@@ -214,6 +218,14 @@ public class BusinessFixtureService {
             return objectMapper.writeValueAsString(scores);
         } catch (Exception exception) {
             throw new IllegalStateException("사업부 체크리스트 점수 JSON을 저장할 수 없습니다.", exception);
+        }
+    }
+
+    private String writeAiReportSnapshot(Object report) {
+        try {
+            return report == null ? null : objectMapper.writeValueAsString(report);
+        } catch (Exception exception) {
+            throw new IllegalStateException("사업부 제출 시점 AI 레포트 스냅샷을 저장할 수 없습니다.", exception);
         }
     }
 

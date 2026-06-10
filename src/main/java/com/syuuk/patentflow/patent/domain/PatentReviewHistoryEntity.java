@@ -142,6 +142,11 @@ public class PatentReviewHistoryEntity extends BaseEntity {
     @Column(name = "business_ai_report_created_at")
     private OffsetDateTime businessAiReportCreatedAt;
 
+    // 제출 시점에 사업부가 실제로 본 레포트 전체(JSON). 기존 3개 스냅샷 컬럼(createdAt/recommendation/
+    // totalScore)만으로는 이후 레포트 편집·재생성 시 사업부가 본 내용을 복원할 수 없던 결함의 수정.
+    @Column(name = "business_ai_report_snapshot_json", columnDefinition = "TEXT")
+    private String businessAiReportSnapshotJson;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "business_ai_recommendation", length = 64)
     private Recommendation businessAiRecommendation;
@@ -450,6 +455,14 @@ public class PatentReviewHistoryEntity extends BaseEntity {
 
     public void setBusinessAiReportCreatedAt(OffsetDateTime businessAiReportCreatedAt) {
         this.businessAiReportCreatedAt = businessAiReportCreatedAt;
+    }
+
+    public String getBusinessAiReportSnapshotJson() {
+        return businessAiReportSnapshotJson;
+    }
+
+    public void setBusinessAiReportSnapshotJson(String businessAiReportSnapshotJson) {
+        this.businessAiReportSnapshotJson = businessAiReportSnapshotJson;
     }
 
     public Recommendation getBusinessAiRecommendation() {

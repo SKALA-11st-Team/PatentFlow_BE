@@ -42,8 +42,13 @@ class PatentWorkflowServiceMapAgentResponseTest {
     }
 
     private AgentEvaluateResponse agentResponse(List<AgentScoreItem> scores, Integer totalScore) {
+        return agentResponse(scores, totalScore, "# 보고서", null);
+    }
+
+    private AgentEvaluateResponse agentResponse(
+            List<AgentScoreItem> scores, Integer totalScore, String rawMarkdown, String summaryMarkdown) {
         return new AgentEvaluateResponse(
-                "PAT-VAL09", scores, "포기 검토", null, "# 보고서",
+                "PAT-VAL09", scores, "포기 검토", summaryMarkdown, rawMarkdown,
                 totalScore, null, "D", "포기 검토", null, false, null, OffsetDateTime.now(),
                 List.of(), null, List.of(), List.of(), List.of());
     }
@@ -70,5 +75,18 @@ class PatentWorkflowServiceMapAgentResponseTest {
         // 점수 미산출은 합계 null + degraded=true로 명시 구분된다(0점 매각후보와 혼동 안 됨).
         assertThat(report.totalScore()).isNull();
         assertThat(report.degraded()).isTrue();
+    }
+
+    @Test
+    void missingReportMarkdownBuildsSyntheticReportInsteadOfPassingSummaryAsReport() {
+        // 전체 레포트가 없으면 요약문이 레포트로 둔갑하지 않고, 합성 레포트(요약+점수+권고)가 생성된다.
+        AgentEvaluateResponse agent = agentResponse(
+                List.of(score("권리성", 70)), 70, null, "# 특허 요약 한 줄");
+
+        AiEvaluationReportResponse report = service.mapAgentResponse(agent, "PAT-VAL09");
+
+        assertThat(report.rawMarkdown()).startsWith("# AI 특허 평가 레포트");
+        assertThat(report.rawMarkdown()).contains("# 특허 요약 한 줄");
+        assertThat(report.rawMarkdown()).contains("## 평가 점수");
     }
 }
