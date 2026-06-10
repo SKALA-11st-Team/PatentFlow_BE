@@ -1,0 +1,4931 @@
+{
+  "openapi" : "3.1.0",
+  "info" : {
+    "title" : "PatentFlow BE API",
+    "description" : "PatentFlow FE 우선 연동 API 문서",
+    "version" : "v1"
+  },
+  "servers" : [
+    {
+      "url" : "http://localhost",
+      "description" : "Generated server url"
+    }
+  ],
+  "paths" : {
+    "/api/v1/settings/review-quarters/{quarterKey}" : {
+      "put" : {
+        "tags" : [
+          "settings-controller"
+        ],
+        "operationId" : "updateQuarterSetting",
+        "parameters" : [
+          {
+            "name" : "quarterKey",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/QuarterSettingRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseQuarterSettingResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/review-periods/{periodNumber}" : {
+      "put" : {
+        "tags" : [
+          "settings-controller"
+        ],
+        "operationId" : "updatePeriodTemplate",
+        "parameters" : [
+          {
+            "name" : "periodNumber",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "integer",
+              "format" : "int32"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ReviewPeriodTemplateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseReviewPeriodTemplateResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/country-extensions/{country}" : {
+      "put" : {
+        "tags" : [
+          "settings-controller"
+        ],
+        "operationId" : "updateCountryExtension",
+        "parameters" : [
+          {
+            "name" : "country",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CountryExtensionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseCountryExtensionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/classifications/{type}/{value}" : {
+      "put" : {
+        "tags" : [
+          "settings-controller"
+        ],
+        "operationId" : "renameClassification",
+        "parameters" : [
+          {
+            "name" : "type",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "value",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ClassificationRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseClassificationResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [
+          "settings-controller"
+        ],
+        "operationId" : "deleteClassification",
+        "parameters" : [
+          {
+            "name" : "type",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "value",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseClassificationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patents/{patentId}" : {
+      "get" : {
+        "tags" : [
+          "patent-controller"
+        ],
+        "operationId" : "getPatentDetail",
+        "parameters" : [
+          {
+            "name" : "patentId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePatentDetailResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put" : {
+        "tags" : [
+          "patent-controller"
+        ],
+        "operationId" : "updatePatent",
+        "parameters" : [
+          {
+            "name" : "patentId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PatentUpsertRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePatentUpsertResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/mailings/department-recipient-mappings/{departmentId}" : {
+      "put" : {
+        "tags" : [
+          "mailing-controller"
+        ],
+        "operationId" : "updateRecipientMapping",
+        "parameters" : [
+          {
+            "name" : "departmentId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/DepartmentRecipientMappingRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseDepartmentRecipientMappingResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/users/{userId}" : {
+      "put" : {
+        "tags" : [
+          "admin-user-controller"
+        ],
+        "operationId" : "updateUser",
+        "parameters" : [
+          {
+            "name" : "userId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateUserRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseUserResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [
+          "admin-user-controller"
+        ],
+        "operationId" : "deleteUser",
+        "parameters" : [
+          {
+            "name" : "userId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/settings/mail" : {
+      "get" : {
+        "tags" : [
+          "admin-settings-controller"
+        ],
+        "operationId" : "getMailSettings",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseMailSettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put" : {
+        "tags" : [
+          "admin-settings-controller"
+        ],
+        "operationId" : "updateMailSettings",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/MailSettingsRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseMailSettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/departments/{departmentId}" : {
+      "put" : {
+        "tags" : [
+          "admin-department-controller"
+        ],
+        "operationId" : "updateDepartment",
+        "parameters" : [
+          {
+            "name" : "departmentId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateDepartmentRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseDepartmentRecipientMappingResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [
+          "admin-department-controller"
+        ],
+        "operationId" : "deleteDepartment",
+        "parameters" : [
+          {
+            "name" : "departmentId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/review-quarters/{quarterKey}/activate" : {
+      "post" : {
+        "tags" : [
+          "settings-controller"
+        ],
+        "operationId" : "activateQuarter",
+        "parameters" : [
+          {
+            "name" : "quarterKey",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseQuarterActivateResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/classifications/{type}" : {
+      "post" : {
+        "tags" : [
+          "settings-controller"
+        ],
+        "operationId" : "addClassification",
+        "parameters" : [
+          {
+            "name" : "type",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ClassificationRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseClassificationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patents" : {
+      "get" : {
+        "tags" : [
+          "patent-controller"
+        ],
+        "operationId" : "getPatents",
+        "parameters" : [
+          {
+            "name" : "page",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "integer",
+              "format" : "int32",
+              "default" : 1
+            }
+          },
+          {
+            "name" : "size",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "integer",
+              "format" : "int32",
+              "default" : 20
+            }
+          },
+          {
+            "name" : "keyword",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "departmentId",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "reviewWorkflowStatus",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string",
+              "enum" : [
+                "NOT_IN_REVIEW",
+                "REVIEW_QUARTER_STARTED",
+                "MAIL_READY",
+                "WAITING_BUSINESS_RESPONSE",
+                "BUSINESS_RESPONSE_RECEIVED"
+              ]
+            }
+          },
+          {
+            "name" : "sort",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponsePatentListItemResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [
+          "patent-controller"
+        ],
+        "operationId" : "createPatent",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PatentUpsertRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePatentUpsertResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patents/{patentId}/request-ai-report" : {
+      "post" : {
+        "tags" : [
+          "patent-controller"
+        ],
+        "operationId" : "requestAiReport",
+        "parameters" : [
+          {
+            "name" : "patentId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseAiReportJobResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patents/{patentId}/final-decision" : {
+      "post" : {
+        "tags" : [
+          "patent-controller"
+        ],
+        "operationId" : "recordFinalDecision",
+        "parameters" : [
+          {
+            "name" : "patentId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/FinalDecisionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseFinalDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch" : {
+        "tags" : [
+          "patent-controller"
+        ],
+        "operationId" : "patchFinalDecision",
+        "parameters" : [
+          {
+            "name" : "patentId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PatchFinalDecisionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseFinalDecisionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patents/{patentId}/business-submissions" : {
+      "get" : {
+        "tags" : [
+          "business-controller"
+        ],
+        "operationId" : "getBusinessSubmissions",
+        "parameters" : [
+          {
+            "name" : "patentId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListBusinessSubmissionVersionResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [
+          "business-controller"
+        ],
+        "operationId" : "submitBusinessChecklist",
+        "parameters" : [
+          {
+            "name" : "patentId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/BusinessChecklistSubmissionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseBusinessSubmissionVersionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patents/context-suggestions" : {
+      "post" : {
+        "tags" : [
+          "patent-controller"
+        ],
+        "operationId" : "suggestContext",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PatentContextSuggestionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePatentContextSuggestionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/mailings/send" : {
+      "post" : {
+        "tags" : [
+          "mailing-controller"
+        ],
+        "operationId" : "sendMailing",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/MailingSendRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseMailingSendResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/refresh" : {
+      "post" : {
+        "tags" : [
+          "auth-controller"
+        ],
+        "operationId" : "refresh",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseLoginResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout" : {
+      "post" : {
+        "tags" : [
+          "auth-controller"
+        ],
+        "operationId" : "logout",
+        "parameters" : [
+          {
+            "name" : "Authorization",
+            "in" : "header",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login" : {
+      "post" : {
+        "tags" : [
+          "auth-controller"
+        ],
+        "operationId" : "login",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseLoginResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/annual-fees/schedule/recompute" : {
+      "post" : {
+        "tags" : [
+          "annual-fee-schedule-controller"
+        ],
+        "operationId" : "recompute",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseInteger"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/users" : {
+      "get" : {
+        "tags" : [
+          "admin-user-controller"
+        ],
+        "operationId" : "getUsers",
+        "parameters" : [
+          {
+            "name" : "page",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "integer",
+              "format" : "int32"
+            }
+          },
+          {
+            "name" : "size",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "integer",
+              "format" : "int32"
+            }
+          },
+          {
+            "name" : "search",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [
+          "admin-user-controller"
+        ],
+        "operationId" : "createUser",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateUserRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseUserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/users/{userId}/reset-password" : {
+      "post" : {
+        "tags" : [
+          "admin-user-controller"
+        ],
+        "operationId" : "resetPassword",
+        "parameters" : [
+          {
+            "name" : "userId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseResetPasswordResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/departments" : {
+      "get" : {
+        "tags" : [
+          "admin-department-controller"
+        ],
+        "operationId" : "getDepartments",
+        "parameters" : [
+          {
+            "name" : "page",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "integer",
+              "format" : "int32"
+            }
+          },
+          {
+            "name" : "size",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "integer",
+              "format" : "int32"
+            }
+          },
+          {
+            "name" : "search",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseObject"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [
+          "admin-department-controller"
+        ],
+        "operationId" : "createDepartment",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateDepartmentRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseDepartmentRecipientMappingResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/response-deadline" : {
+      "get" : {
+        "tags" : [
+          "settings-controller"
+        ],
+        "operationId" : "getResponseDeadline",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseResponseDeadlineResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch" : {
+        "tags" : [
+          "settings-controller"
+        ],
+        "operationId" : "updateResponseDeadline",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ResponseDeadlineResponse"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseResponseDeadlineResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/mail-lead-months" : {
+      "get" : {
+        "tags" : [
+          "settings-controller"
+        ],
+        "operationId" : "getMailLeadMonths",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseMailLeadMonthsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch" : {
+        "tags" : [
+          "settings-controller"
+        ],
+        "operationId" : "updateMailLeadMonths",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/MailLeadMonthsResponse"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseMailLeadMonthsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patents/{patentId}/department" : {
+      "patch" : {
+        "tags" : [
+          "patent-controller"
+        ],
+        "operationId" : "assignDepartment",
+        "parameters" : [
+          {
+            "name" : "patentId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AssignDepartmentRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePatentDetailResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications/{notificationId}/read-state" : {
+      "patch" : {
+        "tags" : [
+          "notification-controller"
+        ],
+        "operationId" : "updateReadState",
+        "parameters" : [
+          {
+            "name" : "notificationId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/NotificationReadStateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseNotificationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications/read-all" : {
+      "patch" : {
+        "tags" : [
+          "notification-controller"
+        ],
+        "operationId" : "markAllRead",
+        "parameters" : [
+          {
+            "name" : "role",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string",
+              "default" : "COMMON"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/password" : {
+      "patch" : {
+        "tags" : [
+          "auth-controller"
+        ],
+        "operationId" : "changePassword",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ChangePasswordRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/me" : {
+      "get" : {
+        "tags" : [
+          "auth-controller"
+        ],
+        "operationId" : "me",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseUserPrincipalResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch" : {
+        "tags" : [
+          "auth-controller"
+        ],
+        "operationId" : "updateProfile",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateProfileRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseUserPrincipalResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/annual-fees/schedule/{patentId}" : {
+      "patch" : {
+        "tags" : [
+          "annual-fee-schedule-controller"
+        ],
+        "operationId" : "adjustSchedule",
+        "parameters" : [
+          {
+            "name" : "patentId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AnnualFeeScheduleAdjustmentRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseAnnualFeeScheduleItemResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/review-quarters" : {
+      "get" : {
+        "tags" : [
+          "settings-controller"
+        ],
+        "operationId" : "getQuarterSettings",
+        "parameters" : [
+          {
+            "name" : "year",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "integer",
+              "format" : "int32",
+              "default" : 0
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListQuarterSettingResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/review-quarters/active" : {
+      "get" : {
+        "tags" : [
+          "settings-controller"
+        ],
+        "operationId" : "getActiveQuarter",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseQuarterSettingResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/review-periods" : {
+      "get" : {
+        "tags" : [
+          "settings-controller"
+        ],
+        "operationId" : "getPeriodTemplates",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListReviewPeriodTemplateResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/country-extensions" : {
+      "get" : {
+        "tags" : [
+          "settings-controller"
+        ],
+        "operationId" : "getCountryExtensions",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListCountryExtensionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settings/classifications" : {
+      "get" : {
+        "tags" : [
+          "settings-controller"
+        ],
+        "operationId" : "getClassifications",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListClassificationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patents/{patentId}/history" : {
+      "get" : {
+        "tags" : [
+          "patent-controller"
+        ],
+        "operationId" : "getPatentHistory",
+        "parameters" : [
+          {
+            "name" : "patentId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListPatentHistoryResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patents/{patentId}/ai-report/status" : {
+      "get" : {
+        "tags" : [
+          "patent-controller"
+        ],
+        "operationId" : "getAiReportStatus",
+        "parameters" : [
+          {
+            "name" : "patentId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseAiReportJobResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patents/review-targets" : {
+      "get" : {
+        "tags" : [
+          "patent-controller"
+        ],
+        "operationId" : "getReviewTargets",
+        "parameters" : [
+          {
+            "name" : "quarter",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "country",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "dateFrom",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string",
+              "format" : "date"
+            }
+          },
+          {
+            "name" : "dateTo",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string",
+              "format" : "date"
+            }
+          },
+          {
+            "name" : "reviewWorkflowStatus",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string",
+              "enum" : [
+                "NOT_IN_REVIEW",
+                "REVIEW_QUARTER_STARTED",
+                "MAIL_READY",
+                "WAITING_BUSINESS_RESPONSE",
+                "BUSINESS_RESPONSE_RECEIVED"
+              ]
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListPatentListItemResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patents/external-lookup" : {
+      "get" : {
+        "tags" : [
+          "patent-controller"
+        ],
+        "operationId" : "lookupBibliographicInfo",
+        "parameters" : [
+          {
+            "name" : "managementNumber",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "applicationNumber",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "registrationNumber",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "sourcePriority",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePatentBibliographicInfoResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications" : {
+      "get" : {
+        "tags" : [
+          "notification-controller"
+        ],
+        "operationId" : "getNotifications",
+        "parameters" : [
+          {
+            "name" : "role",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string",
+              "default" : "COMMON"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListNotificationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications/unread-count" : {
+      "get" : {
+        "tags" : [
+          "notification-controller"
+        ],
+        "operationId" : "unreadCount",
+        "parameters" : [
+          {
+            "name" : "role",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string",
+              "default" : "COMMON"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseNotificationUnreadCountResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/mailings/history" : {
+      "get" : {
+        "tags" : [
+          "mailing-controller"
+        ],
+        "operationId" : "getMailingHistory",
+        "parameters" : [
+          {
+            "name" : "patentId",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "recipientEmail",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "page",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "integer",
+              "format" : "int32",
+              "default" : 1
+            }
+          },
+          {
+            "name" : "size",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "integer",
+              "format" : "int32",
+              "default" : 20
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponseMailingHistoryItemResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/mailings/department-recipient-mappings" : {
+      "get" : {
+        "tags" : [
+          "mailing-controller"
+        ],
+        "operationId" : "getRecipientMappings",
+        "parameters" : [
+          {
+            "name" : "departmentId",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListDepartmentRecipientMappingResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/legal/dashboard/summary" : {
+      "get" : {
+        "tags" : [
+          "legal-controller"
+        ],
+        "operationId" : "getDashboardSummary",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseLegalDashboardSummaryResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/departments" : {
+      "get" : {
+        "tags" : [
+          "department-controller"
+        ],
+        "operationId" : "getDepartments_1",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListDepartmentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/business/review-requests" : {
+      "get" : {
+        "tags" : [
+          "business-controller"
+        ],
+        "operationId" : "getReviewRequests",
+        "parameters" : [
+          {
+            "name" : "page",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "integer",
+              "format" : "int32",
+              "default" : 1
+            }
+          },
+          {
+            "name" : "size",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "integer",
+              "format" : "int32",
+              "default" : 20
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponsePatentListItemResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/business/patents" : {
+      "get" : {
+        "tags" : [
+          "business-controller"
+        ],
+        "operationId" : "getBusinessPatents",
+        "parameters" : [
+          {
+            "name" : "page",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "integer",
+              "format" : "int32",
+              "default" : 1
+            }
+          },
+          {
+            "name" : "size",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "integer",
+              "format" : "int32",
+              "default" : 20
+            }
+          },
+          {
+            "name" : "keyword",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "reviewWorkflowStatus",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string",
+              "enum" : [
+                "NOT_IN_REVIEW",
+                "REVIEW_QUARTER_STARTED",
+                "MAIL_READY",
+                "WAITING_BUSINESS_RESPONSE",
+                "BUSINESS_RESPONSE_RECEIVED"
+              ]
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageResponsePatentListItemResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/business/patents/{patentId}" : {
+      "get" : {
+        "tags" : [
+          "business-controller"
+        ],
+        "operationId" : "getBusinessPatentDetail",
+        "parameters" : [
+          {
+            "name" : "patentId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePatentDetailResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/business/dashboard/summary" : {
+      "get" : {
+        "tags" : [
+          "business-controller"
+        ],
+        "operationId" : "getDashboardSummary_1",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseBusinessDashboardSummaryResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/business/checklist-items" : {
+      "get" : {
+        "tags" : [
+          "business-controller"
+        ],
+        "operationId" : "getChecklistItems",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListBusinessChecklistItemResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/annual-fees/schedule" : {
+      "get" : {
+        "tags" : [
+          "annual-fee-schedule-controller"
+        ],
+        "operationId" : "getSchedule",
+        "parameters" : [
+          {
+            "name" : "country",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListAnnualFeeScheduleItemResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/settings/mail/oauth2/google/status" : {
+      "get" : {
+        "tags" : [
+          "mail-o-auth-2-controller"
+        ],
+        "operationId" : "getStatus",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseMailOAuth2StatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/settings/mail/oauth2/google/callback" : {
+      "get" : {
+        "tags" : [
+          "mail-o-auth-2-controller"
+        ],
+        "operationId" : "callback",
+        "parameters" : [
+          {
+            "name" : "code",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "error",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "state",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/settings/mail/oauth2/google/authorize-url" : {
+      "get" : {
+        "tags" : [
+          "mail-o-auth-2-controller"
+        ],
+        "operationId" : "getAuthorizeUrl",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseString"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/settings/mail/oauth2/google" : {
+      "delete" : {
+        "tags" : [
+          "mail-o-auth-2-controller"
+        ],
+        "operationId" : "disconnect",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseMailOAuth2StatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components" : {
+    "schemas" : {
+      "QuarterSettingRequest" : {
+        "type" : "object",
+        "properties" : {
+          "startDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "endDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "submissionDeadline" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "businessResponseDueDate" : {
+            "type" : "string",
+            "format" : "date"
+          }
+        }
+      },
+      "ApiResponseQuarterSettingResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/QuarterSettingResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "QuarterSettingResponse" : {
+        "type" : "object",
+        "properties" : {
+          "quarterKey" : {
+            "type" : "string"
+          },
+          "year" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "quarterNumber" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "quarterLabel" : {
+            "type" : "string"
+          },
+          "startDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "endDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "activated" : {
+            "type" : "boolean"
+          },
+          "activatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "ended" : {
+            "type" : "boolean"
+          },
+          "endedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "targetPatentCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "submissionDeadline" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "businessResponseDueDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "mailLeadMonths" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "scheduledMailSendDate" : {
+            "type" : "string",
+            "format" : "date"
+          }
+        }
+      },
+      "ReviewPeriodTemplateRequest" : {
+        "type" : "object",
+        "properties" : {
+          "startMonth" : {
+            "type" : "integer",
+            "format" : "int32",
+            "maximum" : 12,
+            "minimum" : 1
+          },
+          "startDay" : {
+            "type" : "integer",
+            "format" : "int32",
+            "maximum" : 31,
+            "minimum" : 1
+          },
+          "endMonth" : {
+            "type" : "integer",
+            "format" : "int32",
+            "maximum" : 12,
+            "minimum" : 1
+          },
+          "endDay" : {
+            "type" : "integer",
+            "format" : "int32",
+            "maximum" : 31,
+            "minimum" : 1
+          }
+        },
+        "required" : [
+          "endDay",
+          "endMonth",
+          "startDay",
+          "startMonth"
+        ]
+      },
+      "ApiResponseReviewPeriodTemplateResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/ReviewPeriodTemplateResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "ReviewPeriodTemplateResponse" : {
+        "type" : "object",
+        "properties" : {
+          "periodNumber" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "startMonth" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "startDay" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "endMonth" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "endDay" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "label" : {
+            "type" : "string"
+          }
+        }
+      },
+      "CountryExtensionRequest" : {
+        "type" : "object",
+        "properties" : {
+          "extensionMonths" : {
+            "type" : "integer",
+            "format" : "int32",
+            "maximum" : 240,
+            "minimum" : 0
+          }
+        }
+      },
+      "ApiResponseCountryExtensionResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/CountryExtensionResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "CountryExtensionResponse" : {
+        "type" : "object",
+        "properties" : {
+          "country" : {
+            "type" : "string"
+          },
+          "label" : {
+            "type" : "string"
+          },
+          "extensionMonths" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "ClassificationRequest" : {
+        "type" : "object",
+        "properties" : {
+          "value" : {
+            "type" : "string",
+            "maxLength" : 80,
+            "minLength" : 0
+          }
+        },
+        "required" : [
+          "value"
+        ]
+      },
+      "ApiResponseClassificationResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/ClassificationResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "ClassificationResponse" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "type" : "string"
+          },
+          "values" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }
+      },
+      "PatentUpsertRequest" : {
+        "type" : "object",
+        "properties" : {
+          "managementNumber" : {
+            "type" : "string",
+            "minLength" : 1
+          },
+          "title" : {
+            "type" : "string",
+            "minLength" : 1
+          },
+          "applicationDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "coApplicants" : {
+            "type" : "string"
+          },
+          "country" : {
+            "type" : "string"
+          },
+          "registrationDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "applicationNumber" : {
+            "type" : "string"
+          },
+          "registrationNumber" : {
+            "type" : "string"
+          },
+          "expectedExpirationDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "source" : {
+            "type" : "string"
+          },
+          "businessArea" : {
+            "type" : "string"
+          },
+          "technologyArea" : {
+            "type" : "string"
+          },
+          "productName" : {
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "managementNumber",
+          "title"
+        ]
+      },
+      "ApiResponsePatentUpsertResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/PatentUpsertResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "PatentUpsertResponse" : {
+        "type" : "object",
+        "properties" : {
+          "patentId" : {
+            "type" : "string"
+          },
+          "mode" : {
+            "type" : "string"
+          }
+        }
+      },
+      "DepartmentRecipientMappingRequest" : {
+        "type" : "object",
+        "properties" : {
+          "departmentName" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ApiResponseDepartmentRecipientMappingResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/DepartmentRecipientMappingResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "DepartmentRecipientMappingResponse" : {
+        "type" : "object",
+        "properties" : {
+          "departmentId" : {
+            "type" : "string"
+          },
+          "departmentName" : {
+            "type" : "string"
+          },
+          "managerEmail" : {
+            "type" : "string"
+          },
+          "managerName" : {
+            "type" : "string"
+          },
+          "ccEmails" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "updatedAt" : {
+            "type" : "string"
+          }
+        }
+      },
+      "CreateUserRequest" : {
+        "type" : "object",
+        "properties" : {
+          "email" : {
+            "type" : "string",
+            "format" : "email",
+            "minLength" : 1
+          },
+          "role" : {
+            "type" : "string",
+            "minLength" : 1,
+            "pattern" : "ADMIN|BUSINESS"
+          },
+          "departmentId" : {
+            "type" : "string"
+          },
+          "username" : {
+            "type" : "string",
+            "minLength" : 1
+          }
+        },
+        "required" : [
+          "email",
+          "role",
+          "username"
+        ]
+      },
+      "ApiResponseUserResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/UserResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "UserResponse" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "email" : {
+            "type" : "string"
+          },
+          "username" : {
+            "type" : "string"
+          },
+          "role" : {
+            "type" : "string"
+          },
+          "departmentId" : {
+            "type" : "string"
+          },
+          "departmentName" : {
+            "type" : "string"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "MailSettingsRequest" : {
+        "type" : "object",
+        "properties" : {
+          "gmailUsername" : {
+            "type" : "string"
+          },
+          "gmailAppPassword" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ApiResponseMailSettingsResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/MailSettingsResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "MailSettingsResponse" : {
+        "type" : "object",
+        "properties" : {
+          "gmailUsername" : {
+            "type" : "string"
+          },
+          "isAppPasswordConfigured" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "UpdateDepartmentRequest" : {
+        "type" : "object",
+        "properties" : {
+          "departmentName" : {
+            "type" : "string",
+            "minLength" : 1
+          }
+        },
+        "required" : [
+          "departmentName"
+        ]
+      },
+      "ApiResponseQuarterActivateResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/QuarterActivateResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "QuarterActivateResponse" : {
+        "type" : "object",
+        "properties" : {
+          "quarterKey" : {
+            "type" : "string"
+          },
+          "reviewStartedCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "autoCompletedCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "reviewStartedPatentIds" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "autoCompletedPatentIds" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }
+      },
+      "AiReportJobResponse" : {
+        "type" : "object",
+        "properties" : {
+          "jobId" : {
+            "type" : "string"
+          },
+          "patentId" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string",
+            "enum" : [
+              "PENDING",
+              "RUNNING",
+              "SUCCEEDED",
+              "FAILED",
+              "DEGRADED"
+            ]
+          },
+          "requestedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "startedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "finishedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "reportId" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ApiResponseAiReportJobResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/AiReportJobResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "FinalDecisionRequest" : {
+        "type" : "object",
+        "properties" : {
+          "legalActionResult" : {
+            "type" : "string",
+            "enum" : [
+              "MAINTAINED",
+              "ABANDONED"
+            ]
+          },
+          "reason" : {
+            "type" : "string",
+            "minLength" : 1
+          }
+        },
+        "required" : [
+          "legalActionResult",
+          "reason"
+        ]
+      },
+      "ApiResponseFinalDecisionResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/FinalDecisionResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "FinalDecisionRecordResponse" : {
+        "type" : "object",
+        "properties" : {
+          "decisionId" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "decidedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "decidedBy" : {
+            "type" : "string"
+          }
+        }
+      },
+      "FinalDecisionResponse" : {
+        "type" : "object",
+        "properties" : {
+          "patentId" : {
+            "type" : "string"
+          },
+          "finalDecisionRecord" : {
+            "$ref" : "#/components/schemas/FinalDecisionRecordResponse"
+          },
+          "legalActionResult" : {
+            "type" : "string",
+            "enum" : [
+              "MAINTAINED",
+              "ABANDONED"
+            ]
+          },
+          "reviewWorkflowStatus" : {
+            "type" : "string",
+            "enum" : [
+              "NOT_IN_REVIEW",
+              "REVIEW_QUARTER_STARTED",
+              "MAIL_READY",
+              "WAITING_BUSINESS_RESPONSE",
+              "BUSINESS_RESPONSE_RECEIVED"
+            ]
+          }
+        }
+      },
+      "BusinessChecklistResponseDto" : {
+        "type" : "object",
+        "properties" : {
+          "itemId" : {
+            "type" : "string",
+            "minLength" : 1
+          },
+          "score" : {
+            "type" : "integer",
+            "format" : "int32",
+            "maximum" : 4,
+            "minimum" : 1
+          },
+          "aiSuggestedScore" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "memo" : {
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "itemId",
+          "score"
+        ]
+      },
+      "BusinessChecklistSubmissionRequest" : {
+        "type" : "object",
+        "properties" : {
+          "patentId" : {
+            "type" : "string",
+            "minLength" : 1
+          },
+          "evaluatorName" : {
+            "type" : "string"
+          },
+          "evaluatedAt" : {
+            "type" : "string"
+          },
+          "responses" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BusinessChecklistResponseDto"
+            },
+            "minItems" : 1
+          },
+          "qualitativeScore" : {
+            "type" : "integer",
+            "format" : "int32",
+            "maximum" : 5,
+            "minimum" : -5
+          },
+          "qualitativeMemo" : {
+            "type" : "string"
+          },
+          "finalOpinion" : {
+            "type" : "string",
+            "enum" : [
+              "MAINTAIN",
+              "ABANDON"
+            ]
+          },
+          "finalReason" : {
+            "type" : "string"
+          },
+          "additionalNeeds" : {
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "finalOpinion",
+          "patentId",
+          "responses"
+        ]
+      },
+      "ApiResponseBusinessSubmissionVersionResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/BusinessSubmissionVersionResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "BusinessSubmissionChecklistScoreResponse" : {
+        "type" : "object",
+        "properties" : {
+          "itemId" : {
+            "type" : "string"
+          },
+          "score" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "memo" : {
+            "type" : "string"
+          }
+        }
+      },
+      "BusinessSubmissionVersionResponse" : {
+        "type" : "object",
+        "properties" : {
+          "submissionId" : {
+            "type" : "string"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "decision" : {
+            "type" : "string",
+            "enum" : [
+              "MAINTAIN",
+              "ABANDON"
+            ]
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "submittedBy" : {
+            "type" : "string"
+          },
+          "submittedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "aiReportCreatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "aiRecommendation" : {
+            "type" : "string",
+            "enum" : [
+              "MAINTAIN",
+              "REVIEW_AGAIN",
+              "ABANDON",
+              "HOLD"
+            ]
+          },
+          "aiTotalScore" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "checklistTotal" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "checklistScores" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BusinessSubmissionChecklistScoreResponse"
+            }
+          },
+          "qualitativeScore" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "responses" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BusinessSubmissionChecklistScoreResponse"
+            }
+          },
+          "finalOpinion" : {
+            "type" : "string",
+            "enum" : [
+              "MAINTAIN",
+              "ABANDON"
+            ]
+          }
+        }
+      },
+      "PatentContextSuggestionRequest" : {
+        "type" : "object",
+        "properties" : {
+          "managementNumber" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "applicationDate" : {
+            "type" : "string"
+          },
+          "coApplicants" : {
+            "type" : "string"
+          },
+          "country" : {
+            "type" : "string"
+          },
+          "registrationDate" : {
+            "type" : "string"
+          },
+          "applicationNumber" : {
+            "type" : "string"
+          },
+          "registrationNumber" : {
+            "type" : "string"
+          },
+          "expectedExpirationDate" : {
+            "type" : "string"
+          },
+          "source" : {
+            "type" : "string"
+          },
+          "businessArea" : {
+            "type" : "string"
+          },
+          "technologyArea" : {
+            "type" : "string"
+          },
+          "productName" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ApiResponsePatentContextSuggestionResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/PatentContextSuggestionResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "PatentContextSuggestionResponse" : {
+        "type" : "object",
+        "properties" : {
+          "businessArea" : {
+            "type" : "string"
+          },
+          "confidenceText" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "technologyArea" : {
+            "type" : "string"
+          }
+        }
+      },
+      "BusinessReviewMailPatentSummary" : {
+        "type" : "object",
+        "properties" : {
+          "patentId" : {
+            "type" : "string",
+            "minLength" : 1
+          },
+          "managementNumber" : {
+            "type" : "string"
+          },
+          "originalPatentUrl" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "patentId"
+        ]
+      },
+      "BusinessReviewMailSendDraft" : {
+        "type" : "object",
+        "properties" : {
+          "body" : {
+            "type" : "string",
+            "minLength" : 1
+          },
+          "ccEmails" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "patents" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BusinessReviewMailPatentSummary"
+            },
+            "minItems" : 1
+          },
+          "recipientEmail" : {
+            "type" : "string",
+            "minLength" : 1
+          },
+          "recipientName" : {
+            "type" : "string",
+            "minLength" : 1
+          },
+          "subject" : {
+            "type" : "string",
+            "minLength" : 1
+          }
+        },
+        "required" : [
+          "body",
+          "patents",
+          "recipientEmail",
+          "recipientName",
+          "subject"
+        ]
+      },
+      "MailingSendRequest" : {
+        "type" : "object",
+        "properties" : {
+          "drafts" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BusinessReviewMailSendDraft"
+            },
+            "minItems" : 1
+          }
+        },
+        "required" : [
+          "drafts"
+        ]
+      },
+      "ApiResponseMailingSendResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/MailingSendResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "MailingSendResponse" : {
+        "type" : "object",
+        "properties" : {
+          "mailingBatchId" : {
+            "type" : "string"
+          },
+          "updatedCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "updatedPatentIds" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "skippedPatentIds" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "sentCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "failedCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "recordedCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "ApiResponseLoginResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/LoginResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "LoginResponse" : {
+        "type" : "object",
+        "properties" : {
+          "accessToken" : {
+            "type" : "string"
+          },
+          "tokenType" : {
+            "type" : "string"
+          },
+          "expiresAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "user" : {
+            "$ref" : "#/components/schemas/UserPrincipalResponse"
+          },
+          "refreshToken" : {
+            "type" : "string"
+          }
+        }
+      },
+      "UserPrincipalResponse" : {
+        "type" : "object",
+        "properties" : {
+          "email" : {
+            "type" : "string"
+          },
+          "username" : {
+            "type" : "string"
+          },
+          "roles" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "userId" : {
+            "type" : "string"
+          },
+          "role" : {
+            "type" : "string"
+          },
+          "departmentId" : {
+            "type" : "string"
+          },
+          "departmentName" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ApiResponseVoid" : {
+        "type" : "object",
+        "properties" : {
+          "data" : { },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "LoginRequest" : {
+        "type" : "object",
+        "properties" : {
+          "email" : {
+            "type" : "string",
+            "format" : "email",
+            "minLength" : 1
+          },
+          "password" : {
+            "type" : "string",
+            "minLength" : 1
+          }
+        },
+        "required" : [
+          "email",
+          "password"
+        ]
+      },
+      "ApiResponseInteger" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "ApiResponseResetPasswordResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/ResetPasswordResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "ResetPasswordResponse" : {
+        "type" : "object",
+        "properties" : {
+          "userId" : {
+            "type" : "string"
+          },
+          "email" : {
+            "type" : "string"
+          },
+          "temporaryPassword" : {
+            "type" : "string"
+          },
+          "emailSent" : {
+            "type" : "boolean"
+          },
+          "message" : {
+            "type" : "string"
+          }
+        }
+      },
+      "CreateDepartmentRequest" : {
+        "type" : "object",
+        "properties" : {
+          "departmentId" : {
+            "type" : "string",
+            "minLength" : 1
+          },
+          "departmentName" : {
+            "type" : "string",
+            "minLength" : 1
+          }
+        },
+        "required" : [
+          "departmentId",
+          "departmentName"
+        ]
+      },
+      "ResponseDeadlineResponse" : {
+        "type" : "object",
+        "properties" : {
+          "months" : {
+            "type" : "integer",
+            "format" : "int32",
+            "maximum" : 12,
+            "minimum" : 0
+          },
+          "days" : {
+            "type" : "integer",
+            "format" : "int32",
+            "maximum" : 31,
+            "minimum" : 0
+          }
+        }
+      },
+      "ApiResponseResponseDeadlineResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/ResponseDeadlineResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "MailLeadMonthsResponse" : {
+        "type" : "object",
+        "properties" : {
+          "mailLeadMonths" : {
+            "type" : "integer",
+            "format" : "int32",
+            "maximum" : 24,
+            "minimum" : 0
+          }
+        }
+      },
+      "ApiResponseMailLeadMonthsResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/MailLeadMonthsResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "PatchFinalDecisionRequest" : {
+        "type" : "object",
+        "properties" : {
+          "legalActionResult" : {
+            "type" : "string",
+            "enum" : [
+              "MAINTAINED",
+              "ABANDONED"
+            ]
+          },
+          "reason" : {
+            "type" : "string"
+          }
+        }
+      },
+      "AssignDepartmentRequest" : {
+        "type" : "object",
+        "properties" : {
+          "departmentId" : {
+            "type" : "string",
+            "minLength" : 1
+          }
+        },
+        "required" : [
+          "departmentId"
+        ]
+      },
+      "AiEvaluationReportResponse" : {
+        "type" : "object",
+        "properties" : {
+          "reportId" : {
+            "type" : "string"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "recommendation" : {
+            "type" : "string",
+            "enum" : [
+              "MAINTAIN",
+              "REVIEW_AGAIN",
+              "ABANDON",
+              "HOLD"
+            ]
+          },
+          "recommendationReason" : {
+            "type" : "string"
+          },
+          "totalScore" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "averageScore" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "finalGrade" : {
+            "type" : "string"
+          },
+          "finalIndicator" : {
+            "type" : "string"
+          },
+          "degraded" : {
+            "type" : "boolean"
+          },
+          "failureReason" : {
+            "type" : "string"
+          },
+          "scores" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/EvaluationScoreResponse"
+            }
+          },
+          "missingInformation" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "rawMarkdown" : {
+            "type" : "string"
+          },
+          "markdownFilePath" : {
+            "type" : "string"
+          },
+          "keyEvidence" : {
+            "type" : "string"
+          },
+          "judgementGrounds" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "businessCheckRequests" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "externalSources" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/SourceResponse"
+            }
+          }
+        }
+      },
+      "ApiResponsePatentDetailResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/PatentDetailResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "BusinessOpinionResponse" : {
+        "type" : "object",
+        "properties" : {
+          "decision" : {
+            "type" : "string",
+            "enum" : [
+              "MAINTAIN",
+              "ABANDON"
+            ]
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "submittedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "EvaluationScoreResponse" : {
+        "type" : "object",
+        "properties" : {
+          "category" : {
+            "type" : "string",
+            "enum" : [
+              "RIGHTS",
+              "TECHNOLOGY",
+              "MARKET",
+              "BUSINESS_ALIGNMENT"
+            ]
+          },
+          "score" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "grade" : {
+            "type" : "string"
+          },
+          "evidence" : {
+            "type" : "string"
+          },
+          "evidenceDetails" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/EvidenceDetailResponse"
+            }
+          }
+        }
+      },
+      "EvidenceDetailResponse" : {
+        "type" : "object",
+        "properties" : {
+          "text" : {
+            "type" : "string"
+          },
+          "source" : {
+            "$ref" : "#/components/schemas/SourceResponse"
+          }
+        }
+      },
+      "PatentDetailResponse" : {
+        "type" : "object",
+        "properties" : {
+          "patentId" : {
+            "type" : "string"
+          },
+          "managementNumber" : {
+            "type" : "string"
+          },
+          "applicationNumber" : {
+            "type" : "string"
+          },
+          "registrationNumber" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "draftTitle" : {
+            "type" : "string"
+          },
+          "businessArea" : {
+            "type" : "string"
+          },
+          "technologyArea" : {
+            "type" : "string"
+          },
+          "productName" : {
+            "type" : "string"
+          },
+          "country" : {
+            "type" : "string"
+          },
+          "coApplicants" : {
+            "type" : "string"
+          },
+          "applicationDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "registrationDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "expectedExpirationDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "departmentId" : {
+            "type" : "string"
+          },
+          "departmentName" : {
+            "type" : "string"
+          },
+          "lifecycleStatus" : {
+            "type" : "string",
+            "enum" : [
+              "ACTIVE",
+              "ABANDONED",
+              "EXPIRED"
+            ]
+          },
+          "reviewWorkflowStatus" : {
+            "type" : "string",
+            "enum" : [
+              "NOT_IN_REVIEW",
+              "REVIEW_QUARTER_STARTED",
+              "MAIL_READY",
+              "WAITING_BUSINESS_RESPONSE",
+              "BUSINESS_RESPONSE_RECEIVED"
+            ]
+          },
+          "feeDueDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "reviewReason" : {
+            "type" : "string"
+          },
+          "currentRecommendation" : {
+            "type" : "string",
+            "enum" : [
+              "MAINTAIN",
+              "REVIEW_AGAIN",
+              "ABANDON",
+              "HOLD"
+            ]
+          },
+          "businessOpinionDecision" : {
+            "type" : "string",
+            "enum" : [
+              "MAINTAIN",
+              "ABANDON"
+            ]
+          },
+          "legalActionResult" : {
+            "type" : "string",
+            "enum" : [
+              "MAINTAINED",
+              "ABANDONED"
+            ]
+          },
+          "summary" : {
+            "$ref" : "#/components/schemas/PatentSummaryResponse"
+          },
+          "aiEvaluationReport" : {
+            "$ref" : "#/components/schemas/AiEvaluationReportResponse"
+          },
+          "finalDecisionRecord" : {
+            "$ref" : "#/components/schemas/FinalDecisionRecordResponse"
+          },
+          "businessOpinion" : {
+            "$ref" : "#/components/schemas/BusinessOpinionResponse"
+          },
+          "inReview" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "PatentSummaryResponse" : {
+        "type" : "object",
+        "properties" : {
+          "summaryText" : {
+            "type" : "string"
+          },
+          "problemSolved" : {
+            "type" : "string"
+          },
+          "coreTechnicalPoints" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "claimsSummary" : {
+            "type" : "string"
+          },
+          "missingFields" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }
+      },
+      "SourceResponse" : {
+        "type" : "object",
+        "properties" : {
+          "title" : {
+            "type" : "string"
+          },
+          "url" : {
+            "type" : "string"
+          }
+        }
+      },
+      "NotificationReadStateRequest" : {
+        "type" : "object",
+        "properties" : {
+          "isRead" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "ApiResponseNotificationResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/NotificationResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "NotificationResponse" : {
+        "type" : "object",
+        "properties" : {
+          "notificationId" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "targetRole" : {
+            "type" : "string"
+          },
+          "isRead" : {
+            "type" : "boolean"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "link" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ChangePasswordRequest" : {
+        "type" : "object",
+        "properties" : {
+          "currentPassword" : {
+            "type" : "string",
+            "minLength" : 1
+          },
+          "newPassword" : {
+            "type" : "string",
+            "maxLength" : 128,
+            "minLength" : 10
+          }
+        },
+        "required" : [
+          "currentPassword",
+          "newPassword"
+        ]
+      },
+      "UpdateProfileRequest" : {
+        "type" : "object",
+        "properties" : {
+          "username" : {
+            "type" : "string",
+            "minLength" : 1
+          }
+        },
+        "required" : [
+          "username"
+        ]
+      },
+      "ApiResponseUserPrincipalResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/UserPrincipalResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "AnnualFeeScheduleAdjustmentRequest" : {
+        "type" : "object",
+        "properties" : {
+          "adjustedDueDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "reason" : {
+            "type" : "string",
+            "maxLength" : 1000,
+            "minLength" : 0
+          },
+          "adjustedBy" : {
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "adjustedDueDate"
+        ]
+      },
+      "AnnualFeeAdjustmentHistoryResponse" : {
+        "type" : "object",
+        "properties" : {
+          "adjustmentId" : {
+            "type" : "string"
+          },
+          "previousDueDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "adjustedDueDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "adjustedBy" : {
+            "type" : "string"
+          },
+          "adjustedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "AnnualFeeScheduleItemResponse" : {
+        "type" : "object",
+        "properties" : {
+          "patentId" : {
+            "type" : "string"
+          },
+          "managementNumber" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "country" : {
+            "type" : "string"
+          },
+          "domesticPatent" : {
+            "type" : "boolean"
+          },
+          "applicationDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "registrationDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "expectedExpirationDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "annualFeeBaseDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "calculatedAnnualFeeDueDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "storedAnnualFeeDueDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "effectiveAnnualFeeDueDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "nextAnnualFeeDueDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "adjustedAnnualFeeDueDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "latestAdjustmentReason" : {
+            "type" : "string"
+          },
+          "countryExtensionMonths" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "adjustmentHistory" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/AnnualFeeAdjustmentHistoryResponse"
+            }
+          }
+        }
+      },
+      "ApiResponseAnnualFeeScheduleItemResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/AnnualFeeScheduleItemResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "ApiResponseListQuarterSettingResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/QuarterSettingResponse"
+            }
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "ApiResponseListReviewPeriodTemplateResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ReviewPeriodTemplateResponse"
+            }
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "ApiResponseListCountryExtensionResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/CountryExtensionResponse"
+            }
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "ApiResponseListClassificationResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ClassificationResponse"
+            }
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "PageInfo" : {
+        "type" : "object",
+        "properties" : {
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "size" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "totalElements" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "totalPages" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "PageResponsePatentListItemResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/PatentListItemResponse"
+            }
+          },
+          "page" : {
+            "$ref" : "#/components/schemas/PageInfo"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "PatentListItemResponse" : {
+        "type" : "object",
+        "properties" : {
+          "patentId" : {
+            "type" : "string"
+          },
+          "managementNumber" : {
+            "type" : "string"
+          },
+          "applicationNumber" : {
+            "type" : "string"
+          },
+          "registrationNumber" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "draftTitle" : {
+            "type" : "string"
+          },
+          "businessArea" : {
+            "type" : "string"
+          },
+          "technologyArea" : {
+            "type" : "string"
+          },
+          "productName" : {
+            "type" : "string"
+          },
+          "country" : {
+            "type" : "string"
+          },
+          "coApplicants" : {
+            "type" : "string"
+          },
+          "applicationDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "registrationDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "expectedExpirationDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "departmentId" : {
+            "type" : "string"
+          },
+          "departmentName" : {
+            "type" : "string"
+          },
+          "lifecycleStatus" : {
+            "type" : "string",
+            "enum" : [
+              "ACTIVE",
+              "ABANDONED",
+              "EXPIRED"
+            ]
+          },
+          "reviewWorkflowStatus" : {
+            "type" : "string",
+            "enum" : [
+              "NOT_IN_REVIEW",
+              "REVIEW_QUARTER_STARTED",
+              "MAIL_READY",
+              "WAITING_BUSINESS_RESPONSE",
+              "BUSINESS_RESPONSE_RECEIVED"
+            ]
+          },
+          "feeDueDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "reviewReason" : {
+            "type" : "string"
+          },
+          "currentRecommendation" : {
+            "type" : "string",
+            "enum" : [
+              "MAINTAIN",
+              "REVIEW_AGAIN",
+              "ABANDON",
+              "HOLD"
+            ]
+          },
+          "businessOpinionDecision" : {
+            "type" : "string",
+            "enum" : [
+              "MAINTAIN",
+              "ABANDON"
+            ]
+          },
+          "legalActionResult" : {
+            "type" : "string",
+            "enum" : [
+              "MAINTAINED",
+              "ABANDONED"
+            ]
+          },
+          "originalPatentUrl" : {
+            "type" : "string"
+          },
+          "inReview" : {
+            "type" : "boolean"
+          },
+          "currentQuarterKey" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ApiResponseListPatentHistoryResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/PatentHistoryResponse"
+            }
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "PatentHistoryResponse" : {
+        "type" : "object",
+        "properties" : {
+          "historyId" : {
+            "type" : "string"
+          },
+          "type" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "actorName" : {
+            "type" : "string"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "ApiResponseListBusinessSubmissionVersionResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BusinessSubmissionVersionResponse"
+            }
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "ApiResponseListPatentListItemResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/PatentListItemResponse"
+            }
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "ApiResponsePatentBibliographicInfoResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/PatentBibliographicInfoResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "PatentBibliographicInfoResponse" : {
+        "type" : "object",
+        "properties" : {
+          "managementNumber" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "applicationDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "coApplicants" : {
+            "type" : "string"
+          },
+          "country" : {
+            "type" : "string"
+          },
+          "registrationDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "applicationNumber" : {
+            "type" : "string"
+          },
+          "registrationNumber" : {
+            "type" : "string"
+          },
+          "expectedExpirationDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "source" : {
+            "type" : "string"
+          },
+          "lookupStatus" : {
+            "type" : "string",
+            "enum" : [
+              "FOUND",
+              "NOT_FOUND",
+              "SOURCE_UNCONFIGURED",
+              "SOURCE_ERROR"
+            ]
+          },
+          "sourceConfidence" : {
+            "type" : "string"
+          },
+          "lookupMessage" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ApiResponseListNotificationResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/NotificationResponse"
+            }
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "ApiResponseNotificationUnreadCountResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/NotificationUnreadCountResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "NotificationUnreadCountResponse" : {
+        "type" : "object",
+        "properties" : {
+          "unreadCount" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "MailingHistoryItemResponse" : {
+        "type" : "object",
+        "properties" : {
+          "body" : {
+            "type" : "string"
+          },
+          "ccEmails" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "mailingId" : {
+            "type" : "string"
+          },
+          "patentCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "patents" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BusinessReviewMailPatentSummary"
+            }
+          },
+          "recipientEmail" : {
+            "type" : "string"
+          },
+          "recipientName" : {
+            "type" : "string"
+          },
+          "sentAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "sentBy" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "subject" : {
+            "type" : "string"
+          }
+        }
+      },
+      "PageResponseMailingHistoryItemResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/MailingHistoryItemResponse"
+            }
+          },
+          "page" : {
+            "$ref" : "#/components/schemas/PageInfo"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "ApiResponseListDepartmentRecipientMappingResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/DepartmentRecipientMappingResponse"
+            }
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "ApiResponseLegalDashboardSummaryResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/LegalDashboardSummaryResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "LegalDashboardSummaryResponse" : {
+        "type" : "object",
+        "properties" : {
+          "totalPatents" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "quarterlyTargetCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "pendingReview" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "waitingBusinessResponse" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "businessResponseReceived" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "pendingLegalAction" : {
+            "type" : "integer",
+            "format" : "int32",
+            "deprecated" : true
+          },
+          "pendingFinalDecision" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "legalActionCompleted" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "ApiResponseListDepartmentResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/DepartmentResponse"
+            }
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "DepartmentResponse" : {
+        "type" : "object",
+        "properties" : {
+          "departmentId" : {
+            "type" : "string"
+          },
+          "departmentName" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ApiResponseBusinessDashboardSummaryResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/BusinessDashboardSummaryResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "BusinessDashboardSummaryResponse" : {
+        "type" : "object",
+        "properties" : {
+          "totalAssigned" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "pendingReview" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "reviewed" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "maintained" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "abandoned" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "ApiResponseListBusinessChecklistItemResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BusinessChecklistItemResponse"
+            }
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "BusinessChecklistItemResponse" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "category" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "options" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/BusinessChecklistScoreOptionResponse"
+            }
+          }
+        }
+      },
+      "BusinessChecklistScoreOptionResponse" : {
+        "type" : "object",
+        "properties" : {
+          "score" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "label" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ApiResponseListAnnualFeeScheduleItemResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/AnnualFeeScheduleItemResponse"
+            }
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "ApiResponseObject" : {
+        "type" : "object",
+        "properties" : {
+          "data" : { },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "ApiResponseMailOAuth2StatusResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/MailOAuth2StatusResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "MailOAuth2StatusResponse" : {
+        "type" : "object",
+        "properties" : {
+          "connected" : {
+            "type" : "boolean"
+          },
+          "connectedEmail" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ApiResponseString" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "type" : "string"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      }
+    }
+  }
+}
