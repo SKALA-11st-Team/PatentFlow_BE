@@ -96,7 +96,12 @@ public class AdminUserService {
                 passwordEncoder.encode(tempPassword),
                 request.role(), departmentId, request.username());
         userRepository.save(user);
-        sendWelcomeEmail(user.getEmail(), user.getUsername(), tempPassword);
+        // USER-06: 메일 발송 실패가 계정 생성을 롤백시키지 않도록 분리한다(커밋된 계정은 보존, 발송 실패는 로깅).
+        try {
+            sendWelcomeEmail(user.getEmail(), user.getUsername(), tempPassword);
+        } catch (RuntimeException mailError) {
+            log.warn("계정은 생성됐으나 환영 메일 발송 실패: recipient={} — {}", user.getEmail(), mailError.getMessage());
+        }
         return UserResponse.from(user);
     }
 
@@ -148,9 +153,17 @@ public class AdminUserService {
         String tempPassword = generatePassword();
         user.setPassword(passwordEncoder.encode(tempPassword));
         userRepository.save(user);
-        sendPasswordResetEmail(user.getEmail(), user.getUsername(), tempPassword);
-        return new ResetPasswordResponse(user.getId(), user.getEmail(), "************", true,
-                "임시 비밀번호를 이메일로 발송했습니다.");
+        // USER-06: 메일 발송 실패가 비밀번호 초기화를 롤백시키지 않도록 분리. 발송 여부를 응답에 반영(평문 비밀번호는 미노출).
+        boolean mailSent = true;
+        try {
+            sendPasswordResetEmail(user.getEmail(), user.getUsername(), tempPassword);
+        } catch (RuntimeException mailError) {
+            mailSent = false;
+            log.warn("비밀번호는 초기화됐으나 메일 발송 실패: recipient={} — {}", user.getEmail(), mailError.getMessage());
+        }
+        return new ResetPasswordResponse(user.getId(), user.getEmail(), "************", mailSent,
+                mailSent ? "임시 비밀번호를 이메일로 발송했습니다."
+                        : "비밀번호는 초기화됐으나 메일 발송에 실패했습니다. Gmail 연동을 확인해 주세요.");
     }
 
     private void validateAdminRoleChange(String userId, String currentRole, String requestedRole) {

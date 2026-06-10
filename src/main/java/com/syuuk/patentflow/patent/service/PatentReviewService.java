@@ -1200,10 +1200,6 @@ public class PatentReviewService {
         return null;
     }
 
-    private boolean lowerEquals(String value, String lowerKeyword) {
-        return value != null && value.toLowerCase(Locale.ROOT).equals(lowerKeyword);
-    }
-
     private PatentReviewHistoryEntity latestHistoryOrNull(String patentId) {
         return reviewHistoryRepository.findByPatentIdOrderByCreatedAtDesc(patentId).stream()
                 .findFirst()
@@ -1459,17 +1455,6 @@ public class PatentReviewService {
 
     private String nameOrNull(Enum<?> value) {
         return value == null ? null : value.name();
-    }
-
-    private <T extends Enum<T>> T enumOrDefault(Class<T> enumType, String value, T defaultValue) {
-        if (value == null || value.isBlank()) {
-            return defaultValue;
-        }
-        try {
-            return Enum.valueOf(enumType, value);
-        } catch (IllegalArgumentException exception) {
-            return defaultValue;
-        }
     }
 
     private interface PatentUpdater {
