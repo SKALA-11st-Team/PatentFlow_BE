@@ -13,7 +13,11 @@ import com.syuuk.patentflow.settings.dto.QuarterSettingRequest;
 import com.syuuk.patentflow.settings.dto.QuarterSettingResponse;
 import com.syuuk.patentflow.settings.dto.ReviewPeriodTemplateRequest;
 import com.syuuk.patentflow.settings.dto.ReviewPeriodTemplateResponse;
+import com.syuuk.patentflow.settings.dto.ValuationCriteriaRequest;
+import com.syuuk.patentflow.settings.dto.ValuationCriteriaResponse;
+import com.syuuk.patentflow.settings.dto.ValuationCriteriaVersionResponse;
 import com.syuuk.patentflow.settings.service.SettingsService;
+import com.syuuk.patentflow.settings.service.ValuationCriteriaService;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -35,10 +39,37 @@ public class SettingsController {
 
     private final SettingsService settingsService;
     private final SystemSettingsService systemSettingsService;
+    private final ValuationCriteriaService valuationCriteriaService;
 
-    public SettingsController(SettingsService settingsService, SystemSettingsService systemSettingsService) {
+    public SettingsController(
+            SettingsService settingsService,
+            SystemSettingsService systemSettingsService,
+            ValuationCriteriaService valuationCriteriaService
+    ) {
         this.settingsService = settingsService;
         this.systemSettingsService = systemSettingsService;
+        this.valuationCriteriaService = valuationCriteriaService;
+    }
+
+    // ── AI 가치평가 기준 (UI-008) ─────────────────────────────
+    // 축 가중치/등급 컷오프/유지 임계/subscore 배점을 버전 관리하며,
+    // 변경은 이후 생성되는 AI 레포트부터 적용된다(레포트별 appliedCriteria 스냅샷으로 추적).
+
+    @GetMapping("/valuation-criteria")
+    public ApiResponse<ValuationCriteriaResponse> getValuationCriteria() {
+        return ApiResponse.ok(valuationCriteriaService.getCurrent());
+    }
+
+    @PutMapping("/valuation-criteria")
+    public ApiResponse<ValuationCriteriaResponse> updateValuationCriteria(
+            @Valid @RequestBody ValuationCriteriaRequest request,
+            org.springframework.security.core.Authentication authentication) {
+        return ApiResponse.ok(valuationCriteriaService.update(request, currentActor(authentication)));
+    }
+
+    @GetMapping("/valuation-criteria/history")
+    public ApiResponse<List<ValuationCriteriaVersionResponse>> getValuationCriteriaHistory() {
+        return ApiResponse.ok(valuationCriteriaService.history());
     }
 
     // ── 분기 템플릿 ──────────────────────────────────────────
@@ -159,5 +190,23 @@ public class SettingsController {
             @PathVariable String type,
             @PathVariable String value) {
         return ApiResponse.ok(systemSettingsService.deleteClassification(type, value));
+    }
+
+    // 인증 주체 표시명 추출(PatentController.currentActor와 동일 규칙).
+    private String currentActor(org.springframework.security.core.Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return "관리자";
+        }
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof com.syuuk.patentflow.auth.dto.UserPrincipalResponse userPrincipal) {
+            if (userPrincipal.username() != null && !userPrincipal.username().isBlank()) {
+                return userPrincipal.username().trim();
+            }
+            if (userPrincipal.email() != null && !userPrincipal.email().isBlank()) {
+                return userPrincipal.email().trim();
+            }
+        }
+        String name = authentication.getName();
+        return name == null || name.isBlank() ? "관리자" : name.trim();
     }
 }

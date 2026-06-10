@@ -57,6 +57,7 @@ public class PatentWorkflowService {
     private final AiReportAgentClient aiReportAgentClient;
     private final AnnualFeeScheduleService annualFeeScheduleService;
     private final AiReportEditService aiReportEditService;
+    private final com.syuuk.patentflow.settings.service.ValuationCriteriaService valuationCriteriaService;
     private final ObjectMapper objectMapper;
 
     private final org.springframework.context.ApplicationEventPublisher eventPublisher;
@@ -68,6 +69,7 @@ public class PatentWorkflowService {
             AiReportAgentClient aiReportAgentClient,
             AnnualFeeScheduleService annualFeeScheduleService,
             AiReportEditService aiReportEditService,
+            com.syuuk.patentflow.settings.service.ValuationCriteriaService valuationCriteriaService,
             ObjectMapper objectMapper,
             org.springframework.context.ApplicationEventPublisher eventPublisher
     ) {
@@ -77,6 +79,7 @@ public class PatentWorkflowService {
         this.aiReportAgentClient = aiReportAgentClient;
         this.annualFeeScheduleService = annualFeeScheduleService;
         this.aiReportEditService = aiReportEditService;
+        this.valuationCriteriaService = valuationCriteriaService;
         this.objectMapper = objectMapper;
         this.eventPublisher = eventPublisher;
     }
@@ -89,7 +92,9 @@ public class PatentWorkflowService {
             throw new PatentFlowException(ErrorCode.INVALID_WORKFLOW_STATUS,
                     "AI 레포트는 검토 시작(REVIEW_QUARTER_STARTED) 상태에서만 생성할 수 있습니다.");
         }
-        AgentEvaluateResponse agentResponse = aiReportAgentClient.evaluate(patentId);
+        // UI-008: 현재 활성 가치평가 기준을 agent에 전달한다(미설정 시 null → agent 기본값).
+        AgentEvaluateResponse agentResponse =
+                aiReportAgentClient.evaluate(patentId, valuationCriteriaService.currentConfigForAgent());
         AiEvaluationReportResponse report = mapAgentResponse(agentResponse, patentId);
         // 기존 법무 편집 위에서 재생성되면 편집은 보존(stale 처리)하고 감사 로그만 남긴다.
         aiReportEditService.logRegeneratedOverEdit(patentId, "SYSTEM");
@@ -103,7 +108,8 @@ public class PatentWorkflowService {
             throw new PatentFlowException(ErrorCode.INVALID_WORKFLOW_STATUS,
                     "AI 레포트는 검토 시작(REVIEW_QUARTER_STARTED) 상태에서만 생성할 수 있습니다.");
         }
-        AgentEvaluateResponse agentResponse = aiReportAgentClient.evaluateForBatch(patentId);
+        AgentEvaluateResponse agentResponse =
+                aiReportAgentClient.evaluateForBatch(patentId, valuationCriteriaService.currentConfigForAgent());
         AiEvaluationReportResponse report = mapAgentResponse(agentResponse, patentId);
         aiReportEditService.logRegeneratedOverEdit(patentId, "SYSTEM");
         return patentReviewService.updatePatentInternal(patentId, p -> withAiReport(p, report, agentResponse.summaryText()));
@@ -379,12 +385,15 @@ public class PatentWorkflowService {
         String markdownFilePath = null;
         OffsetDateTime generatedAt = agent.generatedAt() == null ? OffsetDateTime.now(KST) : agent.generatedAt();
         // ORCH-06/AIREPORT-02: 에이전트가 산출한 리치 근거를 폐기하지 않고 DTO로 풀스루한다.
-        return new AiEvaluationReportResponse(reportId, generatedAt,
-                toRecommendation(agent.recommendation()), summary,
-                totalScore, averageScore, agent.finalGrade(), agent.finalIndicator(), degraded, failureReason,
-                scores, nullSafeList(agent.missingInformation()), rawMarkdown, markdownFilePath,
-                agent.keyEvidence(), nullSafeList(agent.judgementGrounds()),
-                nullSafeList(agent.businessCheckRequests()), toSourceResponses(agent.externalSources()));
+        // UI-008: 적용된 가치평가 기준 스냅샷(appliedValuationConfig)도 함께 보존한다.
+        return AiReportOverridesSupport.withAppliedCriteria(
+                new AiEvaluationReportResponse(reportId, generatedAt,
+                        toRecommendation(agent.recommendation()), summary,
+                        totalScore, averageScore, agent.finalGrade(), agent.finalIndicator(), degraded, failureReason,
+                        scores, nullSafeList(agent.missingInformation()), rawMarkdown, markdownFilePath,
+                        agent.keyEvidence(), nullSafeList(agent.judgementGrounds()),
+                        nullSafeList(agent.businessCheckRequests()), toSourceResponses(agent.externalSources())),
+                agent.appliedValuationConfig());
     }
 
     private static <T> List<T> nullSafeList(List<T> value) {

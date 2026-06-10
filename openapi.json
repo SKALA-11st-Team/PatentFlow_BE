@@ -12,6 +12,54 @@
     }
   ],
   "paths" : {
+    "/api/v1/settings/valuation-criteria" : {
+      "get" : {
+        "tags" : [
+          "settings-controller"
+        ],
+        "operationId" : "getValuationCriteria",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseValuationCriteriaResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put" : {
+        "tags" : [
+          "settings-controller"
+        ],
+        "operationId" : "updateValuationCriteria",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ValuationCriteriaRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseValuationCriteriaResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/settings/review-quarters/{quarterKey}" : {
       "put" : {
         "tags" : [
@@ -1637,6 +1685,26 @@
         }
       }
     },
+    "/api/v1/settings/valuation-criteria/history" : {
+      "get" : {
+        "tags" : [
+          "settings-controller"
+        ],
+        "operationId" : "getValuationCriteriaHistory",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListValuationCriteriaVersionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/settings/review-quarters" : {
       "get" : {
         "tags" : [
@@ -2584,6 +2652,79 @@
   },
   "components" : {
     "schemas" : {
+      "ValuationCriteriaRequest" : {
+        "type" : "object",
+        "properties" : {
+          "axisWeights" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "number",
+              "format" : "double"
+            }
+          },
+          "gradeCutoffs" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "number",
+              "format" : "double"
+            }
+          },
+          "maintainThreshold" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "subscoreWeights" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "object",
+              "additionalProperties" : {
+                "type" : "integer",
+                "format" : "int32"
+              }
+            }
+          }
+        },
+        "required" : [
+          "axisWeights",
+          "gradeCutoffs",
+          "maintainThreshold",
+          "subscoreWeights"
+        ]
+      },
+      "ApiResponseValuationCriteriaResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/ValuationCriteriaResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "ValuationCriteriaResponse" : {
+        "type" : "object",
+        "properties" : {
+          "config" : {
+            "type" : "object",
+            "additionalProperties" : { }
+          },
+          "isDefault" : {
+            "type" : "boolean"
+          },
+          "updatedBy" : {
+            "type" : "string"
+          },
+          "updatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
       "QuarterSettingRequest" : {
         "type" : "object",
         "properties" : {
@@ -4558,6 +4699,44 @@
           "timestamp" : {
             "type" : "string",
             "format" : "date-time"
+          }
+        }
+      },
+      "ApiResponseListValuationCriteriaVersionResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ValuationCriteriaVersionResponse"
+            }
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "ValuationCriteriaVersionResponse" : {
+        "type" : "object",
+        "properties" : {
+          "version" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "createdBy" : {
+            "type" : "string"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "config" : {
+            "type" : "object",
+            "additionalProperties" : { }
           }
         }
       },

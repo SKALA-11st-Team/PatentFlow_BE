@@ -50,22 +50,35 @@ public class AiReportAgentClient {
     }
 
     public AgentEvaluateResponse evaluate(String patentId) {
-        return doEvaluate(patentId, TIMEOUT);
+        return doEvaluate(patentId, TIMEOUT, null);
+    }
+
+    /** @param valuationConfig 가치평가 기준(계약 C1 valuationConfig). null이면 agent 기본값으로 평가. */
+    public AgentEvaluateResponse evaluate(String patentId, Object valuationConfig) {
+        return doEvaluate(patentId, TIMEOUT, valuationConfig);
     }
 
     // 배치 자동 생성 전용 — 에이전트 응답에 10분 이상 소요될 수 있으므로 타임아웃을 20분으로 설정
     public AgentEvaluateResponse evaluateForBatch(String patentId) {
-        return doEvaluate(patentId, BATCH_TIMEOUT);
+        return doEvaluate(patentId, BATCH_TIMEOUT, null);
     }
 
-    private AgentEvaluateResponse doEvaluate(String patentId, Duration timeout) {
+    public AgentEvaluateResponse evaluateForBatch(String patentId, Object valuationConfig) {
+        return doEvaluate(patentId, BATCH_TIMEOUT, valuationConfig);
+    }
+
+    private AgentEvaluateResponse doEvaluate(String patentId, Duration timeout, Object valuationConfig) {
         try {
             String url = agentUrl + "/api/v1/ai/patents/" + patentId + "/evaluate";
+            // 구 agent는 valuationConfig를 모르는 필드로 무시한다(pydantic extra ignore) — 양방향 호환.
+            String body = valuationConfig == null
+                    ? "{}"
+                    : objectMapper.writeValueAsString(java.util.Map.of("valuationConfig", valuationConfig));
             HttpRequest.Builder builder = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .timeout(timeout)
                     .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString("{}"));
+                    .POST(HttpRequest.BodyPublishers.ofString(body));
             applyAgentAuth(builder);
             HttpRequest request = builder.build();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -100,7 +113,8 @@ public class AiReportAgentClient {
                 null,
                 List.of(),
                 List.of(),
-                List.of()
+                List.of(),
+                null
         );
     }
 
@@ -125,7 +139,9 @@ public class AiReportAgentClient {
             String keyEvidence,
             List<String> judgementGrounds,
             List<String> businessCheckRequests,
-            List<AgentSourceRef> externalSources
+            List<AgentSourceRef> externalSources,
+            // 계약 C1: agent가 실제 적용한 가치평가 기준 스냅샷(source=request|default). 구 agent는 null.
+            java.util.Map<String, Object> appliedValuationConfig
     ) {
         public String summaryText() {
             return summaryMarkdown;

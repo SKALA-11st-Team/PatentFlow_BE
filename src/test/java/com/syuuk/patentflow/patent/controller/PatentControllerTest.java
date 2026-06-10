@@ -130,7 +130,8 @@ class PatentControllerTest {
 
     @Test
     void requestAiReportCreatesAsyncJob() throws Exception {
-        when(aiReportAgentClient.evaluateForBatch("PAT-2026-0001")).thenReturn(new AgentEvaluateResponse(
+        when(aiReportAgentClient.evaluateForBatch(org.mockito.ArgumentMatchers.eq("PAT-2026-0001"),
+                org.mockito.ArgumentMatchers.any())).thenReturn(new AgentEvaluateResponse(
                 "PAT-2026-0001",
                 List.of(new AgentScoreItem("권리성", 82, "A", "청구항 보호 범위가 명확합니다.", List.of())),
                 "MAINTAIN",
@@ -148,7 +149,8 @@ class PatentControllerTest {
                 null,
                 List.of(),
                 List.of(),
-                List.of()
+                List.of(),
+                null
         ));
 
         mockMvc.perform(post("/api/v1/patents/PAT-2026-0001/request-ai-report"))

@@ -34,6 +34,7 @@ class PatentWorkflowServiceMapAgentResponseTest {
                 mock(AiReportAgentClient.class),
                 mock(AnnualFeeScheduleService.class),
                 mock(AiReportEditService.class),
+                mock(com.syuuk.patentflow.settings.service.ValuationCriteriaService.class),
                 new ObjectMapper(),
                 mock(org.springframework.context.ApplicationEventPublisher.class));
     }
@@ -51,7 +52,7 @@ class PatentWorkflowServiceMapAgentResponseTest {
         return new AgentEvaluateResponse(
                 "PAT-VAL09", scores, "포기 검토", summaryMarkdown, rawMarkdown,
                 totalScore, null, "D", "포기 검토", null, false, null, OffsetDateTime.now(),
-                List.of(), null, List.of(), List.of(), List.of());
+                List.of(), null, List.of(), List.of(), List.of(), null);
     }
 
     @Test

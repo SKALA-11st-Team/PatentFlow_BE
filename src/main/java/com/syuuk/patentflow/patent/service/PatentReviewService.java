@@ -1479,6 +1479,8 @@ public class PatentReviewService {
         state.setAiJudgementGroundsJson(writeJson(report.judgementGrounds()));
         state.setAiBusinessCheckRequestsJson(writeJson(report.businessCheckRequests()));
         state.setAiExternalSourcesJson(writeJson(report.externalSources()));
+        // UI-008: 이 레포트에 적용된 가치평가 기준 스냅샷(없으면 null — 구 agent/시드 레포트).
+        state.setAiAppliedCriteriaJson(report.appliedCriteria() == null ? null : writeJson(report.appliedCriteria()));
     }
 
     private PatentSummaryResponse summaryFromHistory(PatentReviewHistoryEntity state, PatentSummaryResponse fallback) {
