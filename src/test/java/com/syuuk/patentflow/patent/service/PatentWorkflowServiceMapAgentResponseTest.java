@@ -27,14 +27,11 @@ class PatentWorkflowServiceMapAgentResponseTest {
 
     @BeforeEach
     void setUp() {
-        AiReportStorageService storage = mock(AiReportStorageService.class);
-        when(storage.storeMarkdown(any(), any(), any())).thenReturn("/tmp/report.md");
         service = new PatentWorkflowService(
                 mock(PatentReviewService.class),
                 mock(PatentMetadataRepository.class),
                 mock(PatentReviewHistoryRepository.class),
                 mock(AiReportAgentClient.class),
-                storage,
                 mock(AnnualFeeScheduleService.class),
                 new ObjectMapper(),
                 mock(org.springframework.context.ApplicationEventPublisher.class));

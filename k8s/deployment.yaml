@@ -56,12 +56,5 @@ spec:
             limits:
               cpu: "1"
               memory: 1Gi
-          # INFRA-03: AI 리포트 파일을 영속 볼륨에 저장(파드 재시작 시 소실 방지). configmap의
-          # PATENTFLOW_AI_REPORT_STORAGE_DIR=/app/storage/ai-reports와 정합. 다중 replica면 RWX(EFS) 필수.
-          volumeMounts:
-            - name: ai-report-storage
-              mountPath: /app/storage
-      volumes:
-        - name: ai-report-storage
-          persistentVolumeClaim:
-            claimName: team11-patentflow-be-ai-reports-pvc
+          # AIREPORT-03: AI 리포트 마크다운은 DB 컬럼에 영속되고 파일 저장은 폐지됨 → 공유 볼륨(PVC) 불필요.
+          # 덕분에 멀티레플리카(INFRA-09)가 RWX/EFS 없이도 정합을 유지한다.

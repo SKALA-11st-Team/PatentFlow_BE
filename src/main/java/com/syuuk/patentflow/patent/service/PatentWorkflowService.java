@@ -55,7 +55,6 @@ public class PatentWorkflowService {
     private final PatentMetadataRepository patentMetadataRepository;
     private final PatentReviewHistoryRepository reviewHistoryRepository;
     private final AiReportAgentClient aiReportAgentClient;
-    private final AiReportStorageService aiReportStorageService;
     private final AnnualFeeScheduleService annualFeeScheduleService;
     private final ObjectMapper objectMapper;
 
@@ -66,7 +65,6 @@ public class PatentWorkflowService {
             PatentMetadataRepository patentMetadataRepository,
             PatentReviewHistoryRepository reviewHistoryRepository,
             AiReportAgentClient aiReportAgentClient,
-            AiReportStorageService aiReportStorageService,
             AnnualFeeScheduleService annualFeeScheduleService,
             ObjectMapper objectMapper,
             org.springframework.context.ApplicationEventPublisher eventPublisher
@@ -75,7 +73,6 @@ public class PatentWorkflowService {
         this.patentMetadataRepository = patentMetadataRepository;
         this.reviewHistoryRepository = reviewHistoryRepository;
         this.aiReportAgentClient = aiReportAgentClient;
-        this.aiReportStorageService = aiReportStorageService;
         this.annualFeeScheduleService = annualFeeScheduleService;
         this.objectMapper = objectMapper;
         this.eventPublisher = eventPublisher;
@@ -371,7 +368,9 @@ public class PatentWorkflowService {
         String failureReason = failureReason(agent, degraded);
         String summary = agent.summaryText();
         String rawMarkdown = normalizeMarkdown(agent.reportMarkdown(), summary, scores, agent.recommendation());
-        String markdownFilePath = aiReportStorageService.storeMarkdown(patentId, reportId, rawMarkdown);
+        // AIREPORT-03/04: 마크다운 본문은 DB 컬럼(aiReportMarkdown)에 영속되고 파일은 읽히지 않는 중복이었다.
+        // 파일 기록(무한 적재)·서버 절대경로 노출을 제거한다 — markdownFilePath는 더 이상 채우지 않는다(null).
+        String markdownFilePath = null;
         OffsetDateTime generatedAt = agent.generatedAt() == null ? OffsetDateTime.now(KST) : agent.generatedAt();
         // ORCH-06/AIREPORT-02: 에이전트가 산출한 리치 근거를 폐기하지 않고 DTO로 풀스루한다.
         return new AiEvaluationReportResponse(reportId, generatedAt,
