@@ -118,7 +118,11 @@ patentflow:
     storage-dir: ${PATENTFLOW_AI_REPORT_STORAGE_DIR:storage/ai-reports}
 
 springdoc:
+  # SEC-12: 운영에서는 SPRINGDOC_ENABLED=false로 api-docs·swagger-ui를 전면 비활성화(ADMIN 게이트에 더한 심층 방어).
+  api-docs:
+    enabled: ${SPRINGDOC_ENABLED:true}
   swagger-ui:
+    enabled: ${SPRINGDOC_ENABLED:true}
     path: /swagger-ui.html
 
 agent:

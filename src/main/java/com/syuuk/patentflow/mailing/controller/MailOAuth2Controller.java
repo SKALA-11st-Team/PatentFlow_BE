@@ -6,6 +6,8 @@ import com.syuuk.patentflow.mailing.dto.MailOAuth2StatusResponse;
 import com.syuuk.patentflow.mailing.service.MailOAuth2Service;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -52,7 +54,8 @@ public class MailOAuth2Controller {
             HttpServletResponse response) throws IOException {
         String frontendUri = properties.getFrontendSettingsUri();
         if (error != null) {
-            response.sendRedirect(frontendUri + "?oauth2_error=" + error);
+            // SEC-11: 외부에서 온 error 원문을 무검증 반사하지 않고 URL 인코딩해 파라미터 변조(CRLF·쿼리 주입)를 차단.
+            response.sendRedirect(frontendUri + "?oauth2_error=" + URLEncoder.encode(error, StandardCharsets.UTF_8));
             return;
         }
         // SEC-04/MAIL-07: 발급한 state와 일치하지 않으면(위조/재사용) code 교환 전에 거부한다.
