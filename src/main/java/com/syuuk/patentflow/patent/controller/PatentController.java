@@ -4,6 +4,7 @@ import com.syuuk.patentflow.auth.dto.UserPrincipalResponse;
 import com.syuuk.patentflow.common.response.ApiResponse;
 import com.syuuk.patentflow.common.response.PageResponse;
 import com.syuuk.patentflow.patent.dto.AssignDepartmentRequest;
+import com.syuuk.patentflow.patent.dto.BulkAssignDepartmentRequest;
 import com.syuuk.patentflow.patent.dto.AiEvaluationReportResponse;
 import com.syuuk.patentflow.patent.dto.AiReportEditRequest;
 import com.syuuk.patentflow.patent.dto.AiReportJobResponse;
@@ -189,6 +190,15 @@ public class PatentController {
     }
 
     /**
+     * @relatedFR FR-LEGAL-05
+     * @description F6: 특허 패밀리(같은 관리번호 계열의 국가별 출원) 조회.
+     */
+    @GetMapping("/{patentId}/family")
+    public ApiResponse<List<PatentListItemResponse>> getPatentFamily(@PathVariable String patentId) {
+        return ApiResponse.ok(patentReviewService.getPatentFamily(patentId));
+    }
+
+    /**
      * @relatedFR FR-LEGAL-13
      * @relatedUI UI-LEGAL-03
      * @description MAIL-13: 법무팀 특허 PDF 직접 업로드 — TW·UAE 등 KIPRIS로 공개전문을
@@ -316,6 +326,29 @@ public class PatentController {
     ) {
         return ApiResponse.ok(patentReviewService.assignDepartment(patentId, request.departmentId()));
     }
+
+    /**
+     * @relatedFR FR-LEGAL-02
+     * @description F5: 특허 다건 부서 일괄 배정 — 건별 실패는 건너뛰고 성공/실패 ID 목록을 반환한다.
+     */
+    @PatchMapping("/bulk/department")
+    public ApiResponse<BulkAssignDepartmentResponse> bulkAssignDepartment(
+            @Valid @RequestBody BulkAssignDepartmentRequest request
+    ) {
+        List<String> assigned = new java.util.ArrayList<>();
+        List<String> failed = new java.util.ArrayList<>();
+        for (String patentId : request.patentIds()) {
+            try {
+                patentReviewService.assignDepartment(patentId, request.departmentId());
+                assigned.add(patentId);
+            } catch (Exception exception) {
+                failed.add(patentId);
+            }
+        }
+        return ApiResponse.ok(new BulkAssignDepartmentResponse(assigned, failed));
+    }
+
+    public record BulkAssignDepartmentResponse(List<String> assignedPatentIds, List<String> failedPatentIds) {}
 
     /**
      * @description AI 평가 레포트 생성을 비동기 잡으로 요청한다.

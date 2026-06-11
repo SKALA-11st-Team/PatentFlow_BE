@@ -146,6 +146,19 @@ public class BusinessController {
     }
 
     /**
+     * @relatedFR FR-LEGAL-05, FR-BUS-01
+     * @description F6: 사업부 배정 특허의 패밀리(같은 관리번호 계열) 조회 — 자기 부서 특허 기준으로만 허용.
+     */
+    @GetMapping("/api/v1/business/patents/{patentId}/family")
+    public ApiResponse<List<PatentListItemResponse>> getBusinessPatentFamily(
+            @PathVariable String patentId,
+            Authentication authentication
+    ) {
+        assertBusinessDepartmentPatent(patentId, authentication);
+        return ApiResponse.ok(patentReviewService.getPatentFamily(patentId));
+    }
+
+    /**
      * @relatedFR FR-LEGAL-13, FR-BUS-01
      * @relatedUI UI-BUS-02
      * @description MAIL-13: 사업부가 배정 특허의 업로드 PDF를 다운로드한다 —
