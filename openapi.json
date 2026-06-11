@@ -1214,6 +1214,36 @@
         }
       }
     },
+    "/api/v1/mailings/patent-pdf-links" : {
+      "post" : {
+        "tags" : [
+          "mailing-controller"
+        ],
+        "operationId" : "resolvePatentPdfLinks",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PatentPdfLinkRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListPatentPdfLinkResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/refresh" : {
       "post" : {
         "tags" : [
@@ -4423,6 +4453,9 @@
           },
           "title" : {
             "type" : "string"
+          },
+          "pdfDownloadUrl" : {
+            "type" : "string"
           }
         },
         "required" : [
@@ -4533,6 +4566,58 @@
           "recordedCount" : {
             "type" : "integer",
             "format" : "int32"
+          }
+        }
+      },
+      "PatentPdfLinkRequest" : {
+        "type" : "object",
+        "properties" : {
+          "patentIds" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            },
+            "maxItems" : 100,
+            "minItems" : 0
+          }
+        },
+        "required" : [
+          "patentIds"
+        ]
+      },
+      "ApiResponseListPatentPdfLinkResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/PatentPdfLinkResponse"
+            }
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "PatentPdfLinkResponse" : {
+        "type" : "object",
+        "properties" : {
+          "patentId" : {
+            "type" : "string"
+          },
+          "pdfUrl" : {
+            "type" : "string"
+          },
+          "source" : {
+            "type" : "string"
+          },
+          "expiresAt" : {
+            "type" : "string",
+            "format" : "date-time"
           }
         }
       },
