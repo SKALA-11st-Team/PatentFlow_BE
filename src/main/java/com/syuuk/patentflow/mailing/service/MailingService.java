@@ -146,14 +146,24 @@ public class MailingService {
         List<BusinessReviewMailSendDraft> sentDrafts = new ArrayList<>();
         int recordedCount = 0;
 
+        int failedCount = 0;
         if (oauth2Connected) {
             String senderEmail = systemSettingsService.getGmailOAuth2ConnectedEmail();
             // 토큰 획득 실패 시 예외를 전파해 전체 롤백한다(이력 미기록).
             String accessToken = mailOAuth2Service.getValidAccessToken();
+            // I1: 건별 처리 — 1건의 SMTP 실패가 나머지 발송·이력 기록을 막지 않는다.
+            // 실패 건은 FAILED 이력으로 남겨 메일 이력 화면에서 식별·재발송할 수 있게 한다.
             for (BusinessReviewMailSendDraft draft : request.drafts()) {
-                sendEmailOAuth2(senderEmail, accessToken, draft);
-                saveHistory(mailingBatchId, draft, STATUS_SENT, departmentIdsByEmail, sentBy);
-                sentDrafts.add(draft);
+                try {
+                    sendEmailOAuth2(senderEmail, accessToken, draft);
+                    saveHistory(mailingBatchId, draft, STATUS_SENT, departmentIdsByEmail, sentBy);
+                    sentDrafts.add(draft);
+                } catch (Exception exception) {
+                    log.warn("메일 발송 실패 — FAILED 이력 기록 후 다음 건 진행. recipient={}",
+                            draft.recipientEmail(), exception);
+                    saveHistory(mailingBatchId, draft, STATUS_FAILED, departmentIdsByEmail, sentBy);
+                    failedCount++;
+                }
             }
         } else {
             // OAuth2 미연동 — 실제 발송 없이 이력만 기록한다. RECORDED는 워크플로우 전이 대상이 아니다.
@@ -192,7 +202,7 @@ public class MailingService {
                 updateResult.updatedPatentIds(),
                 updateResult.skippedPatentIds(),
                 sentDrafts.size(),
-                0,
+                failedCount,
                 recordedCount);
     }
 
