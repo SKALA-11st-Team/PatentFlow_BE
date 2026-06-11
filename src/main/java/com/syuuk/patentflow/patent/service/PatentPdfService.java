@@ -98,9 +98,20 @@ public class PatentPdfService {
         // pdfUrl은 null — presigned가 아니라 인증이 필요한 앱 내 다운로드라 FE가 상세 딥링크를 안내한다.
         Optional<PatentPdfDocumentEntity> existing = pdfDocumentRepository.findById(patentId);
         if (existing.isPresent() && existing.get().isUploaded()) {
+            // I6: S3에 저장된 업로드본은 presigned 링크를 직접 발급한다(메일에서 바로 다운로드).
+            if (existing.get().getS3Key() != null && properties.usable()) {
+                try {
+                    PatentPdfLinkResponse presigned = presign(patentId, existing.get().getS3Key());
+                    return new PatentPdfLinkResponse(
+                            patentId, presigned.pdfUrl(), PatentPdfLinkResponse.SOURCE_UPLOADED, presigned.expiresAt());
+                } catch (Exception exception) {
+                    log.warn("업로드 PDF presign 실패 — 앱 내 다운로드 안내로 폴백. patentId={}", patentId, exception);
+                }
+            }
             return new PatentPdfLinkResponse(patentId, null, PatentPdfLinkResponse.SOURCE_UPLOADED, null);
         }
-        if (!isKoreanPatent(patent.getCountry()) || !properties.usable()) {
+        // W4: KIPRIS PDF 오퍼레이션이 설정된 국가(KR 기본, US/JP/CN은 설정 시)만 시도한다.
+        if (!properties.usable()) {
             return originalUrlFallback(patentId, patent);
         }
         try {
@@ -121,7 +132,7 @@ public class PatentPdfService {
             return cachedOrNull.getS3Key();
         }
         Optional<KiprisPdfPathClient.KiprisPdfPath> pdfPath =
-                kiprisPdfPathClient.findPdfPath(patent.getApplicationNumber());
+                kiprisPdfPathClient.findPdfPath(patent.getCountry(), patent.getApplicationNumber());
         if (pdfPath.isEmpty()) {
             return null;
         }
@@ -171,10 +182,28 @@ public class PatentPdfService {
             throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "PDF 형식 파일만 업로드할 수 있습니다.");
         }
         String safeDocName = docName == null || docName.isBlank() ? patentId + ".pdf" : docName.trim();
-        PatentPdfDocumentEntity meta = PatentPdfDocumentEntity.uploaded(
-                patentId, safeDocName, (long) content.length, uploadedBy, OffsetDateTime.now(KST));
+        // I6: S3가 활성화돼 있으면 본문을 S3에 두고(DB 비대화 방지) presigned 링크 발급도 가능해진다.
+        S3Client s3Client = properties.usable() ? s3ClientProvider.getIfAvailable() : null;
+        PatentPdfDocumentEntity meta;
+        if (s3Client != null) {
+            String s3Key = keyPrefix() + "uploads/" + patentId + ".pdf";
+            s3Client.putObject(
+                    PutObjectRequest.builder()
+                            .bucket(properties.bucket())
+                            .key(s3Key)
+                            .contentType("application/pdf")
+                            .contentDisposition("attachment; filename=\"%s\"".formatted(safeDocName))
+                            .build(),
+                    RequestBody.fromBytes(content));
+            meta = PatentPdfDocumentEntity.uploadedToS3(
+                    patentId, s3Key, safeDocName, (long) content.length, uploadedBy, OffsetDateTime.now(KST));
+            pdfContentRepository.deleteById(patentId);
+        } else {
+            meta = PatentPdfDocumentEntity.uploaded(
+                    patentId, safeDocName, (long) content.length, uploadedBy, OffsetDateTime.now(KST));
+            pdfContentRepository.save(new PatentPdfContentEntity(patentId, content));
+        }
         pdfDocumentRepository.save(meta);
-        pdfContentRepository.save(new PatentPdfContentEntity(patentId, content));
         return toMeta(meta);
     }
 
@@ -184,6 +213,18 @@ public class PatentPdfService {
         PatentPdfDocumentEntity meta = pdfDocumentRepository.findById(patentId)
                 .filter(PatentPdfDocumentEntity::isUploaded)
                 .orElseThrow(() -> new PatentFlowException(ErrorCode.PATENT_NOT_FOUND, "업로드된 특허 PDF가 없습니다."));
+        // I6: S3 저장 업로드본은 S3에서, 그 외에는 DB 본문에서 내려준다.
+        if (meta.getS3Key() != null) {
+            S3Client s3Client = s3ClientProvider.getIfAvailable();
+            if (s3Client == null) {
+                throw new PatentFlowException(ErrorCode.INTERNAL_ERROR, "PDF 저장소(S3)에 접근할 수 없습니다.");
+            }
+            byte[] bytes = s3Client.getObjectAsBytes(GetObjectRequest.builder()
+                    .bucket(properties.bucket())
+                    .key(meta.getS3Key())
+                    .build()).asByteArray();
+            return new PdfDownload(meta.getDocName(), bytes);
+        }
         PatentPdfContentEntity content = pdfContentRepository.findById(patentId)
                 .orElseThrow(() -> new PatentFlowException(ErrorCode.PATENT_NOT_FOUND, "업로드된 특허 PDF가 없습니다."));
         return new PdfDownload(meta.getDocName(), content.getContent());
@@ -202,6 +243,16 @@ public class PatentPdfService {
         PatentPdfDocumentEntity meta = pdfDocumentRepository.findById(patentId)
                 .filter(PatentPdfDocumentEntity::isUploaded)
                 .orElseThrow(() -> new PatentFlowException(ErrorCode.PATENT_NOT_FOUND, "업로드된 특허 PDF가 없습니다."));
+        if (meta.getS3Key() != null) {
+            S3Client s3Client = s3ClientProvider.getIfAvailable();
+            if (s3Client != null) {
+                try {
+                    s3Client.deleteObject(builder -> builder.bucket(properties.bucket()).key(meta.getS3Key()));
+                } catch (Exception exception) {
+                    log.warn("업로드 PDF S3 객체 삭제 실패(메타는 삭제 진행). patentId={}", patentId, exception);
+                }
+            }
+        }
         pdfContentRepository.deleteById(patentId);
         pdfDocumentRepository.delete(meta);
     }

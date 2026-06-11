@@ -47,11 +47,19 @@ public class KiprisPdfPathClient {
     public record KiprisPdfPath(String downloadUrl, String docName) {
     }
 
-    /** 출원번호(숫자만)로 공개전문 PDF 경로를 조회한다. 미공개·키 미설정·쿼터 소진이면 empty. */
+    /** 출원번호(숫자만)로 공개전문 PDF 경로를 조회한다(KR 기본). 미공개·키 미설정·쿼터 소진이면 empty. */
     public Optional<KiprisPdfPath> findPdfPath(String applicationNumber) {
+        return findPdfPath("KR", applicationNumber);
+    }
+
+    /**
+     * W4: 국가별 공개전문 PDF 경로 조회 — pdf-path-operations 설정에 오퍼레이션이 등록된
+     * 국가(US/JP/CN 등)만 지원한다. 미등록 국가는 empty(원문 URL 폴백 경로로 흐른다).
+     */
+    public Optional<KiprisPdfPath> findPdfPath(String country, String applicationNumber) {
         PatentLookupProperties.Kipris kipris = properties.kipris();
-        String operation = kipris.pdfPathOperation();
-        if (operation == null || operation.isBlank()) {
+        String operation = kipris.pdfOperationFor(country);
+        if (operation == null) {
             return Optional.empty();
         }
         String digits = applicationNumber == null ? "" : applicationNumber.replaceAll("[^0-9]", "");

@@ -121,7 +121,7 @@ class PatentPdfServiceTest {
     void freshPdfDownloadsUploadsAndCaches() throws MalformedURLException {
         when(patentMetadataRepository.findById("PAT-KR")).thenReturn(Optional.of(patent("PAT-KR", "KR")));
         when(pdfDocumentRepository.findById("PAT-KR")).thenReturn(Optional.empty());
-        when(kiprisPdfPathClient.findPdfPath("10-2024-0115774")).thenReturn(Optional.of(
+        when(kiprisPdfPathClient.findPdfPath("KR", "10-2024-0115774")).thenReturn(Optional.of(
                 new KiprisPdfPathClient.KiprisPdfPath("http://plus.kipris.or.kr/file.pdf", "1020240115774.pdf")));
         stubPresign("https://test-bucket.s3.ap-northeast-2.amazonaws.com/patent-pdfs/PAT-KR.pdf?X-Amz-Signature=y");
 

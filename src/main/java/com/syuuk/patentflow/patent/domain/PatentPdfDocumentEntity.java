@@ -77,6 +77,14 @@ public class PatentPdfDocumentEntity {
                 patentId, STORAGE_UPLOADED, null, docName, null, contentLength, uploadedBy, createdAt);
     }
 
+    /** I6: S3 활성화 시 업로드본 — 본문은 S3(s3Key)에 두고 DB에는 메타만 남긴다. */
+    public static PatentPdfDocumentEntity uploadedToS3(
+            String patentId, String s3Key, String docName, Long contentLength, String uploadedBy, OffsetDateTime createdAt
+    ) {
+        return new PatentPdfDocumentEntity(
+                patentId, STORAGE_UPLOADED, s3Key, docName, null, contentLength, uploadedBy, createdAt);
+    }
+
     public boolean isUploaded() {
         return STORAGE_UPLOADED.equals(storageType);
     }

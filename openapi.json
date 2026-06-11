@@ -209,6 +209,46 @@
         }
       }
     },
+    "/api/v1/settings/fee-rules/{country}" : {
+      "put" : {
+        "tags" : [
+          "settings-controller"
+        ],
+        "operationId" : "updateFeeRule",
+        "parameters" : [
+          {
+            "name" : "country",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/FeeRuleUpdateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseFeeRuleResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/settings/country-extensions/{country}" : {
       "put" : {
         "tags" : [
@@ -1807,6 +1847,36 @@
         }
       }
     },
+    "/api/v1/patents/bulk/department" : {
+      "patch" : {
+        "tags" : [
+          "patent-controller"
+        ],
+        "operationId" : "bulkAssignDepartment",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/BulkAssignDepartmentRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseBulkAssignDepartmentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/notifications/{notificationId}/read-state" : {
       "patch" : {
         "tags" : [
@@ -2108,6 +2178,26 @@
         }
       }
     },
+    "/api/v1/settings/fee-rules" : {
+      "get" : {
+        "tags" : [
+          "settings-controller"
+        ],
+        "operationId" : "getFeeRules",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListFeeRuleResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/settings/country-extensions" : {
       "get" : {
         "tags" : [
@@ -2231,6 +2321,36 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/ApiResponsePatentFeeScheduleResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patents/{patentId}/family" : {
+      "get" : {
+        "tags" : [
+          "patent-controller"
+        ],
+        "operationId" : "getPatentFamily",
+        "parameters" : [
+          {
+            "name" : "patentId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListPatentListItemResponse"
                 }
               }
             }
@@ -2684,6 +2804,54 @@
         }
       }
     },
+    "/api/v1/legal/audit-logs" : {
+      "get" : {
+        "tags" : [
+          "legal-controller"
+        ],
+        "operationId" : "getAuditLogs",
+        "parameters" : [
+          {
+            "name" : "type",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "patentId",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "limit",
+            "in" : "query",
+            "required" : false,
+            "schema" : {
+              "type" : "integer",
+              "format" : "int32",
+              "default" : 100
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListAuditLogEntryResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/departments" : {
       "get" : {
         "tags" : [
@@ -2925,6 +3093,36 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/ApiResponsePatentFeeScheduleResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/business/patents/{patentId}/family" : {
+      "get" : {
+        "tags" : [
+          "business-controller"
+        ],
+        "operationId" : "getBusinessPatentFamily",
+        "parameters" : [
+          {
+            "name" : "patentId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListPatentListItemResponse"
                 }
               }
             }
@@ -3435,6 +3633,67 @@
           }
         }
       },
+      "FeeRuleUpdateRequest" : {
+        "type" : "object",
+        "properties" : {
+          "basis" : {
+            "type" : "string",
+            "pattern" : "APPLICATION_DATE|REGISTRATION_DATE"
+          },
+          "initialLumpYears" : {
+            "type" : "integer",
+            "format" : "int32",
+            "maximum" : 10,
+            "minimum" : 0
+          },
+          "cycleMonths" : {
+            "type" : "integer",
+            "format" : "int32",
+            "maximum" : 120,
+            "minimum" : 1
+          }
+        }
+      },
+      "ApiResponseFeeRuleResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/FeeRuleResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "FeeRuleResponse" : {
+        "type" : "object",
+        "properties" : {
+          "country" : {
+            "type" : "string"
+          },
+          "countryLabel" : {
+            "type" : "string"
+          },
+          "basis" : {
+            "type" : "string"
+          },
+          "initialLumpYears" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "cycleMonths" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "ruleLabel" : {
+            "type" : "string"
+          }
+        }
+      },
       "CountryExtensionRequest" : {
         "type" : "object",
         "properties" : {
@@ -3747,7 +4006,7 @@
           "role" : {
             "type" : "string",
             "minLength" : 1,
-            "pattern" : "ADMIN|BUSINESS"
+            "pattern" : "ADMIN|LEGAL|BUSINESS"
           },
           "departmentId" : {
             "type" : "string"
@@ -3895,6 +4154,12 @@
             "type" : "string"
           },
           "reportId" : {
+            "type" : "string"
+          },
+          "progressStage" : {
+            "type" : "string"
+          },
+          "progressStageLabel" : {
             "type" : "string"
           }
         }
@@ -5213,6 +5478,59 @@
           }
         }
       },
+      "BulkAssignDepartmentRequest" : {
+        "type" : "object",
+        "properties" : {
+          "patentIds" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            },
+            "maxItems" : 200,
+            "minItems" : 0
+          },
+          "departmentId" : {
+            "type" : "string",
+            "minLength" : 1
+          }
+        },
+        "required" : [
+          "departmentId",
+          "patentIds"
+        ]
+      },
+      "ApiResponseBulkAssignDepartmentResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/BulkAssignDepartmentResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "BulkAssignDepartmentResponse" : {
+        "type" : "object",
+        "properties" : {
+          "assignedPatentIds" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "failedPatentIds" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }
+      },
       "NotificationReadStateRequest" : {
         "type" : "object",
         "properties" : {
@@ -5544,6 +5862,24 @@
           }
         }
       },
+      "ApiResponseListFeeRuleResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/FeeRuleResponse"
+            }
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
       "ApiResponseListCountryExtensionResponse" : {
         "type" : "object",
         "properties" : {
@@ -5836,6 +6172,13 @@
           },
           "adjusted" : {
             "type" : "boolean"
+          },
+          "estimatedAmount" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "currency" : {
+            "type" : "string"
           }
         }
       },
@@ -5900,13 +6243,13 @@
           }
         }
       },
-      "ApiResponseListBusinessSubmissionVersionResponse" : {
+      "ApiResponseListPatentListItemResponse" : {
         "type" : "object",
         "properties" : {
           "data" : {
             "type" : "array",
             "items" : {
-              "$ref" : "#/components/schemas/BusinessSubmissionVersionResponse"
+              "$ref" : "#/components/schemas/PatentListItemResponse"
             }
           },
           "message" : {
@@ -5918,13 +6261,13 @@
           }
         }
       },
-      "ApiResponseListPatentListItemResponse" : {
+      "ApiResponseListBusinessSubmissionVersionResponse" : {
         "type" : "object",
         "properties" : {
           "data" : {
             "type" : "array",
             "items" : {
-              "$ref" : "#/components/schemas/PatentListItemResponse"
+              "$ref" : "#/components/schemas/BusinessSubmissionVersionResponse"
             }
           },
           "message" : {
@@ -6285,6 +6628,48 @@
             "items" : {
               "type" : "string"
             }
+          }
+        }
+      },
+      "ApiResponseListAuditLogEntryResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/AuditLogEntryResponse"
+            }
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "AuditLogEntryResponse" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "type" : {
+            "type" : "string"
+          },
+          "patentId" : {
+            "type" : "string"
+          },
+          "actor" : {
+            "type" : "string"
+          },
+          "summary" : {
+            "type" : "string"
+          },
+          "occurredAt" : {
+            "type" : "string",
+            "format" : "date-time"
           }
         }
       },
