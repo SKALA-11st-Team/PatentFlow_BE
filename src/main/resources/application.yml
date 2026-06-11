@@ -110,6 +110,12 @@ patentflow:
       bibliography-operation: ${PATENTFLOW_KIPRIS_BIBLIOGRAPHY_OPERATION:getBibliographyDetailInfoSearch}
       application-search-operation: ${PATENTFLOW_KIPRIS_APPLICATION_SEARCH_OPERATION:}
       pdf-path-operation: ${PATENTFLOW_KIPRIS_PDF_PATH_OPERATION:getPubFullTextInfoSearch}
+      # W4: 해외특허 공개전문 PDF 오퍼레이션 — KIPRIS Plus에서 발급받은 오퍼레이션명을 국가별로
+      # 주입하면 코드 변경 없이 해당 국가 PDF 첨부가 활성화된다(빈 값 = 미지원 → 원문 URL 폴백).
+      pdf-path-operations:
+        US: ${PATENTFLOW_KIPRIS_PDF_OP_US:}
+        JP: ${PATENTFLOW_KIPRIS_PDF_OP_JP:}
+        CN: ${PATENTFLOW_KIPRIS_PDF_OP_CN:}
       service-key: ${PATENTFLOW_KIPRIS_SERVICE_KEY:}
       service-keys: ${PATENTFLOW_KIPRIS_SERVICE_KEYS:}
     google-patents:

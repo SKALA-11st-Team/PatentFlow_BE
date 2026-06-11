@@ -93,25 +93,28 @@ public class SecurityConfig {
                                 "/api/v1/admin/settings/mail/oauth2/google/callback").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers("/actuator/**", "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/v1/settings/review-quarters/active").hasAnyRole("ADMIN", "BUSINESS")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/settings/review-quarters/active").hasAnyRole("ADMIN", "LEGAL", "BUSINESS")
                         .requestMatchers(HttpMethod.GET, "/api/v1/business/checklist-items").authenticated()
-                        .requestMatchers("/api/v1/admin/**", "/api/v1/legal/**", "/api/v1/settings/**",
-                                "/api/v1/mailings/**", "/api/v1/departments/**").hasRole("ADMIN")
-                        .requestMatchers("/api/v1/annual-fees/**").hasRole("ADMIN")
+                        // I3: 역할 분리 — 검토 업무(특허·연차료·메일·legal 대시보드)는 ADMIN+LEGAL,
+                        // 운영(admin 설정·계정/부서 관리·시스템 설정)은 ADMIN 전용으로 유지한다.
+                        .requestMatchers("/api/v1/admin/**", "/api/v1/settings/**",
+                                "/api/v1/departments/**").hasRole("ADMIN")
+                        .requestMatchers("/api/v1/legal/**", "/api/v1/mailings/**").hasAnyRole("ADMIN", "LEGAL")
+                        .requestMatchers("/api/v1/annual-fees/**").hasAnyRole("ADMIN", "LEGAL")
                         .requestMatchers("/api/v1/business/**").hasRole("BUSINESS")
                         .requestMatchers(HttpMethod.POST, "/api/v1/patents/*/business-submissions").hasRole("BUSINESS")
                         .requestMatchers(HttpMethod.GET, "/api/v1/patents/*/business-submissions").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/patents/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/v1/patents/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/v1/patents/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.PATCH, "/api/v1/patents/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/patents/**").hasAnyRole("ADMIN", "LEGAL")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/patents/**").hasAnyRole("ADMIN", "LEGAL")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/patents/**").hasAnyRole("ADMIN", "LEGAL")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/patents/**").hasAnyRole("ADMIN", "LEGAL")
                         // DELETE 규칙 부재 시 anyRequest().authenticated()로 흘러 BUSINESS도 통과하던 구멍을 막는다
                         // (레포트 편집 되돌리기 DELETE /api/v1/patents/*/ai-report/edits 추가에 맞춰 명시).
-                        .requestMatchers(HttpMethod.DELETE, "/api/v1/patents/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/patents/**").hasAnyRole("ADMIN", "LEGAL")
                         // 메서드 미지정 캐치올: HEAD 등 위 메서드별 규칙을 비껴가는 요청이
                         // anyRequest().authenticated()로 흘러 BUSINESS가 ADMIN GET 핸들러를
                         // 실행할 수 있던 구멍 차단(Spring MVC는 HEAD를 GET 핸들러로 처리한다).
-                        .requestMatchers("/api/v1/patents/**").hasRole("ADMIN")
+                        .requestMatchers("/api/v1/patents/**").hasAnyRole("ADMIN", "LEGAL")
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterAfter(new CsrfCookieFilter(), JwtAuthenticationFilter.class)

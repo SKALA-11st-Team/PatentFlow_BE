@@ -3,9 +3,13 @@ package com.syuuk.patentflow.patent.controller;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -29,6 +33,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -702,5 +707,47 @@ class PatentControllerTest {
         mockMvc.perform(get("/api/v1/patents/{patentId}", patentId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.title").value("수정된 테스트 특허"));
+    }
+
+    // MAIL-13: 법무팀 PDF 직접 업로드 → 메타 → 다운로드 → 삭제 전체 사이클 (FR-LEGAL-13).
+    @Test
+    void uploadsDownloadsAndDeletesPatentPdf() throws Exception {
+        byte[] pdfBytes = "%PDF-1.7 test-upload".getBytes();
+
+        mockMvc.perform(multipart("/api/v1/patents/PAT-2026-0001/pdf")
+                        .file(new MockMultipartFile("file", "수동업로드.pdf", "application/pdf", pdfBytes))
+                        .with(adminAuth()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.exists").value(true))
+                .andExpect(jsonPath("$.data.storageType").value("UPLOADED"))
+                .andExpect(jsonPath("$.data.docName").value("수동업로드.pdf"));
+
+        mockMvc.perform(get("/api/v1/patents/PAT-2026-0001/pdf/meta"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.exists").value(true))
+                .andExpect(jsonPath("$.data.contentLength").value(pdfBytes.length));
+
+        mockMvc.perform(get("/api/v1/patents/PAT-2026-0001/pdf"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", "application/pdf"))
+                .andExpect(content().bytes(pdfBytes));
+
+        mockMvc.perform(delete("/api/v1/patents/PAT-2026-0001/pdf").with(adminAuth()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.exists").value(false));
+
+        mockMvc.perform(get("/api/v1/patents/PAT-2026-0001/pdf/meta"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.exists").value(false));
+    }
+
+    // MAIL-13: PDF가 아닌 파일은 400으로 거부한다.
+    @Test
+    void rejectsNonPdfUpload() throws Exception {
+        mockMvc.perform(multipart("/api/v1/patents/PAT-2026-0001/pdf")
+                        .file(new MockMultipartFile("file", "fake.pdf", "application/pdf", "<html></html>".getBytes()))
+                        .with(adminAuth()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
     }
 }

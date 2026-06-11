@@ -217,6 +217,13 @@ public class AnnualFeeScheduleService {
     private static final int SCHEDULE_PAST_ENTRIES = 3;
     private static final int SCHEDULE_FUTURE_ENTRIES = 5;
 
+    // F2: 국가별 연차료 요금표 기본값(개략치, 청구항 수 미반영) — fee.amounts.{CC} 설정으로 오버라이드.
+    // KR: 연차 구간별 연 납부액(KRW), US: 등록 후 개월별 유지료(USD).
+    private static final String KR_DEFAULT_FEE_AMOUNTS = "4-6:55000,7-9:130000,10-12:290000,13-25:600000";
+    private static final String US_DEFAULT_FEE_AMOUNTS = "42:2000,90:3760,138:7700";
+    private static final java.util.Map<String, String> FEE_CURRENCIES = java.util.Map.of(
+            "KR", "KRW", "US", "USD", "JP", "JPY", "CN", "CNY", "TW", "TWD");
+
     /**
      * FEE-06: 특허 상세 연차료 일정 항목을 생성한다 — 일괄 납부 구간 1줄 + 직전 납부 최대 3건 +
      * 다음 도래(NEXT) 포함 향후 5건. effectiveNextDueDate가 계산값과 다르면(저장/조정값) NEXT 도래일을
@@ -240,7 +247,8 @@ public class AnnualFeeScheduleService {
             }
             return List.of(new FeeScheduleEntry(
                     "다음 납부", 0, false, effectiveNextDueDate,
-                    effectiveNextDueDate.minusMonths(mailLeadMonths), "NEXT", nextDueAdjusted));
+                    effectiveNextDueDate.minusMonths(mailLeadMonths), "NEXT", nextDueAdjusted,
+                    null, feeCurrency(country)));
         }
 
         List<FeeScheduleEntry> entries = new ArrayList<>();
@@ -280,10 +288,11 @@ public class AnnualFeeScheduleService {
             }
         }
 
+        String currency = feeCurrency(country);
         if (lumpRow) {
             entries.add(new FeeScheduleEntry(
                     "1~%d년차".formatted(rule.initialLumpYears()), 1, true,
-                    registrationDate, null, "PAID_LUMP", false));
+                    registrationDate, null, "PAID_LUMP", false, null, currency));
         }
 
         boolean nextAssigned = false;
@@ -304,6 +313,9 @@ public class AnnualFeeScheduleService {
             String yearLabel = maintenance
                     ? maintenanceLabel(registrationDate, due)
                     : (yearNumber > 0 ? "%d년차".formatted(yearNumber) : "납부");
+            Long estimatedAmount = maintenance
+                    ? estimateFeeAmount(country, true, ChronoUnit.MONTHS.between(registrationDate, due))
+                    : estimateFeeAmount(country, false, yearNumber);
             entries.add(new FeeScheduleEntry(
                     yearLabel,
                     yearNumber,
@@ -311,9 +323,58 @@ public class AnnualFeeScheduleService {
                     entryDue,
                     entryDue.minusMonths(mailLeadMonths),
                     past ? "PAST" : (isNext ? "NEXT" : "FUTURE"),
-                    adjusted));
+                    adjusted,
+                    estimatedAmount,
+                    currency));
         }
         return entries;
+    }
+
+    /** F2: 통화 코드 — 요금표가 없어도 통화는 안내한다(미지원 국가는 null). */
+    public String feeCurrency(String country) {
+        return country == null ? null : FEE_CURRENCIES.get(country.trim().toUpperCase());
+    }
+
+    /**
+     * F2: 납부 예상액(개략치). 연차 기반 국가는 yearNumber로 구간 요금표를, US 유지료는
+     * 등록일~도래일 개월수로 요금표를 조회한다. 요금표가 없으면 null.
+     */
+    public Long estimateFeeAmount(String country, boolean maintenance, long yearNumberOrMonths) {
+        String normalized = country == null ? "" : country.trim().toUpperCase();
+        String table = systemSettingsService.getCountryFeeAmountTableOverride(normalized);
+        if (table == null) {
+            table = switch (normalized) {
+                case "KR" -> KR_DEFAULT_FEE_AMOUNTS;
+                case "US" -> US_DEFAULT_FEE_AMOUNTS;
+                default -> null;
+            };
+        }
+        if (table == null) {
+            return null;
+        }
+        for (String token : table.split(",")) {
+            String[] parts = token.trim().split(":");
+            if (parts.length != 2) {
+                continue;
+            }
+            try {
+                long amount = Long.parseLong(parts[1].trim());
+                String range = parts[0].trim();
+                if (range.contains("-")) {
+                    String[] bounds = range.split("-");
+                    long from = Long.parseLong(bounds[0].trim());
+                    long to = Long.parseLong(bounds[1].trim());
+                    if (!maintenance && yearNumberOrMonths >= from && yearNumberOrMonths <= to) {
+                        return amount;
+                    }
+                } else if (Long.parseLong(range) == yearNumberOrMonths) {
+                    return amount;
+                }
+            } catch (NumberFormatException ignored) {
+                // 잘못된 요금표 토큰은 건너뛴다(설정 실수에 관대).
+            }
+        }
+        return null;
     }
 
     private String maintenanceLabel(LocalDate registrationDate, LocalDate due) {

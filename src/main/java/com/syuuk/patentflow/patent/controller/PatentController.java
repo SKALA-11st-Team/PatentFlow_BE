@@ -4,6 +4,7 @@ import com.syuuk.patentflow.auth.dto.UserPrincipalResponse;
 import com.syuuk.patentflow.common.response.ApiResponse;
 import com.syuuk.patentflow.common.response.PageResponse;
 import com.syuuk.patentflow.patent.dto.AssignDepartmentRequest;
+import com.syuuk.patentflow.patent.dto.BulkAssignDepartmentRequest;
 import com.syuuk.patentflow.patent.dto.AiEvaluationReportResponse;
 import com.syuuk.patentflow.patent.dto.AiReportEditRequest;
 import com.syuuk.patentflow.patent.dto.AiReportJobResponse;
@@ -20,6 +21,7 @@ import com.syuuk.patentflow.patent.dto.PatentHistoryResponse;
 import com.syuuk.patentflow.patent.dto.PatentFeeScheduleResponse;
 import com.syuuk.patentflow.patent.dto.PatentListFilter;
 import com.syuuk.patentflow.patent.dto.PatentListItemResponse;
+import com.syuuk.patentflow.patent.dto.PatentPdfMetaResponse;
 
 import com.syuuk.patentflow.patent.dto.PatentUpsertRequest;
 import com.syuuk.patentflow.patent.dto.PatentUpsertResponse;
@@ -27,13 +29,17 @@ import com.syuuk.patentflow.patent.dto.ReviewWorkflowStatus;
 import com.syuuk.patentflow.patent.service.AiReportEditService;
 import com.syuuk.patentflow.patent.service.AiReportJobService;
 import com.syuuk.patentflow.patent.service.AnnualFeeScheduleManagementService;
+import com.syuuk.patentflow.patent.service.PatentPdfService;
 import com.syuuk.patentflow.patent.service.PatentReviewService;
 import jakarta.validation.Valid;
+import java.io.IOException;
 import java.time.LocalDate;
 import java.util.List;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -53,17 +59,20 @@ public class PatentController {
     private final AiReportJobService aiReportJobService;
     private final AiReportEditService aiReportEditService;
     private final AnnualFeeScheduleManagementService annualFeeScheduleManagementService;
+    private final PatentPdfService patentPdfService;
 
     public PatentController(
             PatentReviewService patentReviewService,
             AiReportJobService aiReportJobService,
             AiReportEditService aiReportEditService,
-            AnnualFeeScheduleManagementService annualFeeScheduleManagementService
+            AnnualFeeScheduleManagementService annualFeeScheduleManagementService,
+            PatentPdfService patentPdfService
     ) {
         this.patentReviewService = patentReviewService;
         this.aiReportJobService = aiReportJobService;
         this.aiReportEditService = aiReportEditService;
         this.annualFeeScheduleManagementService = annualFeeScheduleManagementService;
+        this.patentPdfService = patentPdfService;
     }
 
     /**
@@ -181,6 +190,68 @@ public class PatentController {
     }
 
     /**
+     * @relatedFR FR-LEGAL-05
+     * @description F6: 특허 패밀리(같은 관리번호 계열의 국가별 출원) 조회.
+     */
+    @GetMapping("/{patentId}/family")
+    public ApiResponse<List<PatentListItemResponse>> getPatentFamily(@PathVariable String patentId) {
+        return ApiResponse.ok(patentReviewService.getPatentFamily(patentId));
+    }
+
+    /**
+     * @relatedFR FR-LEGAL-13
+     * @relatedUI UI-LEGAL-03
+     * @description MAIL-13: 법무팀 특허 PDF 직접 업로드 — TW·UAE 등 KIPRIS로 공개전문을
+     *     가져올 수 없는 국가의 특허에 등록/수정 화면에서 PDF를 첨부한다(기존 첨부는 교체).
+     */
+    @PostMapping(value = "/{patentId}/pdf", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResponse<PatentPdfMetaResponse> uploadPatentPdf(
+            @PathVariable String patentId,
+            @RequestParam("file") MultipartFile file,
+            Authentication authentication
+    ) throws IOException {
+        return ApiResponse.ok(patentPdfService.upload(
+                patentId, file.getOriginalFilename(), file.getBytes(), currentActor(authentication)));
+    }
+
+    /**
+     * @relatedFR FR-LEGAL-13
+     * @description MAIL-13: 업로드된 특허 PDF 다운로드(관리자).
+     */
+    @GetMapping("/{patentId}/pdf")
+    public ResponseEntity<byte[]> downloadPatentPdf(@PathVariable String patentId) {
+        return pdfDownloadResponse(patentPdfService.downloadUploaded(patentId));
+    }
+
+    /**
+     * @relatedFR FR-LEGAL-13
+     * @description MAIL-13: 특허 PDF 첨부 상태 조회 — 등록/수정 화면 업로드 위젯이 사용한다.
+     */
+    @GetMapping("/{patentId}/pdf/meta")
+    public ApiResponse<PatentPdfMetaResponse> getPatentPdfMeta(@PathVariable String patentId) {
+        return ApiResponse.ok(patentPdfService.meta(patentId));
+    }
+
+    /**
+     * @relatedFR FR-LEGAL-13
+     * @description MAIL-13: 업로드된 특허 PDF 삭제(교체·정리용).
+     */
+    @DeleteMapping("/{patentId}/pdf")
+    public ApiResponse<PatentPdfMetaResponse> deletePatentPdf(@PathVariable String patentId) {
+        patentPdfService.deleteUploaded(patentId);
+        return ApiResponse.ok(PatentPdfMetaResponse.none(patentId));
+    }
+
+    public static ResponseEntity<byte[]> pdfDownloadResponse(PatentPdfService.PdfDownload download) {
+        String encodedName = java.net.URLEncoder.encode(download.docName(), java.nio.charset.StandardCharsets.UTF_8)
+                .replace("+", "%20");
+        return ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename*=UTF-8''" + encodedName)
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(download.content());
+    }
+
+    /**
      * @relatedFR FR-LEGAL-03, FR-LEGAL-04
      * @relatedUI UI-LEGAL-02, UI-LEGAL-03
      * @description 특허 기본 정보와 회사 컨텍스트 수정 API.
@@ -255,6 +326,29 @@ public class PatentController {
     ) {
         return ApiResponse.ok(patentReviewService.assignDepartment(patentId, request.departmentId()));
     }
+
+    /**
+     * @relatedFR FR-LEGAL-02
+     * @description F5: 특허 다건 부서 일괄 배정 — 건별 실패는 건너뛰고 성공/실패 ID 목록을 반환한다.
+     */
+    @PatchMapping("/bulk/department")
+    public ApiResponse<BulkAssignDepartmentResponse> bulkAssignDepartment(
+            @Valid @RequestBody BulkAssignDepartmentRequest request
+    ) {
+        List<String> assigned = new java.util.ArrayList<>();
+        List<String> failed = new java.util.ArrayList<>();
+        for (String patentId : request.patentIds()) {
+            try {
+                patentReviewService.assignDepartment(patentId, request.departmentId());
+                assigned.add(patentId);
+            } catch (Exception exception) {
+                failed.add(patentId);
+            }
+        }
+        return ApiResponse.ok(new BulkAssignDepartmentResponse(assigned, failed));
+    }
+
+    public record BulkAssignDepartmentResponse(List<String> assignedPatentIds, List<String> failedPatentIds) {}
 
     /**
      * @description AI 평가 레포트 생성을 비동기 잡으로 요청한다.

@@ -36,6 +36,8 @@ public class AdminUserService {
     private static final Logger log = LoggerFactory.getLogger(AdminUserService.class);
     private static final String CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$";
     private static final String ROLE_ADMIN = "ADMIN";
+    // I3: LEGAL — 검토 업무(특허·연차료·메일)는 ADMIN과 동일, 운영(계정·설정)만 제한되는 역할.
+    private static final String ROLE_LEGAL = "LEGAL";
     private static final String ROLE_BUSINESS = "BUSINESS";
     private static final Set<String> PROTECTED_ADMIN_IDS = Set.of("USER-admin", "USER-admin-bootstrap");
 
@@ -177,7 +179,7 @@ public class AdminUserService {
 
     private String validateDepartmentId(String role, String departmentId) {
         String normalizedDepartmentId = normalize(departmentId);
-        if (ROLE_ADMIN.equals(role)) {
+        if (ROLE_ADMIN.equals(role) || ROLE_LEGAL.equals(role)) {
             return null;
         }
         if (ROLE_BUSINESS.equals(role) && isBlank(normalizedDepartmentId)) {

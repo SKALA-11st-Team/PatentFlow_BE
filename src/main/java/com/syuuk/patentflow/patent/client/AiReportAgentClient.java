@@ -68,6 +68,34 @@ public class AiReportAgentClient {
         return doEvaluate(patentId, BATCH_TIMEOUT, valuationConfig);
     }
 
+    /**
+     * W1: agent의 평가 진행 단계 조회. 미지원 agent(구버전)·미실행·오류는 전부 null —
+     * 진행 표시는 부가 정보라 어떤 실패도 잡 상태 조회를 막지 않는다.
+     */
+    public AgentProgress fetchProgress(String patentId) {
+        try {
+            HttpRequest.Builder builder = HttpRequest.newBuilder()
+                    .uri(URI.create(agentUrl + "/api/v1/ai/patents/" + patentId + "/evaluate/progress"))
+                    .timeout(Duration.ofSeconds(3))
+                    .GET();
+            applyAgentAuth(builder);
+            HttpResponse<String> response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200 || response.body() == null || response.body().isBlank()) {
+                return null;
+            }
+            return objectMapper.readValue(response.body(), AgentProgress.class);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            return null;
+        } catch (Exception exception) {
+            log.debug("agent 진행 단계 조회 실패(무시). patentId={}", patentId, exception);
+            return null;
+        }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record AgentProgress(String stage, String stageLabel, String updatedAt) {}
+
     private AgentEvaluateResponse doEvaluate(String patentId, Duration timeout, Object valuationConfig) {
         try {
             String url = agentUrl + "/api/v1/ai/patents/" + patentId + "/evaluate";

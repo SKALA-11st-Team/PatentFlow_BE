@@ -10,6 +10,9 @@ import org.springframework.data.jpa.repository.Query;
 
 public interface PatentMetadataRepository extends JpaRepository<PatentMetadataEntity, String>, JpaSpecificationExecutor<PatentMetadataEntity> {
 
+    // F6: 특허 패밀리 — 같은 관리번호 계열(P201103001-KR0 / -US0 등) 조회.
+    java.util.List<PatentMetadataEntity> findByManagementNumberStartingWithOrderByManagementNumberAsc(String prefix);
+
     @Query("""
             select coalesce(max(cast(substring(p.patentId, 10) as integer)), 0)
             from PatentMetadataEntity p

@@ -2,10 +2,13 @@ package com.syuuk.patentflow.patent.controller;
 
 import com.syuuk.patentflow.common.response.ApiResponse;
 import com.syuuk.patentflow.patent.dto.AreaDistributionResponse;
+import com.syuuk.patentflow.patent.dto.AuditLogEntryResponse;
 import com.syuuk.patentflow.patent.dto.LegalDashboardSummaryResponse;
 import com.syuuk.patentflow.patent.dto.ReviewWorkflowStatus;
+import com.syuuk.patentflow.patent.service.AuditLogService;
 import com.syuuk.patentflow.patent.service.DashboardSummaryService;
 import java.time.LocalDate;
+import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -16,9 +19,23 @@ import org.springframework.web.bind.annotation.RestController;
 public class LegalController {
 
     private final DashboardSummaryService dashboardSummaryService;
+    private final AuditLogService auditLogService;
 
-    public LegalController(DashboardSummaryService dashboardSummaryService) {
+    public LegalController(DashboardSummaryService dashboardSummaryService, AuditLogService auditLogService) {
         this.dashboardSummaryService = dashboardSummaryService;
+        this.auditLogService = auditLogService;
+    }
+
+    /**
+     * @relatedFR FR-LEGAL-09, FR-LEGAL-10, FR-LEGAL-24
+     * @description F4: 통합 감사 로그 — AI 레포트 편집/연차료 조정/최종 결정 이력을 시간 역순 조회.
+     */
+    @GetMapping("/audit-logs")
+    public ApiResponse<List<AuditLogEntryResponse>> getAuditLogs(
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) String patentId,
+            @RequestParam(defaultValue = "100") int limit) {
+        return ApiResponse.ok(auditLogService.getAuditLogs(type, patentId, limit));
     }
 
     /**

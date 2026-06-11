@@ -11,6 +11,9 @@ import com.syuuk.patentflow.business.dto.BusinessChecklistItemResponse;
 import com.syuuk.patentflow.business.service.BusinessChecklistItemService;
 import com.syuuk.patentflow.common.response.ApiResponse;
 import com.syuuk.patentflow.common.service.SystemSettingsService;
+import com.syuuk.patentflow.patent.service.AnnualFeeScheduleService;
+import com.syuuk.patentflow.settings.dto.FeeRuleResponse;
+import com.syuuk.patentflow.settings.dto.FeeRuleUpdateRequest;
 import com.syuuk.patentflow.settings.dto.QuarterActivateResponse;
 import com.syuuk.patentflow.settings.dto.QuarterSettingRequest;
 import com.syuuk.patentflow.settings.dto.QuarterSettingResponse;
@@ -46,19 +49,22 @@ public class SettingsController {
     private final ValuationCriteriaService valuationCriteriaService;
     private final BusinessChecklistItemService businessChecklistItemService;
     private final AiReportAgentClient aiReportAgentClient;
+    private final AnnualFeeScheduleService annualFeeScheduleService;
 
     public SettingsController(
             SettingsService settingsService,
             SystemSettingsService systemSettingsService,
             ValuationCriteriaService valuationCriteriaService,
             BusinessChecklistItemService businessChecklistItemService,
-            AiReportAgentClient aiReportAgentClient
+            AiReportAgentClient aiReportAgentClient,
+            AnnualFeeScheduleService annualFeeScheduleService
     ) {
         this.settingsService = settingsService;
         this.systemSettingsService = systemSettingsService;
         this.valuationCriteriaService = valuationCriteriaService;
         this.businessChecklistItemService = businessChecklistItemService;
         this.aiReportAgentClient = aiReportAgentClient;
+        this.annualFeeScheduleService = annualFeeScheduleService;
     }
 
     // ── 사업부 체크리스트 항목 관리 (리걸팀) ──────────────────
@@ -216,6 +222,48 @@ public class SettingsController {
             @PathVariable String country,
             @Valid @RequestBody CountryExtensionRequest request) {
         return ApiResponse.ok(systemSettingsService.updateCountryExtension(country, request));
+    }
+
+    // ── 국가별 연차료 규칙 (FEE-06 / I4) ─────────────────────
+
+    /**
+     * @relatedFR FR-LEGAL-24
+     * @description I4: 국가별 연차료 규칙(기산일·일괄 연차·납부 주기)의 유효값 목록 조회.
+     */
+    @GetMapping("/fee-rules")
+    public ApiResponse<List<FeeRuleResponse>> getFeeRules() {
+        return ApiResponse.ok(systemSettingsService.getSupportedCountries().stream()
+                .map(country -> {
+                    var rule = annualFeeScheduleService.ruleFor(country);
+                    return new FeeRuleResponse(
+                            country,
+                            systemSettingsService.getCountryLabel(country),
+                            rule.basis(),
+                            rule.initialLumpYears(),
+                            rule.cycleMonths(),
+                            rule.label());
+                })
+                .toList());
+    }
+
+    /**
+     * @relatedFR FR-LEGAL-24
+     * @description I4: 국가별 연차료 규칙 오버라이드 수정 — system_settings(fee.rule.{CC}.*)에 기록.
+     */
+    @PutMapping("/fee-rules/{country}")
+    public ApiResponse<FeeRuleResponse> updateFeeRule(
+            @PathVariable String country,
+            @Valid @RequestBody FeeRuleUpdateRequest request) {
+        systemSettingsService.updateCountryFeeRule(
+                country, request.basis(), request.initialLumpYears(), request.cycleMonths());
+        var rule = annualFeeScheduleService.ruleFor(country.toUpperCase());
+        return ApiResponse.ok(new FeeRuleResponse(
+                country.toUpperCase(),
+                systemSettingsService.getCountryLabel(country.toUpperCase()),
+                rule.basis(),
+                rule.initialLumpYears(),
+                rule.cycleMonths(),
+                rule.label()));
     }
 
     // ── 분류 ─────────────────────────────────────────────────

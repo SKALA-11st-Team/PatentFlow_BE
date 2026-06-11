@@ -105,26 +105,32 @@ class MailingServiceTest {
                 .doesNotHaveDuplicates();
     }
 
+    // I1: 건별 처리 — 한 수신자의 실패가 나머지 발송을 막지 않고, 실패 건은 FAILED 이력으로 남는다.
     @Test
-    void anyRecipientFailureAbortsEntireBatch() {
+    void recipientFailureIsIsolatedAndRecordedAsFailed() {
         when(mailOAuth2Service.isConnected()).thenReturn(true);
         when(mailOAuth2Service.getValidAccessToken()).thenReturn("access-token");
         when(systemSettingsService.getGmailOAuth2ConnectedEmail()).thenReturn("sender@example.com");
         when(userRepository.findAll()).thenReturn(List.of(
                 user("USER-1", "success@example.com", "DEPT-1"),
                 user("USER-2", "fail@example.com", "DEPT-2")));
+        when(patentReviewService.markMailingSent(List.of("PAT-SUCCESS")))
+                .thenReturn(new PatentReviewService.WorkflowBatchUpdateResult(List.of("PAT-SUCCESS"), List.of()));
         mailingService.failRecipients = Set.of("fail@example.com");
 
-        // 전체 원자성: 한 수신자라도 발송 실패하면 예외를 던지고, 워크플로우 전이는 실행되지 않는다
-        // (이미 저장된 SENT 이력은 @Transactional 롤백 대상).
-        assertThatThrownBy(() -> mailingService.send(new MailingSendRequest(List.of(
+        MailingSendResponse response = mailingService.send(new MailingSendRequest(List.of(
                 draft("success@example.com", "PAT-SUCCESS"),
-                draft("fail@example.com", "PAT-FAIL")))))
-                .isInstanceOf(PatentFlowException.class)
-                .extracting("errorCode")
-                .isEqualTo(ErrorCode.MAIL_SEND_FAILED);
+                draft("fail@example.com", "PAT-FAIL"))));
 
-        verify(patentReviewService, never()).markMailingSent(anyList());
+        assertThat(response.sentCount()).isEqualTo(1);
+        assertThat(response.failedCount()).isEqualTo(1);
+        ArgumentCaptor<MailingHistoryEntity> captor = ArgumentCaptor.forClass(MailingHistoryEntity.class);
+        verify(mailingHistoryRepository, times(2)).save(captor.capture());
+        assertThat(captor.getAllValues())
+                .extracting(MailingHistoryEntity::getStatus)
+                .containsExactly("SENT", "FAILED");
+        // 성공 건만 워크플로우 전이 대상이다.
+        verify(patentReviewService).markMailingSent(List.of("PAT-SUCCESS"));
     }
 
     @Test
