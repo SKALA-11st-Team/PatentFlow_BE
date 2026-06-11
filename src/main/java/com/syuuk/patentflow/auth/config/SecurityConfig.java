@@ -91,7 +91,7 @@ public class SecurityConfig {
                         // orphan permitAll(/api/v1/settings/mail/oauth2/google/callback)을 제거해 미인증 표면을 축소한다.
                         .requestMatchers(
                                 "/api/v1/admin/settings/mail/oauth2/google/callback").permitAll()
-                        .requestMatchers("/actuator/health").permitAll()
+                        .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers("/actuator/**", "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/settings/review-quarters/active").hasAnyRole("ADMIN", "BUSINESS")
                         .requestMatchers(HttpMethod.GET, "/api/v1/business/checklist-items").authenticated()

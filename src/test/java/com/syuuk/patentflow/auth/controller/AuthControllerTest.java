@@ -25,6 +25,7 @@ import org.springframework.test.web.servlet.MockMvc;
         "patentflow.lookup.google-patents.enabled=false",
         "patentflow.auth.max-login-failures=2",
         "patentflow.auth.login-lock-seconds=300",
+        "management.endpoint.health.probes.enabled=true",
         // bootstrap 환경변수명이 .email로 변경됨 (users.email = 로그인 ID)
         "patentflow.bootstrap.admin.email=admin@test.com",
         "patentflow.bootstrap.admin.password=admin1234"
@@ -121,6 +122,12 @@ class AuthControllerTest {
     @Test
     void operationalEndpointsExposeOnlyHealthPublicly() throws Exception {
         mockMvc.perform(get("/actuator/health"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/actuator/health/liveness"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/actuator/health/readiness"))
                 .andExpect(status().isOk());
 
         mockMvc.perform(get("/actuator/info"))
