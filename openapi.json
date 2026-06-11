@@ -60,6 +60,74 @@
         }
       }
     },
+    "/api/v1/settings/valuation-criteria/prompts/{axis}" : {
+      "get" : {
+        "tags" : [
+          "settings-controller"
+        ],
+        "operationId" : "getValuationCriteriaPrompt",
+        "parameters" : [
+          {
+            "name" : "axis",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseValuationPromptResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put" : {
+        "tags" : [
+          "settings-controller"
+        ],
+        "operationId" : "updateValuationCriteriaPrompt",
+        "parameters" : [
+          {
+            "name" : "axis",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ValuationPromptUpdateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseValuationPromptResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/settings/review-quarters/{quarterKey}" : {
       "put" : {
         "tags" : [
@@ -1841,6 +1909,26 @@
         }
       }
     },
+    "/api/v1/settings/valuation-criteria/prompts" : {
+      "get" : {
+        "tags" : [
+          "settings-controller"
+        ],
+        "operationId" : "getValuationCriteriaPrompts",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListValuationPromptResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/settings/valuation-criteria/history" : {
       "get" : {
         "tags" : [
@@ -2873,6 +2961,59 @@
             "type" : "boolean"
           },
           "updatedBy" : {
+            "type" : "string"
+          },
+          "updatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "ValuationPromptUpdateRequest" : {
+        "type" : "object",
+        "properties" : {
+          "markdown" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "expectedChecksum" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ApiResponseValuationPromptResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/ValuationPromptResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "ValuationPromptResponse" : {
+        "type" : "object",
+        "properties" : {
+          "axis" : {
+            "type" : "string"
+          },
+          "label" : {
+            "type" : "string"
+          },
+          "path" : {
+            "type" : "string"
+          },
+          "markdown" : {
+            "type" : "string"
+          },
+          "checksum" : {
             "type" : "string"
           },
           "updatedAt" : {
@@ -4975,6 +5116,12 @@
             "type" : "integer",
             "format" : "int32"
           },
+          "annualFeeBasis" : {
+            "type" : "string"
+          },
+          "paymentRuleLabel" : {
+            "type" : "string"
+          },
           "adjustmentHistory" : {
             "type" : "array",
             "items" : {
@@ -4988,6 +5135,24 @@
         "properties" : {
           "data" : {
             "$ref" : "#/components/schemas/AnnualFeeScheduleItemResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "ApiResponseListValuationPromptResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ValuationPromptResponse"
+            }
           },
           "message" : {
             "type" : "string"
