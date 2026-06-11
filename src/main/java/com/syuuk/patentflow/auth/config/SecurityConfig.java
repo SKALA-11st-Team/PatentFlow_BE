@@ -108,6 +108,10 @@ public class SecurityConfig {
                         // DELETE 규칙 부재 시 anyRequest().authenticated()로 흘러 BUSINESS도 통과하던 구멍을 막는다
                         // (레포트 편집 되돌리기 DELETE /api/v1/patents/*/ai-report/edits 추가에 맞춰 명시).
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/patents/**").hasRole("ADMIN")
+                        // 메서드 미지정 캐치올: HEAD 등 위 메서드별 규칙을 비껴가는 요청이
+                        // anyRequest().authenticated()로 흘러 BUSINESS가 ADMIN GET 핸들러를
+                        // 실행할 수 있던 구멍 차단(Spring MVC는 HEAD를 GET 핸들러로 처리한다).
+                        .requestMatchers("/api/v1/patents/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterAfter(new CsrfCookieFilter(), JwtAuthenticationFilter.class)

@@ -156,15 +156,16 @@ public class BusinessFixtureService {
     }
 
     private PatentReviewHistoryEntity findBusinessSubmissionState(String patentId, String quarterKey) {
-        if (quarterKey != null) {
-            return reviewHistoryRepository.findByPatentIdAndQuarterKey(patentId, quarterKey)
-                    .orElseGet(() -> new PatentReviewHistoryEntity(patentId, quarterKey));
-        }
+        // 체크리스트/스냅샷은 의견(recordBusinessOpinion)이 기록된 '최신 행'과 같은 행에 저장해야 한다.
+        // 과거에는 활성 분기 키로 행을 찾거나 새로 만들었는데, 최신 행과 분기 키 행이 다르면
+        // ai_*가 전부 null인 빈 행이 새로 생성·최신화되어 레포트/워크플로우 상태가 화면에서
+        // 사라지고 제출 데이터가 두 행에 분산되는 결함이 있었다(E2E에서 실증된 H-1).
         List<PatentReviewHistoryEntity> histories = reviewHistoryRepository.findByPatentIdOrderByCreatedAtDesc(patentId);
         if (!histories.isEmpty()) {
             return histories.get(0);
         }
-        return new PatentReviewHistoryEntity(patentId, "UNQUARTERED");
+        // 제출은 WAITING_BUSINESS_RESPONSE 상태에서만 가능하므로 실제로는 도달하지 않는 안전 폴백.
+        return new PatentReviewHistoryEntity(patentId, quarterKey != null ? quarterKey : "UNQUARTERED");
     }
 
     private List<BusinessSubmissionChecklistScoreResponse> readChecklistScores(String value) {

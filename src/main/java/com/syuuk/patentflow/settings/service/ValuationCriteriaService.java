@@ -89,9 +89,15 @@ public class ValuationCriteriaService {
         config.put("maintainThreshold", request.maintainThreshold());
         config.put("subscoreWeights", request.subscoreWeights());
         OffsetDateTime now = OffsetDateTime.now(KST);
-        ValuationCriteriaConfigEntity saved = repository.save(
-                new ValuationCriteriaConfigEntity(nextVersion, writeConfig(config), actor, now));
-        return new ValuationCriteriaResponse(readConfig(saved.getConfigJson()), false, actor, now);
+        try {
+            ValuationCriteriaConfigEntity saved = repository.save(
+                    new ValuationCriteriaConfigEntity(nextVersion, writeConfig(config), actor, now));
+            return new ValuationCriteriaResponse(readConfig(saved.getConfigJson()), false, actor, now);
+        } catch (org.springframework.dao.DataIntegrityViolationException exception) {
+            // 동시 저장으로 같은 버전을 계산한 경우(version unique 충돌) — 500 대신 409로 안내.
+            throw new PatentFlowException(ErrorCode.INVALID_WORKFLOW_STATUS,
+                    "다른 관리자가 동시에 기준을 저장했습니다. 새로고침 후 다시 시도해주세요.");
+        }
     }
 
     /**
