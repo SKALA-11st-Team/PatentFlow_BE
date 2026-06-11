@@ -7,6 +7,7 @@ import com.syuuk.patentflow.patent.dto.AiEvaluationReportResponse;
 import com.syuuk.patentflow.patent.dto.AiReportJobResponse;
 import com.syuuk.patentflow.patent.dto.AiReportJobStatus;
 import com.syuuk.patentflow.patent.dto.PatentDetailResponse;
+import com.syuuk.patentflow.patent.client.AiReportAgentClient;
 import com.syuuk.patentflow.patent.dto.ReviewWorkflowStatus;
 import com.syuuk.patentflow.notification.event.WorkflowNotificationEvent;
 import com.syuuk.patentflow.patent.repository.AiReportJobRepository;
@@ -34,19 +35,22 @@ public class AiReportJobService {
     private final PatentWorkflowService workflowService;
     private final Executor aiReportBatchExecutor;
     private final ApplicationEventPublisher eventPublisher;
+    private final AiReportAgentClient agentClient;
 
     public AiReportJobService(
             AiReportJobRepository jobRepository,
             PatentReviewService patentReviewService,
             PatentWorkflowService workflowService,
             @Qualifier("aiReportBatchExecutor") Executor aiReportBatchExecutor,
-            ApplicationEventPublisher eventPublisher
+            ApplicationEventPublisher eventPublisher,
+            AiReportAgentClient agentClient
     ) {
         this.jobRepository = jobRepository;
         this.patentReviewService = patentReviewService;
         this.workflowService = workflowService;
         this.aiReportBatchExecutor = aiReportBatchExecutor;
         this.eventPublisher = eventPublisher;
+        this.agentClient = agentClient;
     }
 
     public AiReportJobResponse requestAiReport(String patentId) {
@@ -74,6 +78,7 @@ public class AiReportJobService {
         patentReviewService.ensurePatentExists(patentId);
         return jobRepository.findFirstByPatentIdOrderByRequestedAtDesc(patentId)
                 .map(this::toResponse)
+                .map(this::withAgentProgress)
                 .orElseGet(() -> new AiReportJobResponse(
                         null,
                         patentId,
@@ -82,6 +87,8 @@ public class AiReportJobService {
                         null,
                         null,
                         "AI 평가 레포트 생성 요청 내역이 없습니다.",
+                        null,
+                        null,
                         null));
     }
 
@@ -128,7 +135,21 @@ public class AiReportJobService {
                 job.getStartedAt(),
                 job.getFinishedAt(),
                 job.getMessage(),
-                job.getReportId());
+                job.getReportId(),
+                null,
+                null);
+    }
+
+    /** W1: RUNNING 잡은 agent 진행 단계를 함께 내려준다(조회 실패는 무해 — 진행 없이 반환). */
+    private AiReportJobResponse withAgentProgress(AiReportJobResponse response) {
+        if (response.status() != AiReportJobStatus.RUNNING) {
+            return response;
+        }
+        AiReportAgentClient.AgentProgress progress = agentClient.fetchProgress(response.patentId());
+        if (progress == null) {
+            return response;
+        }
+        return response.withProgress(progress.stage(), progress.stageLabel());
     }
 
     private String newJobId(String patentId, OffsetDateTime now) {
