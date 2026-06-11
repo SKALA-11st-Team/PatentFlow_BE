@@ -10,6 +10,9 @@ import com.syuuk.patentflow.patent.domain.PatentReviewHistoryEntity;
 import com.syuuk.patentflow.patent.dto.AiEvaluationReportResponse;
 import com.syuuk.patentflow.patent.dto.BusinessOpinionDecision;
 import com.syuuk.patentflow.patent.dto.BusinessOpinionResponse;
+import com.syuuk.patentflow.patent.dto.CoApplicantConsentRequest;
+import com.syuuk.patentflow.patent.dto.CoApplicantConsentResponse;
+import com.syuuk.patentflow.patent.dto.CoApplicantConsentStatus;
 import com.syuuk.patentflow.patent.dto.EvaluationCategory;
 import com.syuuk.patentflow.patent.dto.EvaluationScoreResponse;
 import com.syuuk.patentflow.patent.dto.EvidenceDetailResponse;
@@ -171,8 +174,12 @@ public class PatentWorkflowService {
     public FinalDecisionResponse recordFinalDecision(String patentId, FinalDecisionRequest request, String actor) {
         OffsetDateTime decidedAt = OffsetDateTime.now(KST);
         PatentDetailResponse updated = patentReviewService.updatePatentInternal(patentId, patent -> {
-            if (!canRecordFinalDecision(patent.reviewWorkflowStatus())) {
+            if (patent.reviewWorkflowStatus() != ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED) {
                 throw new PatentFlowException(ErrorCode.INVALID_WORKFLOW_STATUS);
+            }
+            // 공동출원 특허는 연차료 유지/포기 결정 전 공동출원인 합의(AGREED)가 필요하다.
+            if (patent.jointApplication() && !isCoApplicantAgreed(patent)) {
+                throw new PatentFlowException(ErrorCode.CO_APPLICANT_CONSENT_REQUIRED);
             }
             return withFinalDecision(patent, request, decidedAt, actor);
         });
@@ -185,6 +192,31 @@ public class PatentWorkflowService {
                 "/admin/patents/" + patentId));
         return new FinalDecisionResponse(updated.patentId(), updated.finalDecisionRecord(),
                 updated.legalActionResult(), updated.reviewWorkflowStatus());
+    }
+
+    /**
+     * 공동출원 특허의 공동출원인 합의를 기록한다(게이트 모델 — 워크플로 상태는 바꾸지 않음).
+     * 공동출원이 아니거나 최종 판단 대기(BUSINESS_RESPONSE_RECEIVED) 상태가 아니면 거부한다.
+     */
+    @Transactional
+    public PatentDetailResponse recordCoApplicantConsent(String patentId, CoApplicantConsentRequest request, String actor) {
+        OffsetDateTime decidedAt = OffsetDateTime.now(KST);
+        PatentDetailResponse updated = patentReviewService.updatePatentInternal(patentId, patent -> {
+            if (!patent.jointApplication()) {
+                throw new PatentFlowException(ErrorCode.NOT_A_JOINT_APPLICATION);
+            }
+            if (patent.reviewWorkflowStatus() != ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED) {
+                throw new PatentFlowException(ErrorCode.INVALID_WORKFLOW_STATUS,
+                        "공동출원인 합의는 최종 판단 대기(사업부 의견 접수) 상태에서만 기록할 수 있습니다.");
+            }
+            return withCoApplicantConsent(patent, request, decidedAt, actor);
+        });
+        eventPublisher.publishEvent(new com.syuuk.patentflow.notification.event.WorkflowNotificationEvent(
+                "공동출원인 합의 기록",
+                "%s 특허의 공동출원인 합의(%s)가 기록되었습니다.".formatted(patentId, request.status().name()),
+                "ADMIN",
+                "/admin/patents/" + patentId));
+        return updated;
     }
 
     // ── 분기 / 배치 관리 ─────────────────────────────────────
@@ -247,7 +279,8 @@ public class PatentWorkflowService {
                 patent.feeDueDate(), patent.reviewReason(),
                 report.recommendation(), patent.businessOpinionDecision(), patent.legalActionResult(),
                 withAgentSummary(patent.summary(), agentSummary), report,
-                patent.finalDecisionRecord(), patent.businessOpinion(), true);
+                patent.finalDecisionRecord(), patent.businessOpinion(), true,
+                patent.jointApplication(), patent.coApplicantConsent());
     }
 
     private PatentSummaryResponse withAgentSummary(PatentSummaryResponse summary, String agentSummary) {
@@ -270,7 +303,8 @@ public class PatentWorkflowService {
                 ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED, patent.feeDueDate(),
                 patent.reviewReason(), patent.currentRecommendation(), decision,
                 patent.legalActionResult(), patent.summary(), patent.aiEvaluationReport(),
-                patent.finalDecisionRecord(), new BusinessOpinionResponse(decision, reason, submittedAt), true);
+                patent.finalDecisionRecord(), new BusinessOpinionResponse(decision, reason, submittedAt), true,
+                patent.jointApplication(), patent.coApplicantConsent());
     }
 
     private PatentDetailResponse withFinalDecision(
@@ -296,7 +330,26 @@ public class PatentWorkflowService {
                                 ? patent.patentId() + "-DEC-01"
                                 : patent.finalDecisionRecord().decisionId(),
                         request.reason(), decidedAt, actor),
-                patent.businessOpinion(), false);
+                patent.businessOpinion(), false,
+                patent.jointApplication(), patent.coApplicantConsent());
+    }
+
+    private PatentDetailResponse withCoApplicantConsent(
+            PatentDetailResponse patent, CoApplicantConsentRequest request, OffsetDateTime decidedAt, String actor
+    ) {
+        // 합의만 기록하고 상태·연차료·라이프사이클은 불변(게이트 모델).
+        return new PatentDetailResponse(
+                patent.patentId(), patent.managementNumber(), patent.applicationNumber(),
+                patent.registrationNumber(), patent.title(), patent.draftTitle(),
+                patent.businessArea(), patent.technologyArea(), patent.productName(),
+                patent.country(), patent.coApplicants(), patent.applicationDate(),
+                patent.registrationDate(), patent.expectedExpirationDate(),
+                patent.departmentId(), patent.departmentName(), patent.lifecycleStatus(),
+                patent.reviewWorkflowStatus(), patent.feeDueDate(), patent.reviewReason(),
+                patent.currentRecommendation(), patent.businessOpinionDecision(), patent.legalActionResult(),
+                patent.summary(), patent.aiEvaluationReport(), patent.finalDecisionRecord(),
+                patent.businessOpinion(), patent.inReview(), patent.jointApplication(),
+                new CoApplicantConsentResponse(request.status(), request.reason(), decidedAt, actor));
     }
 
     private PatentDetailResponse withClearedFinalDecision(PatentDetailResponse patent) {
@@ -310,7 +363,8 @@ public class PatentWorkflowService {
                 ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED, patent.feeDueDate(),
                 patent.reviewReason(), patent.currentRecommendation(), patent.businessOpinionDecision(),
                 null, patent.summary(), patent.aiEvaluationReport(),
-                new FinalDecisionRecordResponse(null, null, null, null), patent.businessOpinion(), true);
+                new FinalDecisionRecordResponse(null, null, null, null), patent.businessOpinion(), true,
+                patent.jointApplication(), patent.coApplicantConsent());
     }
 
     private PatentDetailResponse withPatchedFinalDecision(
@@ -341,7 +395,8 @@ public class PatentWorkflowService {
                                 ? patent.patentId() + "-DEC-01"
                                 : patent.finalDecisionRecord().decisionId(),
                         reason, decidedAt, actor),
-                patent.businessOpinion(), false);
+                patent.businessOpinion(), false,
+                patent.jointApplication(), patent.coApplicantConsent());
     }
 
     PatentDetailResponse withReviewWorkflowStatus(PatentDetailResponse patent, ReviewWorkflowStatus status) {
@@ -362,7 +417,8 @@ public class PatentWorkflowService {
                 patent.currentRecommendation(), patent.businessOpinionDecision(),
                 patent.legalActionResult(), patent.summary(), patent.aiEvaluationReport(),
                 patent.finalDecisionRecord(), patent.businessOpinion(),
-                status != ReviewWorkflowStatus.NOT_IN_REVIEW);
+                status != ReviewWorkflowStatus.NOT_IN_REVIEW,
+                patent.jointApplication(), patent.coApplicantConsent());
     }
 
     // ── AI 레포트 응답 매핑 ───────────────────────────────────
@@ -512,8 +568,9 @@ public class PatentWorkflowService {
 
     // ── 유틸 ─────────────────────────────────────────────────
 
-    private boolean canRecordFinalDecision(ReviewWorkflowStatus status) {
-        return status == ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED;
+    private boolean isCoApplicantAgreed(PatentDetailResponse patent) {
+        return patent.coApplicantConsent() != null
+                && patent.coApplicantConsent().status() == CoApplicantConsentStatus.AGREED;
     }
 
     private PatentLifecycleStatus lifecycleStatusByLegalAction(LegalActionResult legalActionResult) {

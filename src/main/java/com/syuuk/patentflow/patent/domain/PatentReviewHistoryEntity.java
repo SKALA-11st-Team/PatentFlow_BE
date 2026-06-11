@@ -2,6 +2,7 @@ package com.syuuk.patentflow.patent.domain;
 
 import com.syuuk.patentflow.common.domain.BaseEntity;
 import com.syuuk.patentflow.patent.dto.BusinessOpinionDecision;
+import com.syuuk.patentflow.patent.dto.CoApplicantConsentStatus;
 import com.syuuk.patentflow.patent.dto.LegalActionResult;
 import com.syuuk.patentflow.patent.dto.Recommendation;
 import com.syuuk.patentflow.patent.dto.ReviewWorkflowStatus;
@@ -152,6 +153,20 @@ public class PatentReviewHistoryEntity extends BaseEntity {
 
     @Column(name = "business_opinion_submitted_at")
     private OffsetDateTime businessOpinionSubmittedAt;
+
+    // 공동출원 합의 게이트: 공동출원 특허는 최종 판단 전 공동출원인 합의(AGREED) 필요.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "co_applicant_consent_status", length = 64)
+    private CoApplicantConsentStatus coApplicantConsentStatus;
+
+    @Column(name = "co_applicant_consent_reason", columnDefinition = "TEXT")
+    private String coApplicantConsentReason;
+
+    @Column(name = "co_applicant_consent_decided_by", length = 128)
+    private String coApplicantConsentDecidedBy;
+
+    @Column(name = "co_applicant_consent_decided_at")
+    private OffsetDateTime coApplicantConsentDecidedAt;
 
     // 사업부 체크리스트 결과 — 항목별 점수 합산
     @Column(name = "business_checklist_total")
@@ -498,6 +513,38 @@ public class PatentReviewHistoryEntity extends BaseEntity {
 
     public void setBusinessOpinionSubmittedAt(OffsetDateTime businessOpinionSubmittedAt) {
         this.businessOpinionSubmittedAt = businessOpinionSubmittedAt;
+    }
+
+    public CoApplicantConsentStatus getCoApplicantConsentStatus() {
+        return coApplicantConsentStatus;
+    }
+
+    public void setCoApplicantConsentStatus(CoApplicantConsentStatus coApplicantConsentStatus) {
+        this.coApplicantConsentStatus = coApplicantConsentStatus;
+    }
+
+    public String getCoApplicantConsentReason() {
+        return coApplicantConsentReason;
+    }
+
+    public void setCoApplicantConsentReason(String coApplicantConsentReason) {
+        this.coApplicantConsentReason = coApplicantConsentReason;
+    }
+
+    public String getCoApplicantConsentDecidedBy() {
+        return coApplicantConsentDecidedBy;
+    }
+
+    public void setCoApplicantConsentDecidedBy(String coApplicantConsentDecidedBy) {
+        this.coApplicantConsentDecidedBy = coApplicantConsentDecidedBy;
+    }
+
+    public OffsetDateTime getCoApplicantConsentDecidedAt() {
+        return coApplicantConsentDecidedAt;
+    }
+
+    public void setCoApplicantConsentDecidedAt(OffsetDateTime coApplicantConsentDecidedAt) {
+        this.coApplicantConsentDecidedAt = coApplicantConsentDecidedAt;
     }
 
     public Integer getBusinessChecklistTotal() {

@@ -14,7 +14,12 @@ import com.syuuk.patentflow.auth.dto.UserPrincipalResponse;
 import com.syuuk.patentflow.patent.client.AiReportAgentClient;
 import com.syuuk.patentflow.patent.client.AiReportAgentClient.AgentEvaluateResponse;
 import com.syuuk.patentflow.patent.client.AiReportAgentClient.AgentScoreItem;
+import com.syuuk.patentflow.patent.domain.PatentMetadataEntity;
+import com.syuuk.patentflow.patent.domain.PatentReviewHistoryEntity;
 import com.syuuk.patentflow.patent.dto.EvaluationCategory;
+import com.syuuk.patentflow.patent.dto.ReviewWorkflowStatus;
+import com.syuuk.patentflow.patent.repository.PatentMetadataRepository;
+import com.syuuk.patentflow.patent.repository.PatentReviewHistoryRepository;
 import java.time.OffsetDateTime;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -41,6 +46,12 @@ class PatentControllerTest {
 
     @MockitoBean
     private AiReportAgentClient aiReportAgentClient;
+
+    @Autowired
+    private PatentMetadataRepository patentMetadataRepository;
+
+    @Autowired
+    private PatentReviewHistoryRepository reviewHistoryRepository;
 
     private RequestPostProcessor businessAuth(String departmentId, String departmentName) {
         UserPrincipalResponse principal = new UserPrincipalResponse(
@@ -165,6 +176,13 @@ class PatentControllerTest {
 
     @Test
     void recordFinalDecisionPersistsDecisionAndLegalAction() throws Exception {
+        // PAT-2026-0005는 공동출원 특허라 최종 판단 전 공동출원인 합의(AGREED)가 선행돼야 한다.
+        mockMvc.perform(post("/api/v1/patents/PAT-2026-0005/co-applicant-consent")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"status":"AGREED","reason":"공동출원인 합의 완료"}"""))
+                .andExpect(status().isOk());
+
         mockMvc.perform(post("/api/v1/patents/PAT-2026-0005/final-decision")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -310,6 +328,80 @@ class PatentControllerTest {
                 .getContentAsString();
         List<String> businessAreas = JsonPath.read(filtered, "$.data[*].businessArea");
         org.assertj.core.api.Assertions.assertThat(businessAreas).isNotEmpty().containsOnly(firstBusinessArea);
+    }
+
+    private static final String MAINTAIN_BODY = """
+            {"legalActionResult":"MAINTAINED","reason":"유지 검토"}""";
+
+    private void forceWorkflowStatus(String patentId, ReviewWorkflowStatus status) {
+        PatentReviewHistoryEntity history =
+                reviewHistoryRepository.findByPatentIdOrderByCreatedAtDesc(patentId).get(0);
+        history.setReviewWorkflowStatus(status);
+        reviewHistoryRepository.save(history);
+    }
+
+    private String firstPatentId(boolean joint) {
+        return patentMetadataRepository.findAll(org.springframework.data.domain.Sort.by("patentId")).stream()
+                .filter(entity -> joint == "Y".equalsIgnoreCase(entity.getJointApplication()))
+                .map(PatentMetadataEntity::getPatentId)
+                .findFirst()
+                .orElseThrow();
+    }
+
+    @Test
+    void coApplicantPatentBlocksFinalDecisionUntilConsentAgreed() throws Exception {
+        String patentId = firstPatentId(true);
+        forceWorkflowStatus(patentId, ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED);
+
+        mockMvc.perform(get("/api/v1/patents/{id}", patentId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.jointApplication").value(true));
+
+        // 1. 합의 없이 최종 판단 → 차단(409)
+        mockMvc.perform(post("/api/v1/patents/{id}/final-decision", patentId)
+                .with(adminAuth()).contentType(MediaType.APPLICATION_JSON).content(MAINTAIN_BODY))
+                .andExpect(status().isConflict());
+
+        // 2. 공동출원인 합의 기록(AGREED)
+        mockMvc.perform(post("/api/v1/patents/{id}/co-applicant-consent", patentId)
+                .with(adminAuth()).contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"status":"AGREED","reason":"연차료 분담 합의 완료"}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.jointApplication").value(true))
+                .andExpect(jsonPath("$.data.coApplicantConsent.status").value("AGREED"));
+
+        // 3. 합의 후 최종 판단 성공
+        mockMvc.perform(post("/api/v1/patents/{id}/final-decision", patentId)
+                .with(adminAuth()).contentType(MediaType.APPLICATION_JSON).content(MAINTAIN_BODY))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void coApplicantDisagreeStillBlocksFinalDecision() throws Exception {
+        String patentId = firstPatentId(true);
+        forceWorkflowStatus(patentId, ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED);
+
+        mockMvc.perform(post("/api/v1/patents/{id}/co-applicant-consent", patentId)
+                .with(adminAuth()).contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"status":"DISAGREED","reason":"공동출원인 반대"}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.coApplicantConsent.status").value("DISAGREED"));
+
+        mockMvc.perform(post("/api/v1/patents/{id}/final-decision", patentId)
+                .with(adminAuth()).contentType(MediaType.APPLICATION_JSON).content(MAINTAIN_BODY))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void nonJointPatentFinalDecisionSkipsConsentGate() throws Exception {
+        String patentId = firstPatentId(false);
+        forceWorkflowStatus(patentId, ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED);
+
+        mockMvc.perform(post("/api/v1/patents/{id}/final-decision", patentId)
+                .with(adminAuth()).contentType(MediaType.APPLICATION_JSON).content(MAINTAIN_BODY))
+                .andExpect(status().isOk());
     }
 
     @Test

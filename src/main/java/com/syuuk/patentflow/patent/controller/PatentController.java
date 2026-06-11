@@ -7,6 +7,7 @@ import com.syuuk.patentflow.patent.dto.AssignDepartmentRequest;
 import com.syuuk.patentflow.patent.dto.AiEvaluationReportResponse;
 import com.syuuk.patentflow.patent.dto.AiReportEditRequest;
 import com.syuuk.patentflow.patent.dto.AiReportJobResponse;
+import com.syuuk.patentflow.patent.dto.CoApplicantConsentRequest;
 import com.syuuk.patentflow.patent.dto.FinalDecisionRequest;
 import com.syuuk.patentflow.patent.dto.FinalDecisionResponse;
 import com.syuuk.patentflow.patent.dto.PatchFinalDecisionRequest;
@@ -199,6 +200,20 @@ public class PatentController {
             Authentication authentication
     ) {
         return ApiResponse.ok(patentReviewService.recordFinalDecision(patentId, request, currentActor(authentication)));
+    }
+
+    /**
+     * @relatedFR FR-LEGAL-09, FR-LEGAL-10
+     * @relatedUI UI-LEGAL-04
+     * @description 공동출원 특허의 공동출원인 합의를 기록하는 API. 연차료 유지/포기 최종 판단의 전제 게이트.
+     */
+    @PostMapping("/{patentId}/co-applicant-consent")
+    public ApiResponse<PatentDetailResponse> recordCoApplicantConsent(
+            @PathVariable String patentId,
+            @Valid @RequestBody CoApplicantConsentRequest request,
+            Authentication authentication
+    ) {
+        return ApiResponse.ok(patentReviewService.recordCoApplicantConsent(patentId, request, currentActor(authentication)));
     }
 
     /**

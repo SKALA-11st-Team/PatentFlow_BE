@@ -58,7 +58,7 @@ class AiReportEditServiceTest {
         PatentDetailResponse detail = new PatentDetailResponse(
                 "PAT-001", null, null, null, null, null, null, null, null, null, null, null, null, null,
                 null, null, null, null, null, null, Recommendation.HOLD, null, null, null,
-                originalReport(), null, null, true);
+                originalReport(), null, null, true, false, null);
         when(patentReviewService.getPatentDetail("PAT-001")).thenReturn(detail);
     }
 

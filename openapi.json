@@ -1026,6 +1026,46 @@
         }
       }
     },
+    "/api/v1/patents/{patentId}/co-applicant-consent" : {
+      "post" : {
+        "tags" : [
+          "patent-controller"
+        ],
+        "operationId" : "recordCoApplicantConsent",
+        "parameters" : [
+          {
+            "name" : "patentId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CoApplicantConsentRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePatentDetailResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/patents/{patentId}/business-submissions" : {
       "get" : {
         "tags" : [
@@ -3613,6 +3653,391 @@
           }
         }
       },
+      "CoApplicantConsentRequest" : {
+        "type" : "object",
+        "properties" : {
+          "status" : {
+            "type" : "string",
+            "enum" : [
+              "PENDING",
+              "AGREED",
+              "DISAGREED"
+            ]
+          },
+          "reason" : {
+            "type" : "string",
+            "minLength" : 1
+          }
+        },
+        "required" : [
+          "reason",
+          "status"
+        ]
+      },
+      "AiEvaluationReportResponse" : {
+        "type" : "object",
+        "properties" : {
+          "reportId" : {
+            "type" : "string"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "recommendation" : {
+            "type" : "string",
+            "enum" : [
+              "MAINTAIN",
+              "REVIEW_AGAIN",
+              "ABANDON",
+              "HOLD"
+            ]
+          },
+          "recommendationReason" : {
+            "type" : "string"
+          },
+          "totalScore" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "averageScore" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "finalGrade" : {
+            "type" : "string"
+          },
+          "finalIndicator" : {
+            "type" : "string"
+          },
+          "degraded" : {
+            "type" : "boolean"
+          },
+          "failureReason" : {
+            "type" : "string"
+          },
+          "scores" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/EvaluationScoreResponse"
+            }
+          },
+          "missingInformation" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "rawMarkdown" : {
+            "type" : "string"
+          },
+          "markdownFilePath" : {
+            "type" : "string"
+          },
+          "keyEvidence" : {
+            "type" : "string"
+          },
+          "judgementGrounds" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "businessCheckRequests" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "externalSources" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/SourceResponse"
+            }
+          },
+          "edited" : {
+            "type" : "boolean"
+          },
+          "editedBy" : {
+            "type" : "string"
+          },
+          "editedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "editVersion" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "editStale" : {
+            "type" : "boolean"
+          },
+          "appliedCriteria" : {
+            "type" : "object",
+            "additionalProperties" : { }
+          }
+        }
+      },
+      "ApiResponsePatentDetailResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/PatentDetailResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "BusinessOpinionResponse" : {
+        "type" : "object",
+        "properties" : {
+          "decision" : {
+            "type" : "string",
+            "enum" : [
+              "MAINTAIN",
+              "ABANDON"
+            ]
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "submittedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "CoApplicantConsentResponse" : {
+        "type" : "object",
+        "properties" : {
+          "status" : {
+            "type" : "string",
+            "enum" : [
+              "PENDING",
+              "AGREED",
+              "DISAGREED"
+            ]
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "decidedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "decidedBy" : {
+            "type" : "string"
+          }
+        }
+      },
+      "EvaluationScoreResponse" : {
+        "type" : "object",
+        "properties" : {
+          "category" : {
+            "type" : "string",
+            "enum" : [
+              "RIGHTS",
+              "TECHNOLOGY",
+              "MARKET",
+              "BUSINESS_ALIGNMENT"
+            ]
+          },
+          "score" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "grade" : {
+            "type" : "string"
+          },
+          "evidence" : {
+            "type" : "string"
+          },
+          "evidenceDetails" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/EvidenceDetailResponse"
+            }
+          }
+        }
+      },
+      "EvidenceDetailResponse" : {
+        "type" : "object",
+        "properties" : {
+          "text" : {
+            "type" : "string"
+          },
+          "source" : {
+            "$ref" : "#/components/schemas/SourceResponse"
+          }
+        }
+      },
+      "PatentDetailResponse" : {
+        "type" : "object",
+        "properties" : {
+          "patentId" : {
+            "type" : "string"
+          },
+          "managementNumber" : {
+            "type" : "string"
+          },
+          "applicationNumber" : {
+            "type" : "string"
+          },
+          "registrationNumber" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "draftTitle" : {
+            "type" : "string"
+          },
+          "businessArea" : {
+            "type" : "string"
+          },
+          "technologyArea" : {
+            "type" : "string"
+          },
+          "productName" : {
+            "type" : "string"
+          },
+          "country" : {
+            "type" : "string"
+          },
+          "coApplicants" : {
+            "type" : "string"
+          },
+          "applicationDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "registrationDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "expectedExpirationDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "departmentId" : {
+            "type" : "string"
+          },
+          "departmentName" : {
+            "type" : "string"
+          },
+          "lifecycleStatus" : {
+            "type" : "string",
+            "enum" : [
+              "ACTIVE",
+              "ABANDONED",
+              "EXPIRED"
+            ]
+          },
+          "reviewWorkflowStatus" : {
+            "type" : "string",
+            "enum" : [
+              "NOT_IN_REVIEW",
+              "REVIEW_QUARTER_STARTED",
+              "MAIL_READY",
+              "WAITING_BUSINESS_RESPONSE",
+              "BUSINESS_RESPONSE_RECEIVED"
+            ]
+          },
+          "feeDueDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "reviewReason" : {
+            "type" : "string"
+          },
+          "currentRecommendation" : {
+            "type" : "string",
+            "enum" : [
+              "MAINTAIN",
+              "REVIEW_AGAIN",
+              "ABANDON",
+              "HOLD"
+            ]
+          },
+          "businessOpinionDecision" : {
+            "type" : "string",
+            "enum" : [
+              "MAINTAIN",
+              "ABANDON"
+            ]
+          },
+          "legalActionResult" : {
+            "type" : "string",
+            "enum" : [
+              "MAINTAINED",
+              "ABANDONED"
+            ]
+          },
+          "summary" : {
+            "$ref" : "#/components/schemas/PatentSummaryResponse"
+          },
+          "aiEvaluationReport" : {
+            "$ref" : "#/components/schemas/AiEvaluationReportResponse"
+          },
+          "finalDecisionRecord" : {
+            "$ref" : "#/components/schemas/FinalDecisionRecordResponse"
+          },
+          "businessOpinion" : {
+            "$ref" : "#/components/schemas/BusinessOpinionResponse"
+          },
+          "inReview" : {
+            "type" : "boolean"
+          },
+          "jointApplication" : {
+            "type" : "boolean"
+          },
+          "coApplicantConsent" : {
+            "$ref" : "#/components/schemas/CoApplicantConsentResponse"
+          }
+        }
+      },
+      "PatentSummaryResponse" : {
+        "type" : "object",
+        "properties" : {
+          "summaryText" : {
+            "type" : "string"
+          },
+          "problemSolved" : {
+            "type" : "string"
+          },
+          "coreTechnicalPoints" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "claimsSummary" : {
+            "type" : "string"
+          },
+          "missingFields" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }
+      },
+      "SourceResponse" : {
+        "type" : "object",
+        "properties" : {
+          "title" : {
+            "type" : "string"
+          },
+          "url" : {
+            "type" : "string"
+          }
+        }
+      },
       "BusinessChecklistResponseDto" : {
         "type" : "object",
         "properties" : {
@@ -4243,341 +4668,6 @@
         "required" : [
           "departmentId"
         ]
-      },
-      "AiEvaluationReportResponse" : {
-        "type" : "object",
-        "properties" : {
-          "reportId" : {
-            "type" : "string"
-          },
-          "createdAt" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "recommendation" : {
-            "type" : "string",
-            "enum" : [
-              "MAINTAIN",
-              "REVIEW_AGAIN",
-              "ABANDON",
-              "HOLD"
-            ]
-          },
-          "recommendationReason" : {
-            "type" : "string"
-          },
-          "totalScore" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "averageScore" : {
-            "type" : "number",
-            "format" : "double"
-          },
-          "finalGrade" : {
-            "type" : "string"
-          },
-          "finalIndicator" : {
-            "type" : "string"
-          },
-          "degraded" : {
-            "type" : "boolean"
-          },
-          "failureReason" : {
-            "type" : "string"
-          },
-          "scores" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/EvaluationScoreResponse"
-            }
-          },
-          "missingInformation" : {
-            "type" : "array",
-            "items" : {
-              "type" : "string"
-            }
-          },
-          "rawMarkdown" : {
-            "type" : "string"
-          },
-          "markdownFilePath" : {
-            "type" : "string"
-          },
-          "keyEvidence" : {
-            "type" : "string"
-          },
-          "judgementGrounds" : {
-            "type" : "array",
-            "items" : {
-              "type" : "string"
-            }
-          },
-          "businessCheckRequests" : {
-            "type" : "array",
-            "items" : {
-              "type" : "string"
-            }
-          },
-          "externalSources" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/SourceResponse"
-            }
-          },
-          "edited" : {
-            "type" : "boolean"
-          },
-          "editedBy" : {
-            "type" : "string"
-          },
-          "editedAt" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "editVersion" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "editStale" : {
-            "type" : "boolean"
-          },
-          "appliedCriteria" : {
-            "type" : "object",
-            "additionalProperties" : { }
-          }
-        }
-      },
-      "ApiResponsePatentDetailResponse" : {
-        "type" : "object",
-        "properties" : {
-          "data" : {
-            "$ref" : "#/components/schemas/PatentDetailResponse"
-          },
-          "message" : {
-            "type" : "string"
-          },
-          "timestamp" : {
-            "type" : "string",
-            "format" : "date-time"
-          }
-        }
-      },
-      "BusinessOpinionResponse" : {
-        "type" : "object",
-        "properties" : {
-          "decision" : {
-            "type" : "string",
-            "enum" : [
-              "MAINTAIN",
-              "ABANDON"
-            ]
-          },
-          "reason" : {
-            "type" : "string"
-          },
-          "submittedAt" : {
-            "type" : "string",
-            "format" : "date-time"
-          }
-        }
-      },
-      "EvaluationScoreResponse" : {
-        "type" : "object",
-        "properties" : {
-          "category" : {
-            "type" : "string",
-            "enum" : [
-              "RIGHTS",
-              "TECHNOLOGY",
-              "MARKET",
-              "BUSINESS_ALIGNMENT"
-            ]
-          },
-          "score" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "grade" : {
-            "type" : "string"
-          },
-          "evidence" : {
-            "type" : "string"
-          },
-          "evidenceDetails" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/EvidenceDetailResponse"
-            }
-          }
-        }
-      },
-      "EvidenceDetailResponse" : {
-        "type" : "object",
-        "properties" : {
-          "text" : {
-            "type" : "string"
-          },
-          "source" : {
-            "$ref" : "#/components/schemas/SourceResponse"
-          }
-        }
-      },
-      "PatentDetailResponse" : {
-        "type" : "object",
-        "properties" : {
-          "patentId" : {
-            "type" : "string"
-          },
-          "managementNumber" : {
-            "type" : "string"
-          },
-          "applicationNumber" : {
-            "type" : "string"
-          },
-          "registrationNumber" : {
-            "type" : "string"
-          },
-          "title" : {
-            "type" : "string"
-          },
-          "draftTitle" : {
-            "type" : "string"
-          },
-          "businessArea" : {
-            "type" : "string"
-          },
-          "technologyArea" : {
-            "type" : "string"
-          },
-          "productName" : {
-            "type" : "string"
-          },
-          "country" : {
-            "type" : "string"
-          },
-          "coApplicants" : {
-            "type" : "string"
-          },
-          "applicationDate" : {
-            "type" : "string",
-            "format" : "date"
-          },
-          "registrationDate" : {
-            "type" : "string",
-            "format" : "date"
-          },
-          "expectedExpirationDate" : {
-            "type" : "string",
-            "format" : "date"
-          },
-          "departmentId" : {
-            "type" : "string"
-          },
-          "departmentName" : {
-            "type" : "string"
-          },
-          "lifecycleStatus" : {
-            "type" : "string",
-            "enum" : [
-              "ACTIVE",
-              "ABANDONED",
-              "EXPIRED"
-            ]
-          },
-          "reviewWorkflowStatus" : {
-            "type" : "string",
-            "enum" : [
-              "NOT_IN_REVIEW",
-              "REVIEW_QUARTER_STARTED",
-              "MAIL_READY",
-              "WAITING_BUSINESS_RESPONSE",
-              "BUSINESS_RESPONSE_RECEIVED"
-            ]
-          },
-          "feeDueDate" : {
-            "type" : "string",
-            "format" : "date"
-          },
-          "reviewReason" : {
-            "type" : "string"
-          },
-          "currentRecommendation" : {
-            "type" : "string",
-            "enum" : [
-              "MAINTAIN",
-              "REVIEW_AGAIN",
-              "ABANDON",
-              "HOLD"
-            ]
-          },
-          "businessOpinionDecision" : {
-            "type" : "string",
-            "enum" : [
-              "MAINTAIN",
-              "ABANDON"
-            ]
-          },
-          "legalActionResult" : {
-            "type" : "string",
-            "enum" : [
-              "MAINTAINED",
-              "ABANDONED"
-            ]
-          },
-          "summary" : {
-            "$ref" : "#/components/schemas/PatentSummaryResponse"
-          },
-          "aiEvaluationReport" : {
-            "$ref" : "#/components/schemas/AiEvaluationReportResponse"
-          },
-          "finalDecisionRecord" : {
-            "$ref" : "#/components/schemas/FinalDecisionRecordResponse"
-          },
-          "businessOpinion" : {
-            "$ref" : "#/components/schemas/BusinessOpinionResponse"
-          },
-          "inReview" : {
-            "type" : "boolean"
-          }
-        }
-      },
-      "PatentSummaryResponse" : {
-        "type" : "object",
-        "properties" : {
-          "summaryText" : {
-            "type" : "string"
-          },
-          "problemSolved" : {
-            "type" : "string"
-          },
-          "coreTechnicalPoints" : {
-            "type" : "array",
-            "items" : {
-              "type" : "string"
-            }
-          },
-          "claimsSummary" : {
-            "type" : "string"
-          },
-          "missingFields" : {
-            "type" : "array",
-            "items" : {
-              "type" : "string"
-            }
-          }
-        }
-      },
-      "SourceResponse" : {
-        "type" : "object",
-        "properties" : {
-          "title" : {
-            "type" : "string"
-          },
-          "url" : {
-            "type" : "string"
-          }
-        }
       },
       "AiReportEditRequest" : {
         "type" : "object",

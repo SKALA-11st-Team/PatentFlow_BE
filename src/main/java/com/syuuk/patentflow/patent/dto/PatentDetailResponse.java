@@ -30,6 +30,9 @@ public record PatentDetailResponse(
         AiEvaluationReportResponse aiEvaluationReport,
         FinalDecisionRecordResponse finalDecisionRecord,
         BusinessOpinionResponse businessOpinion,
-        boolean inReview  // 현재 분기 검토 대상 여부 (patents.is_in_review 반영)
+        boolean inReview,  // 현재 분기 검토 대상 여부 (patents.is_in_review 반영)
+        // 공동출원 합의 게이트: jointApplication=true 이면 최종 판단 전 coApplicantConsent(AGREED)가 필요.
+        boolean jointApplication,
+        CoApplicantConsentResponse coApplicantConsent  // 합의 미기록 시 null
 ) {
 }

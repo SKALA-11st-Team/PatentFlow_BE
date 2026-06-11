@@ -13,6 +13,8 @@ import com.syuuk.patentflow.patent.dto.AiReportOverrides;
 import com.syuuk.patentflow.patent.dto.SourceResponse;
 import com.syuuk.patentflow.patent.dto.BusinessOpinionDecision;
 import com.syuuk.patentflow.patent.dto.BusinessOpinionResponse;
+import com.syuuk.patentflow.patent.dto.CoApplicantConsentRequest;
+import com.syuuk.patentflow.patent.dto.CoApplicantConsentResponse;
 import com.syuuk.patentflow.patent.dto.EvaluationCategory;
 import com.syuuk.patentflow.patent.dto.EvaluationScoreResponse;
 import com.syuuk.patentflow.patent.dto.FinalDecisionRequest;
@@ -529,6 +531,16 @@ public class PatentReviewService {
                     history.getBusinessOpinionSubmittedAt() != null ? history.getBusinessOpinionSubmittedAt() : createdAt));
         }
 
+        if (history.getCoApplicantConsentStatus() != null) {
+            responses.add(new PatentHistoryResponse(
+                    history.getId() + "-COAPPLICANT",
+                    "CO_APPLICANT_CONSENT_RECORDED",
+                    "공동출원인 합의 기록",
+                    "공동출원인 합의가 %s(으)로 기록되었습니다.".formatted(history.getCoApplicantConsentStatus().name()),
+                    valueOrDefault(history.getCoApplicantConsentDecidedBy(), "관리자"),
+                    history.getCoApplicantConsentDecidedAt() != null ? history.getCoApplicantConsentDecidedAt() : createdAt));
+        }
+
         if (history.getLegalActionResult() != null || history.getFinalDecisionDecidedAt() != null) {
             // REVIEW-07: 행위자를 '관리자' 하드코딩 대신 저장된 결정자(decidedBy)로 표기, 미상이면 폴백.
             String finalActor = valueOrDefault(history.getFinalDecisionDecidedBy(), "관리자");
@@ -692,6 +704,11 @@ public class PatentReviewService {
 
     public FinalDecisionResponse recordFinalDecision(String patentId, FinalDecisionRequest request, String actor) {
         return workflowService.recordFinalDecision(patentId, request, actor);
+    }
+
+    public PatentDetailResponse recordCoApplicantConsent(
+            String patentId, CoApplicantConsentRequest request, String actor) {
+        return workflowService.recordCoApplicantConsent(patentId, request, actor);
     }
 
     PatentDetailResponse findPatent(String patentId) {
@@ -927,7 +944,8 @@ public class PatentReviewService {
                 aiEvaluationReport(Recommendation.HOLD),
                 new FinalDecisionRecordResponse(null, null, null, null),
                 new BusinessOpinionResponse(null, null, null),
-                entity.isInReview());
+                entity.isInReview(),
+                isJointApplication(entity.getJointApplication()), null);
         return applyPersistedState(basePatent, latestOrNull);
     }
 
@@ -962,7 +980,8 @@ public class PatentReviewService {
                 aiEvaluationReport(Recommendation.HOLD),
                 new FinalDecisionRecordResponse(null, null, null, null),
                 new BusinessOpinionResponse(null, null, null),
-                false);
+                false,
+                false, null);
     }
 
     private PatentMetadataEntity metadataEntityFromRequest(String patentId, PatentUpsertRequest request) {
@@ -1017,7 +1036,8 @@ public class PatentReviewService {
                 patent.aiEvaluationReport(),
                 patent.finalDecisionRecord(),
                 patent.businessOpinion(),
-                patent.inReview());
+                patent.inReview(),
+                patent.jointApplication(), patent.coApplicantConsent());
     }
 
     private PatentDetailResponse withDepartment(PatentDetailResponse patent, String departmentId, String departmentName) {
@@ -1049,7 +1069,8 @@ public class PatentReviewService {
                 patent.aiEvaluationReport(),
                 patent.finalDecisionRecord(),
                 patent.businessOpinion(),
-                patent.inReview());
+                patent.inReview(),
+                patent.jointApplication(), patent.coApplicantConsent());
     }
 
     private PatentSummaryResponse summaryFromMetadata(String title, String technologyArea, String productName) {
@@ -1076,6 +1097,22 @@ public class PatentReviewService {
             return "정보 부족 있음";
         }
         return "없음";
+    }
+
+    private boolean isJointApplication(String jointApplication) {
+        return "Y".equalsIgnoreCase(jointApplication);
+    }
+
+    /** 이력 행의 공동출원인 합의 필드를 응답으로 변환. 합의 미기록(status null)이면 null. */
+    private CoApplicantConsentResponse coApplicantConsentFromHistory(PatentReviewHistoryEntity state) {
+        if (state.getCoApplicantConsentStatus() == null) {
+            return null;
+        }
+        return new CoApplicantConsentResponse(
+                state.getCoApplicantConsentStatus(),
+                state.getCoApplicantConsentReason(),
+                state.getCoApplicantConsentDecidedAt(),
+                state.getCoApplicantConsentDecidedBy());
     }
 
     String departmentId(String businessArea) {
@@ -1349,7 +1386,8 @@ public class PatentReviewService {
                         state.getBusinessOpinionDecision(),
                         state.getBusinessOpinionReason(),
                         state.getBusinessOpinionSubmittedAt()),
-                patent.inReview());
+                patent.inReview(),
+                patent.jointApplication(), coApplicantConsentFromHistory(state));
     }
 
     private AiEvaluationReportResponse aiReportFromHistory(
@@ -1565,6 +1603,11 @@ public class PatentReviewService {
         state.setBusinessOpinionDecision(patent.businessOpinionDecision());
         state.setBusinessOpinionReason(patent.businessOpinion().reason());
         state.setBusinessOpinionSubmittedAt(patent.businessOpinion().submittedAt());
+        CoApplicantConsentResponse consent = patent.coApplicantConsent();
+        state.setCoApplicantConsentStatus(consent == null ? null : consent.status());
+        state.setCoApplicantConsentReason(consent == null ? null : consent.reason());
+        state.setCoApplicantConsentDecidedBy(consent == null ? null : consent.decidedBy());
+        state.setCoApplicantConsentDecidedAt(consent == null ? null : consent.decidedAt());
         state.setLegalActionResult(patent.legalActionResult());
         state.setFinalDecisionId(patent.finalDecisionRecord().decisionId());
         state.setFinalDecisionReason(patent.finalDecisionRecord().reason());
