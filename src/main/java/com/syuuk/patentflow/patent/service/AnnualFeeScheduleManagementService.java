@@ -140,6 +140,7 @@ public class AnnualFeeScheduleManagementService {
 
     private AnnualFeeScheduleItemResponse toResponse(PatentMetadataEntity patent, List<AnnualFeeAdjustmentHistoryResponse> history) {
         AnnualFeeAdjustmentHistoryResponse latestAdjustment = history.isEmpty() ? null : history.get(0);
+        CountryAnnualFeeRule rule = annualFeeScheduleService.ruleFor(patent.getCountry());
         LocalDate baseDate = annualFeeScheduleService.annualFeeBaseDate(
                 patent.getCountry(), patent.getApplicationDate(), patent.getRegistrationDate());
         LocalDate calculatedDueDate = annualFeeScheduleService.calculateNextDueDate(
@@ -170,8 +171,10 @@ public class AnnualFeeScheduleManagementService {
                 latestAdjustment == null ? null : latestAdjustment.adjustedDueDate(),
                 latestAdjustment == null ? null : latestAdjustment.reason(),
                 annualFeeScheduleService.getCountryExtensionMonths(patent.getCountry()),
-                annualFeeScheduleService.annualFeeBasis(patent.getCountry()),
-                annualFeeScheduleService.paymentRuleLabel(patent.getCountry()),
+                rule.basis(),
+                rule.label(),
+                rule.initialLumpYears(),
+                annualFeeScheduleService.annuityYearNumber(baseDate, effectiveDueDate),
                 history);
     }
 

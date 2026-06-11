@@ -91,8 +91,10 @@ class AnnualFeeScheduleControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.patentId").value("PAT-2026-0001"))
-                .andExpect(jsonPath("$.data.annualFeeBaseDate").value("2024-08-28"))
-                .andExpect(jsonPath("$.data.calculatedAnnualFeeDueDate").value("2026-08-28"))
+                // FEE-06: KR은 등록일 기준 — 기산일은 등록일(2026-02-25), 1~3년차 일괄 납부로
+                // 계산 도래일은 4년차 납부일(등록일+3년)이다.
+                .andExpect(jsonPath("$.data.annualFeeBaseDate").value("2026-02-25"))
+                .andExpect(jsonPath("$.data.calculatedAnnualFeeDueDate").value("2029-02-25"))
                 .andExpect(jsonPath("$.data.storedAnnualFeeDueDate").value("2026-08-15"))
                 .andExpect(jsonPath("$.data.effectiveAnnualFeeDueDate").value("2026-08-15"))
                 .andExpect(jsonPath("$.data.nextAnnualFeeDueDate").value("2026-08-15"))

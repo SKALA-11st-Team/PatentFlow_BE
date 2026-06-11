@@ -5037,6 +5037,14 @@
           "paymentRuleLabel" : {
             "type" : "string"
           },
+          "initialLumpYears" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "nextDueYearNumber" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
           "adjustmentHistory" : {
             "type" : "array",
             "items" : {

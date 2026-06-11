@@ -277,7 +277,10 @@ class PatentControllerTest {
         List<String> countries = JsonPath.read(response, "$.data[*].country");
         List<String> managementNumbers = JsonPath.read(response, "$.data[*].managementNumber");
         org.assertj.core.api.Assertions.assertThat(countries).containsOnly("KR");
-        org.assertj.core.api.Assertions.assertThat(managementNumbers).contains("P202405001-KR0");
+        org.assertj.core.api.Assertions.assertThat(managementNumbers).contains("P201508001-KR0");
+        // FEE-06: 2026-02-25 등록 특허는 1~3년차 일괄 납부 구간이라 다음 도래일이 2029년 —
+        // 2026년 8월 검토 대상에 포함되지 않아야 한다.
+        org.assertj.core.api.Assertions.assertThat(managementNumbers).doesNotContain("P202405001-KR0");
     }
 
     @Test
