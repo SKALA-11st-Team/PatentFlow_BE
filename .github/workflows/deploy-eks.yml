@@ -6,21 +6,13 @@ on:
       - main
   workflow_dispatch:
 
+# 주의: SPRING_*/PATENTFLOW_* 앱 설정 env는 워크플로 전역이 아니라 deploy job에만 둔다.
+# 전역에 두면 test job의 `mvn test`가 상속하고, Spring relaxed binding에서 OS 환경변수가
+# src/test/resources의 H2 설정보다 우선해 러너에서 접근 불가능한 k8s 서비스 호스트로
+# 접속을 시도하다 ApplicationContext 로드가 실패한다(CI에서 실증된 결함).
 env:
   IMAGE_NAME: team11-patentflow-be
   KUBE_NAMESPACE: ${{ vars.KUBE_NAMESPACE || 'patentflow' }}
-  SPRING_PROFILES_ACTIVE: ${{ vars.SPRING_PROFILES_ACTIVE || 'demo' }}
-  SPRING_DATASOURCE_URL: ${{ vars.SPRING_DATASOURCE_URL || 'jdbc:postgresql://team11-patentflow-postgres-svc:5432/patentflow?currentSchema=patentflow' }}
-  SPRING_DATASOURCE_USERNAME: ${{ vars.SPRING_DATASOURCE_USERNAME || 'patentflow' }}
-  PATENTFLOW_DB_SCHEMA: ${{ vars.PATENTFLOW_DB_SCHEMA || 'patentflow' }}
-  PATENTFLOW_CORS_ALLOWED_ORIGINS: ${{ vars.PATENTFLOW_CORS_ALLOWED_ORIGINS || 'https://patentflow.live' }}
-  PATENTFLOW_AGENT_URL: ${{ vars.PATENTFLOW_AGENT_URL || 'http://team11-patentflow-agent-svc:8000' }}
-  PATENTFLOW_AI_REPORT_STORAGE_DIR: /app/storage/ai-reports
-  PATENTFLOW_COOKIE_SECURE: "true"
-  PATENTFLOW_COOKIE_SAME_SITE: None
-  # FE(patentflow.live)와 BE(api.patentflow.live)가 서브도메인이 달라, SPA가 XSRF-TOKEN 쿠키를 읽을 수 있도록 상위 도메인 지정
-  # 주의: 맨 앞 점(.) 금지 — Tomcat RFC6265 검증이 ".patentflow.live"를 거부함. 점 없이도 서브도메인 커버.
-  PATENTFLOW_COOKIE_DOMAIN: ${{ vars.PATENTFLOW_COOKIE_DOMAIN || 'patentflow.live' }}
   BE_INGRESS_HOST: ${{ vars.BE_INGRESS_HOST || 'api.patentflow.example.com' }}
   BE_ACM_CERTIFICATE_ARN: ${{ vars.BE_ACM_CERTIFICATE_ARN || '' }}
   AWS_REGION: ${{ vars.AWS_REGION || 'ap-northeast-2' }}
@@ -53,6 +45,19 @@ jobs:
     needs: test
     permissions:
       contents: read
+    env:
+      SPRING_PROFILES_ACTIVE: ${{ vars.SPRING_PROFILES_ACTIVE || 'demo' }}
+      SPRING_DATASOURCE_URL: ${{ vars.SPRING_DATASOURCE_URL || 'jdbc:postgresql://team11-patentflow-postgres-svc:5432/patentflow?currentSchema=patentflow' }}
+      SPRING_DATASOURCE_USERNAME: ${{ vars.SPRING_DATASOURCE_USERNAME || 'patentflow' }}
+      PATENTFLOW_DB_SCHEMA: ${{ vars.PATENTFLOW_DB_SCHEMA || 'patentflow' }}
+      PATENTFLOW_CORS_ALLOWED_ORIGINS: ${{ vars.PATENTFLOW_CORS_ALLOWED_ORIGINS || 'https://patentflow.live' }}
+      PATENTFLOW_AGENT_URL: ${{ vars.PATENTFLOW_AGENT_URL || 'http://team11-patentflow-agent-svc:8000' }}
+      PATENTFLOW_AI_REPORT_STORAGE_DIR: /app/storage/ai-reports
+      PATENTFLOW_COOKIE_SECURE: "true"
+      PATENTFLOW_COOKIE_SAME_SITE: None
+      # FE(patentflow.live)와 BE(api.patentflow.live)가 서브도메인이 달라, SPA가 XSRF-TOKEN 쿠키를 읽을 수 있도록 상위 도메인 지정
+      # 주의: 맨 앞 점(.) 금지 — Tomcat RFC6265 검증이 ".patentflow.live"를 거부함. 점 없이도 서브도메인 커버.
+      PATENTFLOW_COOKIE_DOMAIN: ${{ vars.PATENTFLOW_COOKIE_DOMAIN || 'patentflow.live' }}
 
     steps:
       - name: Checkout
