@@ -2,12 +2,15 @@ package com.syuuk.patentflow.patent.service;
 
 import com.syuuk.patentflow.common.error.ErrorCode;
 import com.syuuk.patentflow.common.error.PatentFlowException;
+import com.syuuk.patentflow.common.service.SystemSettingsService;
+import com.syuuk.patentflow.mailing.service.MailingService;
 import com.syuuk.patentflow.patent.domain.AnnualFeeAdjustmentEntity;
 import com.syuuk.patentflow.patent.domain.PatentMetadataEntity;
 import com.syuuk.patentflow.patent.domain.PatentReviewHistoryEntity;
 import com.syuuk.patentflow.patent.dto.AnnualFeeAdjustmentHistoryResponse;
 import com.syuuk.patentflow.patent.dto.AnnualFeeScheduleAdjustmentRequest;
 import com.syuuk.patentflow.patent.dto.AnnualFeeScheduleItemResponse;
+import com.syuuk.patentflow.patent.dto.PatentFeeScheduleResponse;
 import com.syuuk.patentflow.patent.repository.AnnualFeeAdjustmentRepository;
 import com.syuuk.patentflow.patent.repository.PatentMetadataRepository;
 import com.syuuk.patentflow.patent.repository.PatentReviewHistoryRepository;
@@ -32,17 +35,23 @@ public class AnnualFeeScheduleManagementService {
     private final AnnualFeeScheduleService annualFeeScheduleService;
     private final PatentMetadataRepository patentMetadataRepository;
     private final PatentReviewHistoryRepository reviewHistoryRepository;
+    private final SystemSettingsService systemSettingsService;
+    private final MailingService mailingService;
 
     public AnnualFeeScheduleManagementService(
             AnnualFeeAdjustmentRepository adjustmentRepository,
             AnnualFeeScheduleService annualFeeScheduleService,
             PatentMetadataRepository patentMetadataRepository,
-            PatentReviewHistoryRepository reviewHistoryRepository
+            PatentReviewHistoryRepository reviewHistoryRepository,
+            SystemSettingsService systemSettingsService,
+            MailingService mailingService
     ) {
         this.adjustmentRepository = adjustmentRepository;
         this.annualFeeScheduleService = annualFeeScheduleService;
         this.patentMetadataRepository = patentMetadataRepository;
         this.reviewHistoryRepository = reviewHistoryRepository;
+        this.systemSettingsService = systemSettingsService;
+        this.mailingService = mailingService;
     }
 
     @Transactional(readOnly = true)
@@ -118,6 +127,74 @@ public class AnnualFeeScheduleManagementService {
             }
         }
         return updated;
+    }
+
+    /**
+     * @relatedFR FR-LEGAL-24
+     * @relatedUI UI-LEGAL-04
+     * FEE-06: 특허 상세의 연차료 일정 — 국가 규칙 기반 도래일 목록과 고지(메일) 발송 예정일,
+     * 수신처(담당 부서 주 수신자/CC)를 한 번에 내려 FE의 규칙 중복 계산을 없앤다.
+     */
+    @Transactional(readOnly = true)
+    public PatentFeeScheduleResponse getPatentFeeSchedule(String patentId) {
+        PatentMetadataEntity patent = patentMetadataRepository.findById(patentId)
+                .orElseThrow(() -> new PatentFlowException(ErrorCode.PATENT_NOT_FOUND));
+        CountryAnnualFeeRule rule = annualFeeScheduleService.ruleFor(patent.getCountry());
+        LocalDate basisDate = annualFeeScheduleService.annualFeeBaseDate(
+                patent.getCountry(), patent.getApplicationDate(), patent.getRegistrationDate());
+        LocalDate calculatedDueDate = annualFeeScheduleService.calculateNextDueDate(
+                patent.getCountry(),
+                patent.getApplicationDate(),
+                patent.getRegistrationDate(),
+                patent.getExpectedExpirationDate());
+        // FEE-05: 저장값이 있으면(조정 포함) 조회 시점에 미래로 굴린 값이 effective 다음 도래일.
+        LocalDate effectiveDueDate = patent.getFeeDueDate() != null
+                ? annualFeeScheduleService.rollForwardToFuture(
+                        patent.getCountry(), patent.getFeeDueDate(), patent.getExpectedExpirationDate())
+                : calculatedDueDate;
+        List<AnnualFeeAdjustmentEntity> adjustments =
+                adjustmentRepository.findByPatentIdOrderByAdjustedAtDesc(patentId);
+        boolean nextDueAdjusted = !adjustments.isEmpty()
+                && adjustments.get(0).getAdjustedDueDate() != null
+                && adjustments.get(0).getAdjustedDueDate().equals(effectiveDueDate);
+
+        int mailLeadMonths = systemSettingsService.getMailLeadMonths();
+        return new PatentFeeScheduleResponse(
+                patent.getPatentId(),
+                patent.getCountry(),
+                rule.basis(),
+                basisDate,
+                rule.label(),
+                rule.initialLumpYears(),
+                mailLeadMonths,
+                resolveRecipient(patentId),
+                annualFeeScheduleService.buildScheduleEntries(
+                        patent.getCountry(),
+                        patent.getApplicationDate(),
+                        patent.getRegistrationDate(),
+                        patent.getExpectedExpirationDate(),
+                        effectiveDueDate,
+                        nextDueAdjusted,
+                        mailLeadMonths,
+                        LocalDate.now(KST)));
+    }
+
+    /** 담당 부서의 메일 수신처 — FR-LEGAL-12와 동일한 users 파생 규칙을 재사용한다. 부서 미배정이면 null. */
+    private PatentFeeScheduleResponse.FeeScheduleRecipient resolveRecipient(String patentId) {
+        List<PatentReviewHistoryEntity> histories = reviewHistoryRepository.findByPatentIdOrderByCreatedAtDesc(patentId);
+        String departmentId = histories.isEmpty() ? null : histories.get(0).getDepartmentId();
+        if (departmentId == null || departmentId.isBlank()) {
+            return null;
+        }
+        return mailingService.getRecipientMappings(departmentId).stream()
+                .findFirst()
+                .map(mapping -> new PatentFeeScheduleResponse.FeeScheduleRecipient(
+                        mapping.departmentId(),
+                        mapping.departmentName(),
+                        mapping.managerName(),
+                        mapping.managerEmail(),
+                        mapping.ccEmails()))
+                .orElse(null);
     }
 
     private Map<String, List<AnnualFeeAdjustmentHistoryResponse>> findAdjustmentHistoriesByPatentId(List<PatentMetadataEntity> patents) {

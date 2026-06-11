@@ -1,9 +1,11 @@
 package com.syuuk.patentflow.patent.service;
 
 import com.syuuk.patentflow.common.service.SystemSettingsService;
+import com.syuuk.patentflow.patent.dto.PatentFeeScheduleResponse.FeeScheduleEntry;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
@@ -210,6 +212,116 @@ public class AnnualFeeScheduleService {
             return 0;
         }
         return (int) ChronoUnit.YEARS.between(basisDate, dueDate) + 1;
+    }
+
+    private static final int SCHEDULE_PAST_ENTRIES = 3;
+    private static final int SCHEDULE_FUTURE_ENTRIES = 5;
+
+    /**
+     * FEE-06: 특허 상세 연차료 일정 항목을 생성한다 — 일괄 납부 구간 1줄 + 직전 납부 최대 3건 +
+     * 다음 도래(NEXT) 포함 향후 5건. effectiveNextDueDate가 계산값과 다르면(저장/조정값) NEXT 도래일을
+     * 그 값으로 대체한다. 검토 시작일(reviewStartDate)은 도래일 - mailLeadMonths.
+     */
+    public List<FeeScheduleEntry> buildScheduleEntries(
+            String country,
+            LocalDate applicationDate,
+            LocalDate registrationDate,
+            LocalDate expectedExpirationDate,
+            LocalDate effectiveNextDueDate,
+            boolean nextDueAdjusted,
+            int mailLeadMonths,
+            LocalDate baseDate
+    ) {
+        CountryAnnualFeeRule rule = ruleFor(country);
+        LocalDate basisDate = annualFeeBaseDate(rule, applicationDate, registrationDate);
+        if (basisDate == null) {
+            if (effectiveNextDueDate == null) {
+                return List.of();
+            }
+            return List.of(new FeeScheduleEntry(
+                    "다음 납부", 0, false, effectiveNextDueDate,
+                    effectiveNextDueDate.minusMonths(mailLeadMonths), "NEXT", nextDueAdjusted));
+        }
+
+        List<FeeScheduleEntry> entries = new ArrayList<>();
+        List<LocalDate> dueDates = new ArrayList<>();
+        boolean maintenance = rule.hasMaintenanceWindows() && registrationDate != null;
+        boolean lumpRow = !maintenance && rule.initialLumpYears() > 0
+                && rule.registrationBased() && registrationDate != null;
+
+        if (maintenance) {
+            for (Integer months : rule.maintenanceMonths()) {
+                LocalDate due = registrationDate.plusMonths(months);
+                if (expectedExpirationDate != null && due.isAfter(expectedExpirationDate)) {
+                    break;
+                }
+                dueDates.add(due);
+            }
+        } else {
+            LocalDate firstDue = lumpRow
+                    ? registrationDate.plusYears(rule.initialLumpYears())
+                    : basisDate.plusMonths(Math.max(rule.cycleMonths(), 1));
+            int futureCount = 0;
+            LocalDate due = firstDue;
+            while (futureCount < SCHEDULE_FUTURE_ENTRIES) {
+                if (expectedExpirationDate != null && due.isAfter(expectedExpirationDate)) {
+                    break;
+                }
+                dueDates.add(due);
+                if (!due.isBefore(baseDate)) {
+                    futureCount++;
+                }
+                due = due.plusMonths(Math.max(rule.cycleMonths(), 1));
+            }
+            // 과거 도래분은 최근 3건만 남긴다(오래된 특허의 일정이 수십 줄로 늘어지는 것 방지).
+            int pastCount = (int) dueDates.stream().filter(d -> d.isBefore(baseDate)).count();
+            if (pastCount > SCHEDULE_PAST_ENTRIES) {
+                dueDates = dueDates.subList(pastCount - SCHEDULE_PAST_ENTRIES, dueDates.size());
+            }
+        }
+
+        if (lumpRow) {
+            entries.add(new FeeScheduleEntry(
+                    "1~%d년차".formatted(rule.initialLumpYears()), 1, true,
+                    registrationDate, null, "PAID_LUMP", false));
+        }
+
+        boolean nextAssigned = false;
+        for (LocalDate due : dueDates) {
+            boolean past = due.isBefore(baseDate);
+            boolean isNext = !past && !nextAssigned;
+            LocalDate entryDue = due;
+            boolean adjusted = false;
+            if (isNext && effectiveNextDueDate != null && !effectiveNextDueDate.isBefore(baseDate)
+                    && !effectiveNextDueDate.equals(due)) {
+                entryDue = effectiveNextDueDate;
+                adjusted = nextDueAdjusted;
+            }
+            if (isNext) {
+                nextAssigned = true;
+            }
+            int yearNumber = annuityYearNumber(basisDate, entryDue);
+            String yearLabel = maintenance
+                    ? maintenanceLabel(registrationDate, due)
+                    : (yearNumber > 0 ? "%d년차".formatted(yearNumber) : "납부");
+            entries.add(new FeeScheduleEntry(
+                    yearLabel,
+                    yearNumber,
+                    false,
+                    entryDue,
+                    entryDue.minusMonths(mailLeadMonths),
+                    past ? "PAST" : (isNext ? "NEXT" : "FUTURE"),
+                    adjusted));
+        }
+        return entries;
+    }
+
+    private String maintenanceLabel(LocalDate registrationDate, LocalDate due) {
+        long months = ChronoUnit.MONTHS.between(registrationDate, due);
+        if (months % 12 == 0) {
+            return "%d년 유지료".formatted(months / 12);
+        }
+        return "%.1f년 유지료".formatted(months / 12.0);
     }
 
     private LocalDate nextMaintenanceDueDate(

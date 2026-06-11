@@ -151,6 +151,80 @@ class AnnualFeeScheduleControllerTest {
                 .andExpect(jsonPath("$.details.reason").isNotEmpty());
     }
 
+    // FEE-06: KR 특허 상세 연차료 일정 — 1~3년차 일괄 행 + 4년차(등록일+3년) NEXT 도래일과
+    // 검토 시작일(도래일 - 메일 리드 2개월)을 내려준다.
+    @Test
+    void getPatentFeeScheduleReturnsKrLumpScheduleWithReviewStartDates() throws Exception {
+        mockMvc.perform(get("/api/v1/patents/PAT-2026-0001/fee-schedule"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.patentId").value("PAT-2026-0001"))
+                .andExpect(jsonPath("$.data.basis").value("REGISTRATION_DATE"))
+                .andExpect(jsonPath("$.data.basisDate").value("2026-02-25"))
+                .andExpect(jsonPath("$.data.initialLumpYears").value(3))
+                .andExpect(jsonPath("$.data.mailLeadMonths").value(2))
+                .andExpect(jsonPath("$.data.items[0].status").value("PAID_LUMP"))
+                .andExpect(jsonPath("$.data.items[0].lump").value(true))
+                .andExpect(jsonPath("$.data.items[0].yearLabel").value("1~3년차"))
+                .andExpect(jsonPath("$.data.items[0].dueDate").value("2026-02-25"))
+                .andExpect(jsonPath("$.data.items[1].status").value("NEXT"))
+                .andExpect(jsonPath("$.data.items[1].dueDate").value("2029-02-25"))
+                .andExpect(jsonPath("$.data.items[1].yearNumber").value(4))
+                .andExpect(jsonPath("$.data.items[1].yearLabel").value("4년차"))
+                .andExpect(jsonPath("$.data.items[1].reviewStartDate").value("2028-12-25"))
+                .andExpect(jsonPath("$.data.items[2].status").value("FUTURE"));
+    }
+
+    // FEE-06: 관리자 조정값이 NEXT 도래일을 대체하고 adjusted 플래그가 켜진다.
+    @Test
+    void getPatentFeeScheduleReflectsAdjustedNextDueDate() throws Exception {
+        mockMvc.perform(patch("/api/v1/annual-fees/schedule/PAT-2026-0001")
+                        .principal(adminPrincipal("이소율"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "adjustedDueDate": "2029-06-30",
+                                  "reason": "해외 패밀리 일정 정렬"
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/patents/PAT-2026-0001/fee-schedule"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[1].status").value("NEXT"))
+                .andExpect(jsonPath("$.data.items[1].dueDate").value("2029-06-30"))
+                .andExpect(jsonPath("$.data.items[1].adjusted").value(true));
+    }
+
+    // FEE-06: 사업부 경로는 자기 부서 특허만 일정 조회 가능 — 타 부서는 차단된다.
+    @Test
+    void businessFeeScheduleBlocksOtherDepartment() throws Exception {
+        String departmentId = reviewHistoryRepository
+                .findByPatentIdOrderByCreatedAtDesc("PAT-2026-0001").get(0).getDepartmentId();
+
+        mockMvc.perform(get("/api/v1/business/patents/PAT-2026-0001/fee-schedule")
+                        .principal(businessPrincipal(departmentId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.patentId").value("PAT-2026-0001"));
+
+        mockMvc.perform(get("/api/v1/business/patents/PAT-2026-0001/fee-schedule")
+                        .principal(businessPrincipal("DEPT-OTHER")))
+                .andExpect(status().isUnauthorized());
+    }
+
+    private UsernamePasswordAuthenticationToken businessPrincipal(String departmentId) {
+        return new UsernamePasswordAuthenticationToken(
+                new UserPrincipalResponse(
+                        "biz@test.com",
+                        "사업부 사용자",
+                        List.of("ROLE_BUSINESS"),
+                        "USER-biz-test",
+                        "BUSINESS",
+                        departmentId,
+                        departmentId + " 사업부"),
+                null,
+                AuthorityUtils.createAuthorityList("ROLE_BUSINESS"));
+    }
+
     private UsernamePasswordAuthenticationToken adminPrincipal(String username) {
         return new UsernamePasswordAuthenticationToken(
                 new UserPrincipalResponse(

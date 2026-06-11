@@ -2043,6 +2043,36 @@
         }
       }
     },
+    "/api/v1/patents/{patentId}/fee-schedule" : {
+      "get" : {
+        "tags" : [
+          "patent-controller"
+        ],
+        "operationId" : "getPatentFeeSchedule",
+        "parameters" : [
+          {
+            "name" : "patentId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePatentFeeScheduleResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/patents/{patentId}/ai-report/status" : {
       "get" : {
         "tags" : [
@@ -2639,6 +2669,36 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/ApiResponsePatentDetailResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/business/patents/{patentId}/fee-schedule" : {
+      "get" : {
+        "tags" : [
+          "business-controller"
+        ],
+        "operationId" : "getBusinessPatentFeeSchedule",
+        "parameters" : [
+          {
+            "name" : "patentId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePatentFeeScheduleResponse"
                 }
               }
             }
@@ -5408,6 +5468,111 @@
           "createdAt" : {
             "type" : "string",
             "format" : "date-time"
+          }
+        }
+      },
+      "ApiResponsePatentFeeScheduleResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/PatentFeeScheduleResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "FeeScheduleEntry" : {
+        "type" : "object",
+        "properties" : {
+          "yearLabel" : {
+            "type" : "string"
+          },
+          "yearNumber" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "lump" : {
+            "type" : "boolean"
+          },
+          "dueDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "reviewStartDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "adjusted" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "FeeScheduleRecipient" : {
+        "type" : "object",
+        "properties" : {
+          "departmentId" : {
+            "type" : "string"
+          },
+          "departmentName" : {
+            "type" : "string"
+          },
+          "managerName" : {
+            "type" : "string"
+          },
+          "managerEmail" : {
+            "type" : "string"
+          },
+          "ccEmails" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        }
+      },
+      "PatentFeeScheduleResponse" : {
+        "type" : "object",
+        "properties" : {
+          "patentId" : {
+            "type" : "string"
+          },
+          "country" : {
+            "type" : "string"
+          },
+          "basis" : {
+            "type" : "string"
+          },
+          "basisDate" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "paymentRuleLabel" : {
+            "type" : "string"
+          },
+          "initialLumpYears" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "mailLeadMonths" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "recipient" : {
+            "$ref" : "#/components/schemas/FeeScheduleRecipient"
+          },
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/FeeScheduleEntry"
+            }
           }
         }
       },
