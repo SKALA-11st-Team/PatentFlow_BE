@@ -21,6 +21,7 @@ import com.syuuk.patentflow.settings.dto.ValuationCriteriaResponse;
 import com.syuuk.patentflow.settings.dto.ValuationCriteriaVersionResponse;
 import com.syuuk.patentflow.settings.service.SettingsService;
 import com.syuuk.patentflow.settings.service.ValuationCriteriaService;
+import com.syuuk.patentflow.patent.client.AiReportAgentClient;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -44,17 +45,20 @@ public class SettingsController {
     private final SystemSettingsService systemSettingsService;
     private final ValuationCriteriaService valuationCriteriaService;
     private final BusinessChecklistItemService businessChecklistItemService;
+    private final AiReportAgentClient aiReportAgentClient;
 
     public SettingsController(
             SettingsService settingsService,
             SystemSettingsService systemSettingsService,
             ValuationCriteriaService valuationCriteriaService,
-            BusinessChecklistItemService businessChecklistItemService
+            BusinessChecklistItemService businessChecklistItemService,
+            AiReportAgentClient aiReportAgentClient
     ) {
         this.settingsService = settingsService;
         this.systemSettingsService = systemSettingsService;
         this.valuationCriteriaService = valuationCriteriaService;
         this.businessChecklistItemService = businessChecklistItemService;
+        this.aiReportAgentClient = aiReportAgentClient;
     }
 
     // ── 사업부 체크리스트 항목 관리 (리걸팀) ──────────────────
@@ -104,6 +108,23 @@ public class SettingsController {
     @GetMapping("/valuation-criteria/history")
     public ApiResponse<List<ValuationCriteriaVersionResponse>> getValuationCriteriaHistory() {
         return ApiResponse.ok(valuationCriteriaService.history());
+    }
+
+    @GetMapping("/valuation-criteria/prompts")
+    public ApiResponse<List<AiReportAgentClient.ValuationPromptResponse>> getValuationCriteriaPrompts() {
+        return ApiResponse.ok(aiReportAgentClient.listValuationPrompts());
+    }
+
+    @GetMapping("/valuation-criteria/prompts/{axis}")
+    public ApiResponse<AiReportAgentClient.ValuationPromptResponse> getValuationCriteriaPrompt(@PathVariable String axis) {
+        return ApiResponse.ok(aiReportAgentClient.getValuationPrompt(axis));
+    }
+
+    @PutMapping("/valuation-criteria/prompts/{axis}")
+    public ApiResponse<AiReportAgentClient.ValuationPromptResponse> updateValuationCriteriaPrompt(
+            @PathVariable String axis,
+            @Valid @RequestBody AiReportAgentClient.ValuationPromptUpdateRequest request) {
+        return ApiResponse.ok(aiReportAgentClient.updateValuationPrompt(axis, request));
     }
 
     // ── 분기 템플릿 ──────────────────────────────────────────

@@ -20,6 +20,8 @@ public record AnnualFeeScheduleItemResponse(
         LocalDate adjustedAnnualFeeDueDate,
         String latestAdjustmentReason,
         int countryExtensionMonths,
+        String annualFeeBasis,
+        String paymentRuleLabel,
         List<AnnualFeeAdjustmentHistoryResponse> adjustmentHistory
 ) {
 }

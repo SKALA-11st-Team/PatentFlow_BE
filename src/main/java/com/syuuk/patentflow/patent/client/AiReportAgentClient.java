@@ -9,6 +9,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -93,6 +94,62 @@ public class AiReportAgentClient {
         }
     }
 
+    public List<ValuationPromptResponse> listValuationPrompts() {
+        try {
+            String url = agentUrl + "/api/v1/admin/valuation-criteria/prompts";
+            HttpRequest.Builder builder = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(TIMEOUT)
+                    .GET();
+            applyAgentAuth(builder);
+            HttpResponse<String> response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) {
+                throw new IllegalStateException("Agent valuation prompt list failed. status=" + response.statusCode());
+            }
+            return objectMapper.readValue(response.body(),
+                    objectMapper.getTypeFactory().constructCollectionType(List.class, ValuationPromptResponse.class));
+        } catch (Exception e) {
+            throw new IllegalStateException("Agent 가치평가 기준 md 목록을 불러오지 못했습니다: " + e.getMessage(), e);
+        }
+    }
+
+    public ValuationPromptResponse getValuationPrompt(String axis) {
+        try {
+            String url = agentUrl + "/api/v1/admin/valuation-criteria/prompts/" + axis;
+            HttpRequest.Builder builder = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(TIMEOUT)
+                    .GET();
+            applyAgentAuth(builder);
+            HttpResponse<String> response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) {
+                throw new IllegalStateException("Agent valuation prompt get failed. status=" + response.statusCode());
+            }
+            return objectMapper.readValue(response.body(), ValuationPromptResponse.class);
+        } catch (Exception e) {
+            throw new IllegalStateException("Agent 가치평가 기준 md를 불러오지 못했습니다: " + e.getMessage(), e);
+        }
+    }
+
+    public ValuationPromptResponse updateValuationPrompt(String axis, ValuationPromptUpdateRequest requestBody) {
+        try {
+            String url = agentUrl + "/api/v1/admin/valuation-criteria/prompts/" + axis;
+            HttpRequest.Builder builder = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(TIMEOUT)
+                    .header("Content-Type", "application/json")
+                    .PUT(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(requestBody)));
+            applyAgentAuth(builder);
+            HttpResponse<String> response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) {
+                throw new IllegalStateException("Agent valuation prompt update failed. status=" + response.statusCode() + " body=" + response.body());
+            }
+            return objectMapper.readValue(response.body(), ValuationPromptResponse.class);
+        } catch (Exception e) {
+            throw new IllegalStateException("Agent 가치평가 기준 md를 저장하지 못했습니다: " + e.getMessage(), e);
+        }
+    }
+
     private AgentEvaluateResponse fallback(String patentId, String failureReason) {
         return new AgentEvaluateResponse(
                 patentId,
@@ -141,7 +198,7 @@ public class AiReportAgentClient {
             List<String> businessCheckRequests,
             List<AgentSourceRef> externalSources,
             // 계약 C1: agent가 실제 적용한 가치평가 기준 스냅샷(source=request|default). 구 agent는 null.
-            java.util.Map<String, Object> appliedValuationConfig
+            Map<String, Object> appliedValuationConfig
     ) {
         public String summaryText() {
             return summaryMarkdown;
@@ -170,6 +227,22 @@ public class AiReportAgentClient {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record AgentSourceRef(String title, String url) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record ValuationPromptResponse(
+            String axis,
+            String label,
+            String path,
+            String markdown,
+            String checksum,
+            OffsetDateTime updatedAt
+    ) {}
+
+    public record ValuationPromptUpdateRequest(
+            String markdown,
+            String reason,
+            String expectedChecksum
+    ) {}
 
     /**
      * 특허 분야 추천 — 관리자 분류(taxonomy)를 함께 보내 에이전트에 추천을 요청한다.

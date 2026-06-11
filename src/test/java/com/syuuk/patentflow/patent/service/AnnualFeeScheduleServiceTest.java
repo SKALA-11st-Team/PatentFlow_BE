@@ -22,6 +22,24 @@ class AnnualFeeScheduleServiceTest {
 
     // 회귀 방지: 출원일이 없고 등록일만 있는 특허는 '올해 12/31'이 아니라 등록일 기준으로 계산되어야 한다.
     @Test
+    void usesUsMaintenanceFeeDatesFromRegistrationDate() {
+        LocalDate due = service.calculateNextDueDate(
+                "US", LocalDate.of(2020, 1, 10), LocalDate.of(2021, 2, 1), null, LocalDate.of(2024, 1, 1));
+        assertThat(due).isEqualTo(LocalDate.of(2024, 8, 1));
+
+        LocalDate second = service.calculateNextDueDate(
+                "US", LocalDate.of(2020, 1, 10), LocalDate.of(2021, 2, 1), null, LocalDate.of(2025, 1, 1));
+        assertThat(second).isEqualTo(LocalDate.of(2028, 8, 1));
+    }
+
+    @Test
+    void advancesUsMaintenanceFeeByFortyEightMonths() {
+        LocalDate next = service.advanceAfterMaintenance(
+                "US", LocalDate.of(2024, 8, 1), LocalDate.of(2038, 1, 10));
+        assertThat(next).isEqualTo(LocalDate.of(2028, 8, 1));
+    }
+
+    @Test
     void fallsBackToRegistrationDateWhenApplicationDateMissing() {
         LocalDate due = service.calculateNextDueDate(
                 "KR", null, LocalDate.of(2020, 3, 10), null, LocalDate.of(2026, 1, 1));

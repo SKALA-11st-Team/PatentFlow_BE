@@ -33,10 +33,13 @@ public class AnnualFeeScheduleService {
             LocalDate expectedExpirationDate,
             LocalDate baseDate
     ) {
-        // 연차료 기준일은 출원일이 원칙이나, 출원일이 없는 데이터(마이그레이션·해외 등록 등)는 등록일로 폴백한다.
-        LocalDate base = applicationDate != null ? applicationDate : registrationDate;
+        LocalDate base = annualFeeBaseDate(country, applicationDate, registrationDate);
         if (base == null) {
             return LocalDate.of(baseDate.getYear(), 12, 31);
+        }
+
+        if (isUsPatent(country) && registrationDate != null) {
+            return capAtExpiration(nextUsMaintenanceDueDate(registrationDate, expectedExpirationDate, baseDate), expectedExpirationDate);
         }
 
         LocalDate dueDate = dateInYear(baseDate.getYear(), base);
@@ -67,7 +70,7 @@ public class AnnualFeeScheduleService {
         if (storedDueDate == null || !storedDueDate.isBefore(baseDate)) {
             return storedDueDate;
         }
-        int months = getCountryExtensionMonths(country);
+        int months = isUsPatent(country) ? 48 : getCountryExtensionMonths(country);
         if (months <= 0) {
             return storedDueDate;
         }
@@ -91,8 +94,46 @@ public class AnnualFeeScheduleService {
         if (currentDueDate == null) {
             return null;
         }
-        LocalDate nextDueDate = currentDueDate.plusMonths(systemSettingsService.getCountryExtensionMonths(country));
+        int months = isUsPatent(country) ? 48 : systemSettingsService.getCountryExtensionMonths(country);
+        LocalDate nextDueDate = currentDueDate.plusMonths(months);
         return capAtExpiration(nextDueDate, expectedExpirationDate);
+    }
+
+
+    public LocalDate annualFeeBaseDate(String country, LocalDate applicationDate, LocalDate registrationDate) {
+        if (isUsPatent(country) && registrationDate != null) {
+            return registrationDate;
+        }
+        // 연차료 기준일은 출원일이 원칙이나, 출원일이 없는 데이터(마이그레이션·해외 등록 등)는 등록일로 폴백한다.
+        return applicationDate != null ? applicationDate : registrationDate;
+    }
+
+    public String annualFeeBasis(String country) {
+        return isUsPatent(country) ? "REGISTRATION_DATE" : "APPLICATION_DATE";
+    }
+
+    public String paymentRuleLabel(String country) {
+        return isUsPatent(country)
+                ? "등록일 기준 3년 6개월, 7년 6개월, 11년 6개월 유지료"
+                : "출원일 기준 매년 도래하는 연차료";
+    }
+
+    private LocalDate nextUsMaintenanceDueDate(LocalDate registrationDate, LocalDate expectedExpirationDate, LocalDate baseDate) {
+        LocalDate[] dueDates = new LocalDate[] {
+                registrationDate.plusMonths(42),
+                registrationDate.plusMonths(90),
+                registrationDate.plusMonths(138)
+        };
+        for (LocalDate dueDate : dueDates) {
+            if (!dueDate.isBefore(baseDate)) {
+                return dueDate;
+            }
+        }
+        return expectedExpirationDate != null ? expectedExpirationDate : dueDates[dueDates.length - 1];
+    }
+
+    private boolean isUsPatent(String country) {
+        return country != null && "US".equalsIgnoreCase(country.trim());
     }
 
     private LocalDate dateInYear(int year, LocalDate base) {
