@@ -216,6 +216,42 @@ public class SystemSettingsService {
         return parseIntOrNull(get(KEY_FEE_RULE_PREFIX + country.toUpperCase() + ".cycle_months"));
     }
 
+    /** I4: 설정 화면용 — 지원 국가 코드·라벨 목록(연차료 규칙 편집 대상). */
+    public java.util.List<String> getSupportedCountries() {
+        return SUPPORTED_COUNTRIES;
+    }
+
+    public String getCountryLabel(String country) {
+        return COUNTRY_LABELS.getOrDefault(country, country);
+    }
+
+    /**
+     * @relatedFR FR-LEGAL-24
+     * I4: 국가별 연차료 규칙 오버라이드 저장. null 필드는 변경하지 않는다.
+     */
+    @Transactional
+    public void updateCountryFeeRule(String country, String basis, Integer initialLumpYears, Integer cycleMonths) {
+        String upper = country.toUpperCase();
+        if (basis != null) {
+            set(KEY_FEE_RULE_PREFIX + upper + ".basis", basis);
+        }
+        if (initialLumpYears != null) {
+            set(KEY_FEE_RULE_PREFIX + upper + ".initial_lump_years", String.valueOf(initialLumpYears));
+        }
+        if (cycleMonths != null) {
+            set(KEY_FEE_RULE_PREFIX + upper + ".cycle_months", String.valueOf(cycleMonths));
+        }
+    }
+
+    /**
+     * F2: 국가별 연차료 요금표 오버라이드(fee.amounts.{CC}).
+     * 형식 "시작연차-끝연차:금액,..."(연차 기반) 또는 "개월:금액,..."(US 유지료). 미설정 시 null.
+     */
+    public String getCountryFeeAmountTableOverride(String country) {
+        String value = get(KEY_FEE_RULE_PREFIX.replace("rule", "amounts") + country.toUpperCase());
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
     private Integer parseIntOrNull(String value) {
         if (value == null || value.isBlank()) {
             return null;

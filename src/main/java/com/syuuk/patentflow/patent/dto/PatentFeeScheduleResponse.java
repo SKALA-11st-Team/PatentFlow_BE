@@ -43,7 +43,10 @@ public record PatentFeeScheduleResponse(
             LocalDate dueDate,
             LocalDate reviewStartDate,
             String status,
-            boolean adjusted
+            boolean adjusted,
+            // F2: 납부 예상액(국가 요금표 기반, 청구항 수 미반영 개략치). 요금표 없는 국가는 null.
+            Long estimatedAmount,
+            String currency
     ) {
     }
 }

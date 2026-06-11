@@ -211,11 +211,16 @@ public class PatentReviewService {
             return;
         }
         String like = "%" + keyword.trim().toLowerCase(Locale.ROOT) + "%";
+        // I5: 통합 검색 — 번호·제목 외에 초안 제목, 관련 제품/사업/기술 분야까지 한 번에 찾는다.
         predicates.add(cb.or(
                 cb.like(cb.lower(cb.coalesce(root.get("title"), "")), like),
+                cb.like(cb.lower(cb.coalesce(root.get("draftTitle"), "")), like),
                 cb.like(cb.lower(cb.coalesce(root.get("managementNumber"), "")), like),
                 cb.like(cb.lower(cb.coalesce(root.get("applicationNumber"), "")), like),
-                cb.like(cb.lower(cb.coalesce(root.get("registrationNumber"), "")), like)));
+                cb.like(cb.lower(cb.coalesce(root.get("registrationNumber"), "")), like),
+                cb.like(cb.lower(cb.coalesce(root.get("productName"), "")), like),
+                cb.like(cb.lower(cb.coalesce(root.get("businessArea"), "")), like),
+                cb.like(cb.lower(cb.coalesce(root.get("technologyArea"), "")), like)));
     }
 
     private void addCountryPredicate(
@@ -672,6 +677,32 @@ public class PatentReviewService {
         PatentDetailResponse updated = updatePatent(patentId, patent -> withDepartment(patent, departmentId, departmentName));
         persistPatentState(updated);
         return updated;
+    }
+
+    /**
+     * @relatedFR FR-LEGAL-05
+     * F6: 특허 패밀리 — 관리번호의 국가 접미사 앞 공통 계열(P201103001-KR0 → P201103001-*)을
+     * 묶어 같은 발명의 국가별 출원을 한눈에 본다. 계열 구분자가 없으면 자신만 반환한다.
+     */
+    @Transactional(readOnly = true)
+    public List<PatentListItemResponse> getPatentFamily(String patentId) {
+        PatentMetadataEntity self = patentMetadataRepository.findById(patentId)
+                .orElseThrow(() -> new PatentFlowException(ErrorCode.PATENT_NOT_FOUND));
+        String managementNumber = self.getManagementNumber() == null ? "" : self.getManagementNumber();
+        int separatorIndex = managementNumber.lastIndexOf('-');
+        if (separatorIndex <= 0) {
+            return List.of();
+        }
+        String familyPrefix = managementNumber.substring(0, separatorIndex + 1);
+        List<PatentMetadataEntity> members =
+                patentMetadataRepository.findByManagementNumberStartingWithOrderByManagementNumberAsc(familyPrefix);
+        Map<String, PatentReviewHistoryEntity> latestHistory = loadLatestHistory(members);
+        return members.stream()
+                .filter(entity -> !entity.getPatentId().equals(patentId))
+                .map(entity -> toListItem(
+                        patentFromMetadataEntity(entity, latestHistory.get(entity.getPatentId())),
+                        entity.getCurrentQuarterKey()))
+                .toList();
     }
 
     public List<PatentListItemResponse> getAllPatents() {
