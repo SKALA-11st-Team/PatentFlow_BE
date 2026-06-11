@@ -11,16 +11,20 @@ import com.syuuk.patentflow.common.error.ErrorCode;
 import com.syuuk.patentflow.common.error.PatentFlowException;
 import com.syuuk.patentflow.common.response.ApiResponse;
 import com.syuuk.patentflow.common.response.PageResponse;
+import com.syuuk.patentflow.patent.controller.PatentController;
 import com.syuuk.patentflow.patent.dto.PatentDetailResponse;
 import com.syuuk.patentflow.patent.dto.PatentFeeScheduleResponse;
 import com.syuuk.patentflow.patent.dto.PatentListFilter;
 import com.syuuk.patentflow.patent.dto.PatentListItemResponse;
+import com.syuuk.patentflow.patent.dto.PatentPdfMetaResponse;
 import com.syuuk.patentflow.patent.dto.ReviewWorkflowStatus;
 import com.syuuk.patentflow.patent.service.AnnualFeeScheduleManagementService;
 import com.syuuk.patentflow.patent.service.DashboardSummaryService;
+import com.syuuk.patentflow.patent.service.PatentPdfService;
 import com.syuuk.patentflow.patent.service.PatentReviewService;
 import jakarta.validation.Valid;
 import java.util.List;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -37,19 +41,22 @@ public class BusinessController {
     private final AuthService authService;
     private final DashboardSummaryService dashboardSummaryService;
     private final AnnualFeeScheduleManagementService annualFeeScheduleManagementService;
+    private final PatentPdfService patentPdfService;
 
     public BusinessController(
             BusinessFixtureService businessFixtureService,
             PatentReviewService patentReviewService,
             AuthService authService,
             DashboardSummaryService dashboardSummaryService,
-            AnnualFeeScheduleManagementService annualFeeScheduleManagementService
+            AnnualFeeScheduleManagementService annualFeeScheduleManagementService,
+            PatentPdfService patentPdfService
     ) {
         this.businessFixtureService = businessFixtureService;
         this.patentReviewService = patentReviewService;
         this.authService = authService;
         this.dashboardSummaryService = dashboardSummaryService;
         this.annualFeeScheduleManagementService = annualFeeScheduleManagementService;
+        this.patentPdfService = patentPdfService;
     }
 
     /**
@@ -136,6 +143,34 @@ public class BusinessController {
     ) {
         assertBusinessDepartmentPatent(patentId, authentication);
         return ApiResponse.ok(annualFeeScheduleManagementService.getPatentFeeSchedule(patentId));
+    }
+
+    /**
+     * @relatedFR FR-LEGAL-13, FR-BUS-01
+     * @relatedUI UI-BUS-02
+     * @description MAIL-13: 사업부가 배정 특허의 업로드 PDF를 다운로드한다 —
+     *     메일의 "시스템에서 다운로드" 안내가 이 경로(특허 상세의 다운로드 버튼)로 이어진다.
+     */
+    @GetMapping("/api/v1/business/patents/{patentId}/pdf")
+    public ResponseEntity<byte[]> downloadBusinessPatentPdf(
+            @PathVariable String patentId,
+            Authentication authentication
+    ) {
+        assertBusinessDepartmentPatent(patentId, authentication);
+        return PatentController.pdfDownloadResponse(patentPdfService.downloadUploaded(patentId));
+    }
+
+    /**
+     * @relatedFR FR-LEGAL-13, FR-BUS-01
+     * @description MAIL-13: 사업부 화면의 PDF 다운로드 버튼 노출 여부 판단용 첨부 상태 조회.
+     */
+    @GetMapping("/api/v1/business/patents/{patentId}/pdf/meta")
+    public ApiResponse<PatentPdfMetaResponse> getBusinessPatentPdfMeta(
+            @PathVariable String patentId,
+            Authentication authentication
+    ) {
+        assertBusinessDepartmentPatent(patentId, authentication);
+        return ApiResponse.ok(patentPdfService.meta(patentId));
     }
 
     /**

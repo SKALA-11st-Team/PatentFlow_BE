@@ -20,6 +20,7 @@ import com.syuuk.patentflow.patent.dto.PatentHistoryResponse;
 import com.syuuk.patentflow.patent.dto.PatentFeeScheduleResponse;
 import com.syuuk.patentflow.patent.dto.PatentListFilter;
 import com.syuuk.patentflow.patent.dto.PatentListItemResponse;
+import com.syuuk.patentflow.patent.dto.PatentPdfMetaResponse;
 
 import com.syuuk.patentflow.patent.dto.PatentUpsertRequest;
 import com.syuuk.patentflow.patent.dto.PatentUpsertResponse;
@@ -27,13 +28,17 @@ import com.syuuk.patentflow.patent.dto.ReviewWorkflowStatus;
 import com.syuuk.patentflow.patent.service.AiReportEditService;
 import com.syuuk.patentflow.patent.service.AiReportJobService;
 import com.syuuk.patentflow.patent.service.AnnualFeeScheduleManagementService;
+import com.syuuk.patentflow.patent.service.PatentPdfService;
 import com.syuuk.patentflow.patent.service.PatentReviewService;
 import jakarta.validation.Valid;
+import java.io.IOException;
 import java.time.LocalDate;
 import java.util.List;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -53,17 +58,20 @@ public class PatentController {
     private final AiReportJobService aiReportJobService;
     private final AiReportEditService aiReportEditService;
     private final AnnualFeeScheduleManagementService annualFeeScheduleManagementService;
+    private final PatentPdfService patentPdfService;
 
     public PatentController(
             PatentReviewService patentReviewService,
             AiReportJobService aiReportJobService,
             AiReportEditService aiReportEditService,
-            AnnualFeeScheduleManagementService annualFeeScheduleManagementService
+            AnnualFeeScheduleManagementService annualFeeScheduleManagementService,
+            PatentPdfService patentPdfService
     ) {
         this.patentReviewService = patentReviewService;
         this.aiReportJobService = aiReportJobService;
         this.aiReportEditService = aiReportEditService;
         this.annualFeeScheduleManagementService = annualFeeScheduleManagementService;
+        this.patentPdfService = patentPdfService;
     }
 
     /**
@@ -178,6 +186,59 @@ public class PatentController {
     @GetMapping("/{patentId}/fee-schedule")
     public ApiResponse<PatentFeeScheduleResponse> getPatentFeeSchedule(@PathVariable String patentId) {
         return ApiResponse.ok(annualFeeScheduleManagementService.getPatentFeeSchedule(patentId));
+    }
+
+    /**
+     * @relatedFR FR-LEGAL-13
+     * @relatedUI UI-LEGAL-03
+     * @description MAIL-13: 법무팀 특허 PDF 직접 업로드 — TW·UAE 등 KIPRIS로 공개전문을
+     *     가져올 수 없는 국가의 특허에 등록/수정 화면에서 PDF를 첨부한다(기존 첨부는 교체).
+     */
+    @PostMapping(value = "/{patentId}/pdf", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResponse<PatentPdfMetaResponse> uploadPatentPdf(
+            @PathVariable String patentId,
+            @RequestParam("file") MultipartFile file,
+            Authentication authentication
+    ) throws IOException {
+        return ApiResponse.ok(patentPdfService.upload(
+                patentId, file.getOriginalFilename(), file.getBytes(), currentActor(authentication)));
+    }
+
+    /**
+     * @relatedFR FR-LEGAL-13
+     * @description MAIL-13: 업로드된 특허 PDF 다운로드(관리자).
+     */
+    @GetMapping("/{patentId}/pdf")
+    public ResponseEntity<byte[]> downloadPatentPdf(@PathVariable String patentId) {
+        return pdfDownloadResponse(patentPdfService.downloadUploaded(patentId));
+    }
+
+    /**
+     * @relatedFR FR-LEGAL-13
+     * @description MAIL-13: 특허 PDF 첨부 상태 조회 — 등록/수정 화면 업로드 위젯이 사용한다.
+     */
+    @GetMapping("/{patentId}/pdf/meta")
+    public ApiResponse<PatentPdfMetaResponse> getPatentPdfMeta(@PathVariable String patentId) {
+        return ApiResponse.ok(patentPdfService.meta(patentId));
+    }
+
+    /**
+     * @relatedFR FR-LEGAL-13
+     * @description MAIL-13: 업로드된 특허 PDF 삭제(교체·정리용).
+     */
+    @DeleteMapping("/{patentId}/pdf")
+    public ApiResponse<PatentPdfMetaResponse> deletePatentPdf(@PathVariable String patentId) {
+        patentPdfService.deleteUploaded(patentId);
+        return ApiResponse.ok(PatentPdfMetaResponse.none(patentId));
+    }
+
+    public static ResponseEntity<byte[]> pdfDownloadResponse(PatentPdfService.PdfDownload download) {
+        String encodedName = java.net.URLEncoder.encode(download.docName(), java.nio.charset.StandardCharsets.UTF_8)
+                .replace("+", "%20");
+        return ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename*=UTF-8''" + encodedName)
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(download.content());
     }
 
     /**

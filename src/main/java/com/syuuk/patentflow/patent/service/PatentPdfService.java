@@ -1,11 +1,16 @@
 package com.syuuk.patentflow.patent.service;
 
+import com.syuuk.patentflow.common.error.ErrorCode;
+import com.syuuk.patentflow.common.error.PatentFlowException;
 import com.syuuk.patentflow.mailing.dto.PatentPdfLinkResponse;
 import com.syuuk.patentflow.patent.client.KiprisPdfPathClient;
 import com.syuuk.patentflow.patent.config.PatentPdfStorageProperties;
 import com.syuuk.patentflow.patent.domain.PatentMetadataEntity;
+import com.syuuk.patentflow.patent.domain.PatentPdfContentEntity;
 import com.syuuk.patentflow.patent.domain.PatentPdfDocumentEntity;
+import com.syuuk.patentflow.patent.dto.PatentPdfMetaResponse;
 import com.syuuk.patentflow.patent.repository.PatentMetadataRepository;
+import com.syuuk.patentflow.patent.repository.PatentPdfContentRepository;
 import com.syuuk.patentflow.patent.repository.PatentPdfDocumentRepository;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -21,6 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
@@ -47,6 +53,7 @@ public class PatentPdfService {
     private final PatentPdfStorageProperties properties;
     private final KiprisPdfPathClient kiprisPdfPathClient;
     private final PatentPdfDocumentRepository pdfDocumentRepository;
+    private final PatentPdfContentRepository pdfContentRepository;
     private final PatentMetadataRepository patentMetadataRepository;
     private final ObjectProvider<S3Client> s3ClientProvider;
     private final ObjectProvider<S3Presigner> s3PresignerProvider;
@@ -56,6 +63,7 @@ public class PatentPdfService {
             PatentPdfStorageProperties properties,
             KiprisPdfPathClient kiprisPdfPathClient,
             PatentPdfDocumentRepository pdfDocumentRepository,
+            PatentPdfContentRepository pdfContentRepository,
             PatentMetadataRepository patentMetadataRepository,
             ObjectProvider<S3Client> s3ClientProvider,
             ObjectProvider<S3Presigner> s3PresignerProvider
@@ -63,6 +71,7 @@ public class PatentPdfService {
         this.properties = properties;
         this.kiprisPdfPathClient = kiprisPdfPathClient;
         this.pdfDocumentRepository = pdfDocumentRepository;
+        this.pdfContentRepository = pdfContentRepository;
         this.patentMetadataRepository = patentMetadataRepository;
         this.s3ClientProvider = s3ClientProvider;
         this.s3PresignerProvider = s3PresignerProvider;
@@ -85,11 +94,17 @@ public class PatentPdfService {
         if (patent == null) {
             return originalUrlFallback(patentId, null);
         }
+        // MAIL-13: 법무팀 업로드본이 있으면 국가·S3 설정과 무관하게 최우선(TW·UAE 등 KIPRIS 미지원 국가).
+        // pdfUrl은 null — presigned가 아니라 인증이 필요한 앱 내 다운로드라 FE가 상세 딥링크를 안내한다.
+        Optional<PatentPdfDocumentEntity> existing = pdfDocumentRepository.findById(patentId);
+        if (existing.isPresent() && existing.get().isUploaded()) {
+            return new PatentPdfLinkResponse(patentId, null, PatentPdfLinkResponse.SOURCE_UPLOADED, null);
+        }
         if (!isKoreanPatent(patent.getCountry()) || !properties.usable()) {
             return originalUrlFallback(patentId, patent);
         }
         try {
-            String s3Key = cachedOrUploadedKey(patent);
+            String s3Key = cachedOrUploadedKey(patent, existing.orElse(null));
             if (s3Key == null) {
                 return originalUrlFallback(patentId, patent);
             }
@@ -101,10 +116,9 @@ public class PatentPdfService {
         }
     }
 
-    private String cachedOrUploadedKey(PatentMetadataEntity patent) {
-        Optional<PatentPdfDocumentEntity> cached = pdfDocumentRepository.findById(patent.getPatentId());
-        if (cached.isPresent()) {
-            return cached.get().getS3Key();
+    private String cachedOrUploadedKey(PatentMetadataEntity patent, PatentPdfDocumentEntity cachedOrNull) {
+        if (cachedOrNull != null) {
+            return cachedOrNull.getS3Key();
         }
         Optional<KiprisPdfPathClient.KiprisPdfPath> pdfPath =
                 kiprisPdfPathClient.findPdfPath(patent.getApplicationNumber());
@@ -128,7 +142,7 @@ public class PatentPdfService {
                         .contentDisposition("attachment; filename=\"%s\"".formatted(pdfPath.get().docName()))
                         .build(),
                 RequestBody.fromBytes(pdfBytes));
-        pdfDocumentRepository.save(new PatentPdfDocumentEntity(
+        pdfDocumentRepository.save(PatentPdfDocumentEntity.kiprisS3Cache(
                 patent.getPatentId(),
                 s3Key,
                 pdfPath.get().docName(),
@@ -136,6 +150,74 @@ public class PatentPdfService {
                 (long) pdfBytes.length,
                 OffsetDateTime.now(KST)));
         return s3Key;
+    }
+
+    /**
+     * @relatedFR FR-LEGAL-13
+     * MAIL-13: 법무팀 특허 PDF 직접 업로드 — TW·UAE 등 KIPRIS로 PDF를 가져올 수 없는 국가 대응.
+     * 기존 첨부(업로드본/KIPRIS 캐시)는 교체된다. PDF 매직 바이트·크기 상한을 검증한다.
+     */
+    @Transactional
+    public PatentPdfMetaResponse upload(String patentId, String docName, byte[] content, String uploadedBy) {
+        patentMetadataRepository.findById(patentId)
+                .orElseThrow(() -> new PatentFlowException(ErrorCode.PATENT_NOT_FOUND));
+        if (content == null || content.length == 0) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "업로드할 PDF 파일이 비어 있습니다.");
+        }
+        if (content.length > MAX_PDF_BYTES) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "PDF 파일은 50MB를 넘을 수 없습니다.");
+        }
+        if (content.length < 4 || content[0] != '%' || content[1] != 'P' || content[2] != 'D' || content[3] != 'F') {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "PDF 형식 파일만 업로드할 수 있습니다.");
+        }
+        String safeDocName = docName == null || docName.isBlank() ? patentId + ".pdf" : docName.trim();
+        PatentPdfDocumentEntity meta = PatentPdfDocumentEntity.uploaded(
+                patentId, safeDocName, (long) content.length, uploadedBy, OffsetDateTime.now(KST));
+        pdfDocumentRepository.save(meta);
+        pdfContentRepository.save(new PatentPdfContentEntity(patentId, content));
+        return toMeta(meta);
+    }
+
+    /** MAIL-13: 업로드된 PDF 본문 — 업로드본이 있을 때만 내려준다(KIPRIS 캐시는 presigned로 제공). */
+    @Transactional(readOnly = true)
+    public PdfDownload downloadUploaded(String patentId) {
+        PatentPdfDocumentEntity meta = pdfDocumentRepository.findById(patentId)
+                .filter(PatentPdfDocumentEntity::isUploaded)
+                .orElseThrow(() -> new PatentFlowException(ErrorCode.PATENT_NOT_FOUND, "업로드된 특허 PDF가 없습니다."));
+        PatentPdfContentEntity content = pdfContentRepository.findById(patentId)
+                .orElseThrow(() -> new PatentFlowException(ErrorCode.PATENT_NOT_FOUND, "업로드된 특허 PDF가 없습니다."));
+        return new PdfDownload(meta.getDocName(), content.getContent());
+    }
+
+    @Transactional(readOnly = true)
+    public PatentPdfMetaResponse meta(String patentId) {
+        return pdfDocumentRepository.findById(patentId)
+                .map(this::toMeta)
+                .orElse(PatentPdfMetaResponse.none(patentId));
+    }
+
+    /** MAIL-13: 업로드본 삭제(법무팀 교체·정리용). KIPRIS 캐시 행은 이 경로로 지우지 않는다. */
+    @Transactional
+    public void deleteUploaded(String patentId) {
+        PatentPdfDocumentEntity meta = pdfDocumentRepository.findById(patentId)
+                .filter(PatentPdfDocumentEntity::isUploaded)
+                .orElseThrow(() -> new PatentFlowException(ErrorCode.PATENT_NOT_FOUND, "업로드된 특허 PDF가 없습니다."));
+        pdfContentRepository.deleteById(patentId);
+        pdfDocumentRepository.delete(meta);
+    }
+
+    private PatentPdfMetaResponse toMeta(PatentPdfDocumentEntity entity) {
+        return new PatentPdfMetaResponse(
+                entity.getPatentId(),
+                true,
+                entity.getStorageType(),
+                entity.getDocName(),
+                entity.getContentLength(),
+                entity.getUploadedBy(),
+                entity.getCreatedAt());
+    }
+
+    public record PdfDownload(String docName, byte[] content) {
     }
 
     // 테스트에서 네트워크 없이 대체할 수 있도록 package 가시성으로 둔다.

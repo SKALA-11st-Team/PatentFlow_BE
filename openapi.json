@@ -968,6 +968,111 @@
         }
       }
     },
+    "/api/v1/patents/{patentId}/pdf" : {
+      "get" : {
+        "tags" : [
+          "patent-controller"
+        ],
+        "operationId" : "downloadPatentPdf",
+        "parameters" : [
+          {
+            "name" : "patentId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "string",
+                  "format" : "byte"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post" : {
+        "tags" : [
+          "patent-controller"
+        ],
+        "operationId" : "uploadPatentPdf",
+        "parameters" : [
+          {
+            "name" : "patentId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "file" : {
+                    "type" : "string",
+                    "format" : "binary"
+                  }
+                },
+                "required" : [
+                  "file"
+                ]
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePatentPdfMetaResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [
+          "patent-controller"
+        ],
+        "operationId" : "deletePatentPdf",
+        "parameters" : [
+          {
+            "name" : "patentId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePatentPdfMetaResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/patents/{patentId}/final-decision" : {
       "post" : {
         "tags" : [
@@ -2043,6 +2148,36 @@
         }
       }
     },
+    "/api/v1/patents/{patentId}/pdf/meta" : {
+      "get" : {
+        "tags" : [
+          "patent-controller"
+        ],
+        "operationId" : "getPatentPdfMeta",
+        "parameters" : [
+          {
+            "name" : "patentId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePatentPdfMetaResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/patents/{patentId}/history" : {
       "get" : {
         "tags" : [
@@ -2699,6 +2834,67 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/ApiResponsePatentDetailResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/business/patents/{patentId}/pdf" : {
+      "get" : {
+        "tags" : [
+          "business-controller"
+        ],
+        "operationId" : "downloadBusinessPatentPdf",
+        "parameters" : [
+          {
+            "name" : "patentId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "string",
+                  "format" : "byte"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/business/patents/{patentId}/pdf/meta" : {
+      "get" : {
+        "tags" : [
+          "business-controller"
+        ],
+        "operationId" : "getBusinessPatentPdfMeta",
+        "parameters" : [
+          {
+            "name" : "patentId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePatentPdfMetaResponse"
                 }
               }
             }
@@ -3713,6 +3909,49 @@
             "type" : "string"
           },
           "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "ApiResponsePatentPdfMetaResponse" : {
+        "type" : "object",
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/PatentPdfMetaResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "PatentPdfMetaResponse" : {
+        "type" : "object",
+        "properties" : {
+          "patentId" : {
+            "type" : "string"
+          },
+          "exists" : {
+            "type" : "boolean"
+          },
+          "storageType" : {
+            "type" : "string"
+          },
+          "docName" : {
+            "type" : "string"
+          },
+          "contentLength" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "uploadedBy" : {
+            "type" : "string"
+          },
+          "createdAt" : {
             "type" : "string",
             "format" : "date-time"
           }
