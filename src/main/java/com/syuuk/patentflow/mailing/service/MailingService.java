@@ -385,10 +385,22 @@ public class MailingService {
 
     private String currentUsername() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || authentication.getName() == null || authentication.getName().isBlank()) {
+        if (authentication == null) {
             return "PatentFlow";
         }
-        return authentication.getName();
+        // principal이 UserPrincipalResponse(record)일 때 getName()은 record toString() 전문을
+        // 반환해 sent_by varchar(128)을 초과 — SMTP 발송 성공 후 이력 저장이 깨지던 결함(E2E 실증).
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof com.syuuk.patentflow.auth.dto.UserPrincipalResponse userPrincipal) {
+            if (userPrincipal.username() != null && !userPrincipal.username().isBlank()) {
+                return userPrincipal.username().trim();
+            }
+            if (userPrincipal.email() != null && !userPrincipal.email().isBlank()) {
+                return userPrincipal.email().trim();
+            }
+        }
+        String name = authentication.getName();
+        return name == null || name.isBlank() ? "PatentFlow" : name.trim();
     }
 
     private String normalizeEmail(String email) {
