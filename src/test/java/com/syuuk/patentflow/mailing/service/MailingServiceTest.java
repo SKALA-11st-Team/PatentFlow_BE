@@ -82,8 +82,6 @@ class MailingServiceTest {
     @Test
     void recordedMailDoesNotAdvanceWorkflowAndUsesCollisionFreeIds() {
         when(mailOAuth2Service.isConnected()).thenReturn(false);
-        when(systemSettingsService.getGmailUsername()).thenReturn("");
-        when(systemSettingsService.getGmailAppPassword()).thenReturn("");
         when(userRepository.findAll()).thenReturn(List.of(
                 user("USER-1", "FB@example.com", "DEPT-1"),
                 user("USER-2", "Ea@example.com", "DEPT-2")));
@@ -109,9 +107,9 @@ class MailingServiceTest {
 
     @Test
     void anyRecipientFailureAbortsEntireBatch() {
-        when(mailOAuth2Service.isConnected()).thenReturn(false);
-        when(systemSettingsService.getGmailUsername()).thenReturn("sender@example.com");
-        when(systemSettingsService.getGmailAppPassword()).thenReturn("app-password");
+        when(mailOAuth2Service.isConnected()).thenReturn(true);
+        when(mailOAuth2Service.getValidAccessToken()).thenReturn("access-token");
+        when(systemSettingsService.getGmailOAuth2ConnectedEmail()).thenReturn("sender@example.com");
         when(userRepository.findAll()).thenReturn(List.of(
                 user("USER-1", "success@example.com", "DEPT-1"),
                 user("USER-2", "fail@example.com", "DEPT-2")));
@@ -134,8 +132,6 @@ class MailingServiceTest {
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken("admin@syuuk.test", "n/a"));
         when(mailOAuth2Service.isConnected()).thenReturn(false);
-        when(systemSettingsService.getGmailUsername()).thenReturn("");
-        when(systemSettingsService.getGmailAppPassword()).thenReturn("");
         when(userRepository.findAll()).thenReturn(List.of(user("USER-1", "recipient@example.com", "DEPT-1")));
         when(patentReviewService.markMailingSent(List.of()))
                 .thenReturn(new PatentReviewService.WorkflowBatchUpdateResult(List.of(), List.of()));
@@ -150,8 +146,6 @@ class MailingServiceTest {
     @Test
     void rejectsUrlPlaceholdersBeforeSavingHistory() {
         when(mailOAuth2Service.isConnected()).thenReturn(false);
-        when(systemSettingsService.getGmailUsername()).thenReturn("");
-        when(systemSettingsService.getGmailAppPassword()).thenReturn("");
 
         BusinessReviewMailSendDraft draft = new BusinessReviewMailSendDraft(
                 "body",
@@ -262,7 +256,7 @@ class MailingServiceTest {
         }
 
         @Override
-        protected void sendEmail(String username, String password, BusinessReviewMailSendDraft draft) {
+        protected void sendEmailOAuth2(String senderEmail, String accessToken, BusinessReviewMailSendDraft draft) {
             if (failRecipients.contains(draft.recipientEmail())) {
                 throw new PatentFlowException(ErrorCode.MAIL_SEND_FAILED);
             }

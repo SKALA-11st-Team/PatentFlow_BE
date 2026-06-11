@@ -577,54 +577,6 @@
         }
       }
     },
-    "/api/v1/admin/settings/mail" : {
-      "get" : {
-        "tags" : [
-          "admin-settings-controller"
-        ],
-        "operationId" : "getMailSettings",
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseMailSettingsResponse"
-                }
-              }
-            }
-          }
-        }
-      },
-      "put" : {
-        "tags" : [
-          "admin-settings-controller"
-        ],
-        "operationId" : "updateMailSettings",
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/MailSettingsRequest"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "description" : "OK",
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseMailSettingsResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/admin/departments/{departmentId}" : {
       "put" : {
         "tags" : [
@@ -3564,43 +3516,6 @@
           "createdAt" : {
             "type" : "string",
             "format" : "date-time"
-          }
-        }
-      },
-      "MailSettingsRequest" : {
-        "type" : "object",
-        "properties" : {
-          "gmailUsername" : {
-            "type" : "string"
-          },
-          "gmailAppPassword" : {
-            "type" : "string"
-          }
-        }
-      },
-      "ApiResponseMailSettingsResponse" : {
-        "type" : "object",
-        "properties" : {
-          "data" : {
-            "$ref" : "#/components/schemas/MailSettingsResponse"
-          },
-          "message" : {
-            "type" : "string"
-          },
-          "timestamp" : {
-            "type" : "string",
-            "format" : "date-time"
-          }
-        }
-      },
-      "MailSettingsResponse" : {
-        "type" : "object",
-        "properties" : {
-          "gmailUsername" : {
-            "type" : "string"
-          },
-          "isAppPasswordConfigured" : {
-            "type" : "boolean"
           }
         }
       },

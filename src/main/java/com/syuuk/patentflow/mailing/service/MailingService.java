@@ -43,10 +43,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort;
 import org.springframework.mail.javamail.MimeMessageHelper;
-import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -61,12 +59,6 @@ public class MailingService {
     private static final String STATUS_FAILED = "FAILED";
     private static final String STATUS_RECORDED = "RECORDED";
     private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\{\\{?[^}]*url[^}]*}?}", Pattern.CASE_INSENSITIVE);
-
-    @Value("${spring.mail.username:}")
-    private String envGmailUsername;
-
-    @Value("${spring.mail.password:}")
-    private String envGmailAppPassword;
 
     private final MailingHistoryRepository mailingHistoryRepository;
     private final PatentReviewService patentReviewService;
@@ -143,12 +135,8 @@ public class MailingService {
     // DB 상태(이력·워크플로우 전이)는 항상 일관되게 유지된다.
     @Transactional
     public MailingSendResponse send(MailingSendRequest request) {
-        // OAuth2 연동 우선 → 앱 비밀번호(레거시) → 미발송 기록
+        // OAuth2 연동 우선 → 미발송 기록
         boolean oauth2Connected = mailOAuth2Service.isConnected();
-        String username = resolve(systemSettingsService.getGmailUsername(), envGmailUsername);
-        String appPassword = resolve(systemSettingsService.getGmailAppPassword(), envGmailAppPassword);
-        boolean appPasswordConfigured = username != null && !username.isBlank()
-                && appPassword != null && !appPassword.isBlank();
 
         request.drafts().forEach(this::validateDraft);
 
@@ -167,15 +155,9 @@ public class MailingService {
                 saveHistory(mailingBatchId, draft, STATUS_SENT, departmentIdsByEmail, sentBy);
                 sentDrafts.add(draft);
             }
-        } else if (appPasswordConfigured) {
-            for (BusinessReviewMailSendDraft draft : request.drafts()) {
-                sendEmail(username, appPassword, draft);
-                saveHistory(mailingBatchId, draft, STATUS_SENT, departmentIdsByEmail, sentBy);
-                sentDrafts.add(draft);
-            }
         } else {
-            // OAuth2·앱비밀번호 모두 미연동 — 실제 발송 없이 이력만 기록한다. RECORDED는 워크플로우 전이 대상이 아니다.
-            log.info("Gmail credentials are not configured; recording mailing workflow without SMTP delivery.");
+            // OAuth2 미연동 — 실제 발송 없이 이력만 기록한다. RECORDED는 워크플로우 전이 대상이 아니다.
+            log.info("Gmail OAuth2 is not connected; recording mailing workflow without SMTP delivery.");
             for (BusinessReviewMailSendDraft draft : request.drafts()) {
                 saveHistory(mailingBatchId, draft, STATUS_RECORDED, departmentIdsByEmail, sentBy);
                 recordedCount++;
@@ -251,47 +233,6 @@ public class MailingService {
             log.warn("Failed to send OAuth2 email to {}: {}", draft.recipientEmail(), e.getMessage());
             throw new PatentFlowException(ErrorCode.MAIL_SEND_FAILED);
         }
-    }
-
-    protected void sendEmail(String username, String password, BusinessReviewMailSendDraft draft) {
-        try {
-            JavaMailSenderImpl sender = buildSender(username, password);
-            MimeMessage message = sender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
-            helper.setFrom(username);
-            helper.setTo(draft.recipientEmail());
-            List<String> ccEmails = normalizedCcEmails(draft);
-            if (!ccEmails.isEmpty()) {
-                helper.setCc(ccEmails.toArray(String[]::new));
-            }
-            helper.setSubject(draft.subject());
-            helper.setText(draft.body(), false);
-            sender.send(message);
-            log.info("Email sent to {} (subject={})", draft.recipientEmail(), draft.subject());
-        } catch (MessagingException e) {
-            log.warn("Failed to send email to {}: {}", draft.recipientEmail(), e.getMessage());
-            throw new PatentFlowException(ErrorCode.MAIL_SEND_FAILED);
-        }
-    }
-
-    private static String resolve(String fromDb, String fromEnv) {
-        return (fromDb != null && !fromDb.isBlank()) ? fromDb : fromEnv;
-    }
-
-    private static JavaMailSenderImpl buildSender(String username, String password) {
-        JavaMailSenderImpl sender = new JavaMailSenderImpl();
-        sender.setHost("smtp.gmail.com");
-        sender.setPort(587);
-        sender.setUsername(username);
-        sender.setPassword(password);
-        Properties props = sender.getJavaMailProperties();
-        props.put("mail.smtp.auth", "true");
-        props.put("mail.smtp.starttls.enable", "true");
-        props.put("mail.smtp.starttls.required", "true");
-        props.put("mail.smtp.connectiontimeout", "5000");
-        props.put("mail.smtp.timeout", "5000");
-        props.put("mail.smtp.writetimeout", "5000");
-        return sender;
     }
 
     @Transactional(readOnly = true)

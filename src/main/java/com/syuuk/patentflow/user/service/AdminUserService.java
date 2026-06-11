@@ -23,12 +23,9 @@ import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.mail.javamail.JavaMailSenderImpl;
-import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,12 +38,6 @@ public class AdminUserService {
     private static final String ROLE_ADMIN = "ADMIN";
     private static final String ROLE_BUSINESS = "BUSINESS";
     private static final Set<String> PROTECTED_ADMIN_IDS = Set.of("USER-admin", "USER-admin-bootstrap");
-
-    @Value("${spring.mail.username:}")
-    private String envGmailUsername;
-
-    @Value("${spring.mail.password:}")
-    private String envGmailAppPassword;
 
     private final UserRepository userRepository;
     private final DepartmentRepository departmentRepository;
@@ -224,22 +215,14 @@ public class AdminUserService {
 
     protected void sendEmail(String to, String subject, String body, String tempPassword) {
         // USER-06: 메일 레인에서 커밋 후 비동기 이벤트 발송으로 분리할 대상.
-        if (mailOAuth2Service.isConnected()) {
-            // OAuth2 연동 계정으로 발송 (권장)
-            String senderEmail = systemSettingsService.getGmailOAuth2ConnectedEmail();
-            String accessToken = mailOAuth2Service.getValidAccessToken();
-            sendEmailOAuth2(senderEmail, accessToken, to, subject, body);
-        } else {
-            // 레거시 앱 비밀번호 폴백
-            String senderEmail = resolve(systemSettingsService.getGmailUsername(), envGmailUsername);
-            String password = resolve(systemSettingsService.getGmailAppPassword(), envGmailAppPassword);
-            if (senderEmail == null || senderEmail.isBlank() || password == null || password.isBlank()) {
-                log.warn("Gmail 미연동 — 이메일 발송 불가. 임시 비밀번호는 보안상 로그에 남기지 않습니다. recipient={}", to);
-                throw new PatentFlowException(ErrorCode.INVALID_REQUEST,
-                        "Gmail이 연동되지 않아 이메일을 발송할 수 없습니다. 설정 페이지에서 Google 계정을 먼저 연동해 주세요.");
-            }
-            sendEmailSmtp(senderEmail, password, to, subject, body);
+        if (!mailOAuth2Service.isConnected()) {
+            log.warn("Gmail 미연동 — 이메일 발송 불가. 임시 비밀번호는 보안상 로그에 남기지 않습니다. recipient={}", to);
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST,
+                    "Gmail이 연동되지 않아 이메일을 발송할 수 없습니다. 설정 페이지에서 Google 계정을 먼저 연동해 주세요.");
         }
+        String senderEmail = systemSettingsService.getGmailOAuth2ConnectedEmail();
+        String accessToken = mailOAuth2Service.getValidAccessToken();
+        sendEmailOAuth2(senderEmail, accessToken, to, subject, body);
     }
 
     private void sendEmailOAuth2(String senderEmail, String accessToken, String to, String subject, String body) {
@@ -267,35 +250,6 @@ public class AdminUserService {
             log.warn("OAuth2 email send failed to {}: {}", to, e.getMessage());
             throw new PatentFlowException(ErrorCode.MAIL_SEND_FAILED);
         }
-    }
-
-    private void sendEmailSmtp(String senderEmail, String password, String to, String subject, String body) {
-        try {
-            JavaMailSenderImpl sender = new JavaMailSenderImpl();
-            sender.setHost("smtp.gmail.com");
-            sender.setPort(587);
-            sender.setUsername(senderEmail);
-            sender.setPassword(password);
-            Properties props = sender.getJavaMailProperties();
-            props.put("mail.smtp.auth", "true");
-            props.put("mail.smtp.starttls.enable", "true");
-            props.put("mail.smtp.starttls.required", "true");
-            MimeMessage message = sender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
-            helper.setFrom(senderEmail);
-            helper.setTo(to);
-            helper.setSubject(subject);
-            helper.setText(body, false);
-            sender.send(message);
-            log.info("Email sent via SMTP to {} (subject={})", to, subject);
-        } catch (MessagingException e) {
-            log.warn("SMTP email send failed to {}: {}", to, e.getMessage());
-            throw new PatentFlowException(ErrorCode.MAIL_SEND_FAILED);
-        }
-    }
-
-    private static String resolve(String fromDb, String fromEnv) {
-        return (fromDb != null && !fromDb.isBlank()) ? fromDb : fromEnv;
     }
 
     private static boolean isProtectedAdminId(String userId) {

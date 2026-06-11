@@ -7,8 +7,6 @@ import com.syuuk.patentflow.common.domain.SystemSettingsEntity;
 import com.syuuk.patentflow.common.dto.ClassificationResponse;
 import com.syuuk.patentflow.common.dto.CountryExtensionRequest;
 import com.syuuk.patentflow.common.dto.CountryExtensionResponse;
-import com.syuuk.patentflow.common.dto.MailSettingsRequest;
-import com.syuuk.patentflow.common.dto.MailSettingsResponse;
 import com.syuuk.patentflow.common.error.ErrorCode;
 import com.syuuk.patentflow.common.error.PatentFlowException;
 import com.syuuk.patentflow.common.repository.SystemSettingsRepository;
@@ -22,8 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class SystemSettingsService {
 
-    static final String KEY_GMAIL_USERNAME = "mail.gmail.username";
-    static final String KEY_GMAIL_APP_PASSWORD = "mail.gmail.app_password";
     // OAuth2 앱 자격증명 — 관리자 UI에서 입력, env 폴백 지원
     static final String KEY_GMAIL_OAUTH2_CLIENT_ID = "mail.gmail.oauth2.client_id";
     static final String KEY_GMAIL_OAUTH2_CLIENT_SECRET = "mail.gmail.oauth2.client_secret";
@@ -58,7 +54,7 @@ public class SystemSettingsService {
             "인증", "보안", "Network", "NFC", "AR", "VR (Avatar)", "사내시스템");
 
     private final SystemSettingsRepository repository;
-    // MAIL-08: 민감 시크릿(앱 비밀번호·refresh_token·client_secret) 저장/조회 시 AES-GCM 적용.
+    // MAIL-08: 민감 시크릿(refresh_token·client_secret) 저장/조회 시 AES-GCM 적용.
     private final com.syuuk.patentflow.common.security.SecretCipher secretCipher;
     // env 폴백 — DB에 값이 없을 때 환경변수 값을 사용 (Docker 배포 시 편의)
     @Value("${GOOGLE_OAUTH2_CLIENT_ID:}")
@@ -83,21 +79,6 @@ public class SystemSettingsService {
         SystemSettingsEntity entity = repository.findById(key).orElse(new SystemSettingsEntity(key));
         entity.setValue(value);
         repository.save(entity);
-    }
-
-    public String getGmailUsername() {
-        return get(KEY_GMAIL_USERNAME);
-    }
-
-    public String getGmailAppPassword() {
-        return secretCipher.decrypt(get(KEY_GMAIL_APP_PASSWORD));
-    }
-
-    @Transactional(readOnly = true)
-    public MailSettingsResponse getMailSettings() {
-        String username = getGmailUsername();
-        String password = getGmailAppPassword();
-        return new MailSettingsResponse(maskEmail(username), password != null && !password.isBlank());
     }
 
     // ── Gmail OAuth2 앱 자격증명 ──────────────────────────────
@@ -126,28 +107,11 @@ public class SystemSettingsService {
     public void saveGmailOAuth2(String refreshToken, String email) {
         set(KEY_GMAIL_OAUTH2_REFRESH_TOKEN, secretCipher.encrypt(refreshToken));
         set(KEY_GMAIL_OAUTH2_CONNECTED_EMAIL, email);
-        set(KEY_GMAIL_APP_PASSWORD, "");
     }
 
     public void clearGmailOAuth2() {
         set(KEY_GMAIL_OAUTH2_REFRESH_TOKEN, "");
         set(KEY_GMAIL_OAUTH2_CONNECTED_EMAIL, "");
-    }
-
-    @Transactional
-    public MailSettingsResponse saveMailSettings(MailSettingsRequest request) {
-        // getMailSettings가 마스킹된 username을 반환하므로, 마스킹 값이 그대로 되돌아오면(미변경) 덮어쓰지 않는다.
-        if (request.gmailUsername() != null
-                && !request.gmailUsername().isBlank()
-                && !request.gmailUsername().contains("*")) {
-            set(KEY_GMAIL_USERNAME, request.gmailUsername().trim());
-        }
-        if (request.gmailAppPassword() != null
-                && !request.gmailAppPassword().isBlank()
-                && !request.gmailAppPassword().contains("*")) {
-            set(KEY_GMAIL_APP_PASSWORD, secretCipher.encrypt(request.gmailAppPassword().trim()));
-        }
-        return getMailSettings();
     }
 
     public int getMailLeadMonths() {
@@ -362,15 +326,4 @@ public class SystemSettingsService {
         repository.save(entity);
     }
 
-    private String maskEmail(String email) {
-        if (email == null || email.isBlank()) {
-            return email;
-        }
-        String trimmed = email.trim();
-        int at = trimmed.indexOf('@');
-        if (at <= 1) {
-            return "***" + (at >= 0 ? trimmed.substring(at) : "");
-        }
-        return trimmed.charAt(0) + "***" + trimmed.substring(at);
-    }
 }
