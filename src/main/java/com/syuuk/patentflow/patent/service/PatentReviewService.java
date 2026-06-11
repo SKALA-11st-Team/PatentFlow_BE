@@ -1294,7 +1294,8 @@ public class PatentReviewService {
                 currentQuarterKey);
     }
 
-    private String originalPatentUrl(String country, String applicationNumber, String registrationNumber) {
+    /** 특허 원문 URL 생성 규칙(MAIL-10) — PDF 폴백(MAIL-12) 등에서 재사용하도록 공개한다. */
+    public static String originalPatentUrl(String country, String applicationNumber, String registrationNumber) {
         String number = firstNonBlank(registrationNumber, applicationNumber);
         if (number == null) {
             return null;
@@ -1314,7 +1315,7 @@ public class PatentReviewService {
         return value;
     }
 
-    private String firstNonBlank(String firstValue, String secondValue) {
+    private static String firstNonBlank(String firstValue, String secondValue) {
         if (firstValue != null && !firstValue.isBlank()) {
             return firstValue;
         }

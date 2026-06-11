@@ -7,7 +7,10 @@ import com.syuuk.patentflow.mailing.dto.DepartmentRecipientMappingRequest;
 import com.syuuk.patentflow.mailing.dto.MailingHistoryItemResponse;
 import com.syuuk.patentflow.mailing.dto.MailingSendRequest;
 import com.syuuk.patentflow.mailing.dto.MailingSendResponse;
+import com.syuuk.patentflow.mailing.dto.PatentPdfLinkRequest;
+import com.syuuk.patentflow.mailing.dto.PatentPdfLinkResponse;
 import com.syuuk.patentflow.mailing.service.MailingService;
+import com.syuuk.patentflow.patent.service.PatentPdfService;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,9 +27,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class MailingController {
 
     private final MailingService mailingService;
+    private final PatentPdfService patentPdfService;
 
-    public MailingController(MailingService mailingService) {
+    public MailingController(MailingService mailingService, PatentPdfService patentPdfService) {
         this.mailingService = mailingService;
+        this.patentPdfService = patentPdfService;
     }
 
     @GetMapping("/department-recipient-mappings")
@@ -52,6 +57,19 @@ public class MailingController {
     @PostMapping("/send")
     public ApiResponse<MailingSendResponse> sendMailing(@Valid @RequestBody MailingSendRequest request) {
         return ApiResponse.ok(mailingService.send(request));
+    }
+
+    /**
+     * @relatedFR FR-LEGAL-13, FR-LEGAL-14
+     * @relatedUI UI-LEGAL-05
+     * @description MAIL-12: 메일 초안에 실을 특허 PDF 다운로드 링크 일괄 해석 API.
+     * KR 특허는 KIPRIS 공개전문 PDF의 S3 presigned 링크, 그 외/실패는 원문 URL 폴백.
+     */
+    @PostMapping("/patent-pdf-links")
+    public ApiResponse<List<PatentPdfLinkResponse>> resolvePatentPdfLinks(
+            @Valid @RequestBody PatentPdfLinkRequest request
+    ) {
+        return ApiResponse.ok(patentPdfService.resolvePdfLinks(request.patentIds()));
     }
 
     @GetMapping("/history")

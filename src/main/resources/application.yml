@@ -109,6 +109,7 @@ patentflow:
       service-path: ${PATENTFLOW_KIPRIS_SERVICE_PATH:/kipo-api/kipi/patUtiModInfoSearchSevice}
       bibliography-operation: ${PATENTFLOW_KIPRIS_BIBLIOGRAPHY_OPERATION:getBibliographyDetailInfoSearch}
       application-search-operation: ${PATENTFLOW_KIPRIS_APPLICATION_SEARCH_OPERATION:}
+      pdf-path-operation: ${PATENTFLOW_KIPRIS_PDF_PATH_OPERATION:getPubFullTextInfoSearch}
       service-key: ${PATENTFLOW_KIPRIS_SERVICE_KEY:}
       service-keys: ${PATENTFLOW_KIPRIS_SERVICE_KEYS:}
     google-patents:
@@ -116,6 +117,14 @@ patentflow:
       base-url: ${PATENTFLOW_GOOGLE_PATENTS_BASE_URL:https://patents.google.com}
   ai-report:
     storage-dir: ${PATENTFLOW_AI_REPORT_STORAGE_DIR:storage/ai-reports}
+  # MAIL-12: 한국 특허 공개전문 PDF를 KIPRIS에서 받아 S3에 캐시하고 presigned 다운로드 링크를
+  # 메일에 싣는다. 비활성/미설정이면 모든 특허가 원문 URL로 폴백한다(무해 배포).
+  pdf-storage:
+    enabled: ${PATENTFLOW_PDF_STORAGE_ENABLED:false}
+    bucket: ${PATENTFLOW_PDF_S3_BUCKET:}
+    region: ${PATENTFLOW_PDF_S3_REGION:ap-northeast-2}
+    key-prefix: ${PATENTFLOW_PDF_S3_KEY_PREFIX:patent-pdfs/}
+    presign-ttl-days: ${PATENTFLOW_PDF_PRESIGN_TTL_DAYS:7}
 
 springdoc:
   # SEC-12: 운영에서는 SPRINGDOC_ENABLED=false로 api-docs·swagger-ui를 전면 비활성화(ADMIN 게이트에 더한 심층 방어).

@@ -150,7 +150,7 @@ class MailingServiceTest {
         BusinessReviewMailSendDraft draft = new BusinessReviewMailSendDraft(
                 "body",
                 List.of(),
-                List.of(new BusinessReviewMailPatentSummary("PAT-1", "M-1", "{originalPatentUrl}", "title")),
+                List.of(new BusinessReviewMailPatentSummary("PAT-1", "M-1", "{originalPatentUrl}", "title", null)),
                 "recipient@example.com",
                 "recipient",
                 "subject");
@@ -230,7 +230,8 @@ class MailingServiceTest {
                         patentId,
                         "M-" + patentId,
                         "https://patents.google.com/patent/KR" + patentId + "/ko",
-                        "title")),
+                        "title",
+                        null)),
                 recipientEmail,
                 "recipient",
                 "subject");

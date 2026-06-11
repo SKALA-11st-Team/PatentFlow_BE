@@ -17,6 +17,7 @@ import com.syuuk.patentflow.patent.dto.PatentContextSuggestionResponse;
 import com.syuuk.patentflow.patent.dto.PatentDetailResponse;
 import com.syuuk.patentflow.patent.dto.PatentFilterOptionsResponse;
 import com.syuuk.patentflow.patent.dto.PatentHistoryResponse;
+import com.syuuk.patentflow.patent.dto.PatentFeeScheduleResponse;
 import com.syuuk.patentflow.patent.dto.PatentListFilter;
 import com.syuuk.patentflow.patent.dto.PatentListItemResponse;
 
@@ -25,6 +26,7 @@ import com.syuuk.patentflow.patent.dto.PatentUpsertResponse;
 import com.syuuk.patentflow.patent.dto.ReviewWorkflowStatus;
 import com.syuuk.patentflow.patent.service.AiReportEditService;
 import com.syuuk.patentflow.patent.service.AiReportJobService;
+import com.syuuk.patentflow.patent.service.AnnualFeeScheduleManagementService;
 import com.syuuk.patentflow.patent.service.PatentReviewService;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
@@ -50,15 +52,18 @@ public class PatentController {
     private final PatentReviewService patentReviewService;
     private final AiReportJobService aiReportJobService;
     private final AiReportEditService aiReportEditService;
+    private final AnnualFeeScheduleManagementService annualFeeScheduleManagementService;
 
     public PatentController(
             PatentReviewService patentReviewService,
             AiReportJobService aiReportJobService,
-            AiReportEditService aiReportEditService
+            AiReportEditService aiReportEditService,
+            AnnualFeeScheduleManagementService annualFeeScheduleManagementService
     ) {
         this.patentReviewService = patentReviewService;
         this.aiReportJobService = aiReportJobService;
         this.aiReportEditService = aiReportEditService;
+        this.annualFeeScheduleManagementService = annualFeeScheduleManagementService;
     }
 
     /**
@@ -163,6 +168,16 @@ public class PatentController {
     @GetMapping("/{patentId}")
     public ApiResponse<PatentDetailResponse> getPatentDetail(@PathVariable String patentId) {
         return ApiResponse.ok(patentReviewService.getPatentDetail(patentId));
+    }
+
+    /**
+     * @relatedFR FR-LEGAL-24
+     * @relatedUI UI-LEGAL-04
+     * @description FEE-06: 특허 상세 연차료 일정 — 국가 규칙 기반 도래일·검토 시작(고지 발송) 예정일·수신처 조회 API.
+     */
+    @GetMapping("/{patentId}/fee-schedule")
+    public ApiResponse<PatentFeeScheduleResponse> getPatentFeeSchedule(@PathVariable String patentId) {
+        return ApiResponse.ok(annualFeeScheduleManagementService.getPatentFeeSchedule(patentId));
     }
 
     /**

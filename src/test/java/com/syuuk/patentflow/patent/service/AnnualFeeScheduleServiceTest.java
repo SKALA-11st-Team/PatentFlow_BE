@@ -1,6 +1,7 @@
 package com.syuuk.patentflow.patent.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -10,13 +11,69 @@ import org.junit.jupiter.api.Test;
 
 class AnnualFeeScheduleServiceTest {
 
-    private final AnnualFeeScheduleService service =
-            new AnnualFeeScheduleService(mock(SystemSettingsService.class));
+    // Mockito는 Integer 반환 메서드에 null이 아닌 0을 기본 반환하므로,
+    // '오버라이드 미설정(null)' 상태를 명시 스텁해 실제 기본 규칙 경로를 검증한다.
+    private static SystemSettingsService settingsWithoutOverrides() {
+        SystemSettingsService settings = mock(SystemSettingsService.class);
+        when(settings.getCountryFeeBasisOverride(anyString())).thenReturn(null);
+        when(settings.getCountryFeeInitialLumpYearsOverride(anyString())).thenReturn(null);
+        when(settings.getCountryFeeCycleMonthsOverride(anyString())).thenReturn(null);
+        return settings;
+    }
 
+    private final AnnualFeeScheduleService service =
+            new AnnualFeeScheduleService(settingsWithoutOverrides());
+
+    // FEE-06: KR 정밀 규칙 — 설정등록 시 1~3년차 일괄 납부, 4년차부터 등록일 기준 매년.
     @Test
-    void usesApplicationDateAsBasisWhenPresent() {
+    void krUsesRegistrationDateAnniversaryAfterLumpPeriod() {
         LocalDate due = service.calculateNextDueDate(
                 "KR", LocalDate.of(2019, 6, 15), LocalDate.of(2020, 3, 10), null, LocalDate.of(2026, 1, 1));
+        assertThat(due).isEqualTo(LocalDate.of(2026, 3, 10));
+    }
+
+    // FEE-06: 등록 후 3년이 지나지 않은 KR 특허의 최초 도래일은 4년차 납부일(등록일+3년)이다.
+    @Test
+    void krFirstDueDateIsFourthYearPaymentAfterRegistration() {
+        LocalDate due = service.calculateNextDueDate(
+                "KR", LocalDate.of(2022, 6, 15), LocalDate.of(2023, 5, 10), null, LocalDate.of(2024, 1, 1));
+        assertThat(due).isEqualTo(LocalDate.of(2026, 5, 10));
+    }
+
+    // FEE-06: 일괄 구간이 끝난 해의 anniversary 당일은 그대로 도래일이다(경계).
+    @Test
+    void krAnniversaryOnBaseDateIsDue() {
+        LocalDate due = service.calculateNextDueDate(
+                "KR", null, LocalDate.of(2023, 5, 10), null, LocalDate.of(2026, 5, 10));
+        assertThat(due).isEqualTo(LocalDate.of(2026, 5, 10));
+    }
+
+    // FEE-06: 미등록 KR 특허(등록일 null)는 기존처럼 출원일 기준으로 폴백한다.
+    @Test
+    void krFallsBackToApplicationDateWhenUnregistered() {
+        LocalDate due = service.calculateNextDueDate(
+                "KR", LocalDate.of(2019, 6, 15), null, null, LocalDate.of(2026, 1, 1));
+        assertThat(due).isEqualTo(LocalDate.of(2026, 6, 15));
+    }
+
+    // FEE-06: fee.rule.KR.basis 오버라이드로 출원일 기준으로 되돌릴 수 있다.
+    @Test
+    void krBasisCanBeOverriddenToApplicationDate() {
+        SystemSettingsService settings = settingsWithoutOverrides();
+        when(settings.getCountryFeeBasisOverride("KR")).thenReturn("APPLICATION_DATE");
+        when(settings.getCountryFeeInitialLumpYearsOverride("KR")).thenReturn(0);
+        AnnualFeeScheduleService svc = new AnnualFeeScheduleService(settings);
+
+        LocalDate due = svc.calculateNextDueDate(
+                "KR", LocalDate.of(2019, 6, 15), LocalDate.of(2020, 3, 10), null, LocalDate.of(2026, 1, 1));
+        assertThat(due).isEqualTo(LocalDate.of(2026, 6, 15));
+    }
+
+    // 일반 규칙(국가 정밀 규칙 없음): 출원일 기준 매년 도래.
+    @Test
+    void genericCountryUsesApplicationDateAnniversary() {
+        LocalDate due = service.calculateNextDueDate(
+                "JP", LocalDate.of(2019, 6, 15), LocalDate.of(2020, 3, 10), null, LocalDate.of(2026, 1, 1));
         assertThat(due).isEqualTo(LocalDate.of(2026, 6, 15));
     }
 
@@ -40,28 +97,30 @@ class AnnualFeeScheduleServiceTest {
     }
 
     @Test
-    void fallsBackToRegistrationDateWhenApplicationDateMissing() {
-        LocalDate due = service.calculateNextDueDate(
-                "KR", null, LocalDate.of(2020, 3, 10), null, LocalDate.of(2026, 1, 1));
-        assertThat(due).isEqualTo(LocalDate.of(2026, 3, 10));
-    }
-
-    @Test
     void fallsBackToYearEndWhenBothDatesMissing() {
         LocalDate due = service.calculateNextDueDate(
                 "KR", null, null, null, LocalDate.of(2026, 1, 1));
         assertThat(due).isEqualTo(LocalDate.of(2026, 12, 31));
     }
 
-    // FEE-05: 과거 저장 납부일을 국가 연장 개월(12)로 굴려 오늘 이후 가장 가까운 도래일로 만든다.
+    // FEE-05: 과거 저장 납부일을 국가 납부 주기(KR 기본 12개월)로 굴려 오늘 이후 가장 가까운 도래일로 만든다.
     @Test
     void rollsForwardPastDueDateToNearestFuture() {
-        SystemSettingsService settings = mock(SystemSettingsService.class);
-        when(settings.getCountryExtensionMonths("KR")).thenReturn(12);
+        LocalDate rolled = service.rollForwardToFuture(
+                "KR", LocalDate.of(2022, 6, 15), null, LocalDate.of(2026, 1, 1));
+
+        assertThat(rolled).isEqualTo(LocalDate.of(2026, 6, 15));
+    }
+
+    // FEE-05: 일반 국가는 country.extension 설정값을 납부 주기로 사용한다.
+    @Test
+    void rollForwardUsesCountryExtensionSettingForGenericCountry() {
+        SystemSettingsService settings = settingsWithoutOverrides();
+        when(settings.getCountryExtensionMonths("JP")).thenReturn(12);
         AnnualFeeScheduleService svc = new AnnualFeeScheduleService(settings);
 
         LocalDate rolled = svc.rollForwardToFuture(
-                "KR", LocalDate.of(2022, 6, 15), null, LocalDate.of(2026, 1, 1));
+                "JP", LocalDate.of(2022, 6, 15), null, LocalDate.of(2026, 1, 1));
 
         assertThat(rolled).isEqualTo(LocalDate.of(2026, 6, 15));
     }
@@ -75,13 +134,27 @@ class AnnualFeeScheduleServiceTest {
 
     @Test
     void rollForwardDoesNotExceedExpiration() {
-        SystemSettingsService settings = mock(SystemSettingsService.class);
-        when(settings.getCountryExtensionMonths("KR")).thenReturn(12);
-        AnnualFeeScheduleService svc = new AnnualFeeScheduleService(settings);
-
-        LocalDate rolled = svc.rollForwardToFuture(
+        LocalDate rolled = service.rollForwardToFuture(
                 "KR", LocalDate.of(2022, 6, 15), LocalDate.of(2023, 12, 31), LocalDate.of(2026, 1, 1));
 
         assertThat(rolled).isEqualTo(LocalDate.of(2023, 12, 31));
+    }
+
+    // FEE-06: 도래일의 연차 번호 — KR 등록일+3년 도래일은 4년차 납부분이다.
+    @Test
+    void annuityYearNumberCountsFromBasisDate() {
+        assertThat(service.annuityYearNumber(LocalDate.of(2023, 5, 10), LocalDate.of(2026, 5, 10))).isEqualTo(4);
+        assertThat(service.annuityYearNumber(LocalDate.of(2023, 5, 10), LocalDate.of(2026, 5, 9))).isEqualTo(3);
+        assertThat(service.annuityYearNumber(null, LocalDate.of(2026, 5, 10))).isZero();
+    }
+
+    // FEE-06: 규칙 라벨 — KR은 일괄 납부 구간을 안내한다.
+    @Test
+    void paymentRuleLabelDescribesKrLumpRule() {
+        assertThat(service.paymentRuleLabel("KR"))
+                .isEqualTo("설정등록 시 1~3년차 일괄 납부, 4년차부터 등록일 기준 매년 납부");
+        assertThat(service.paymentRuleLabel("US"))
+                .isEqualTo("등록일 기준 3년 6개월, 7년 6개월, 11년 6개월 유지료");
+        assertThat(service.paymentRuleLabel("JP")).isEqualTo("출원일 기준 매년 도래하는 연차료");
     }
 }

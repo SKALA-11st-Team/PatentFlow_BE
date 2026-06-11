@@ -31,6 +31,7 @@ public class SystemSettingsService {
     static final String KEY_RESPONSE_DEADLINE_MONTHS = "review.response.deadline.months";
     static final String KEY_RESPONSE_DEADLINE_DAYS = "review.response.deadline.days";
     private static final String KEY_COUNTRY_EXT_PREFIX = "country.extension.";
+    private static final String KEY_FEE_RULE_PREFIX = "fee.rule.";
     private static final String KEY_CLASSIFICATION_PREFIX = "classification.";
 
     private static final List<String> SUPPORTED_COUNTRIES = List.of("KR", "JP", "CN", "US", "TW");
@@ -193,6 +194,37 @@ public class SystemSettingsService {
         String upperCountry = country.toUpperCase();
         set(KEY_COUNTRY_EXT_PREFIX + upperCountry, String.valueOf(request.extensionMonths()));
         return new CountryExtensionResponse(upperCountry, COUNTRY_LABELS.getOrDefault(upperCountry, upperCountry), request.extensionMonths());
+    }
+
+    /**
+     * @relatedFR FR-LEGAL-24
+     * FEE-06: 국가별 연차료 규칙 오버라이드(기산일 종류). 미설정 시 null을 돌려 호출부의
+     * 국가별 기본 규칙(KR·US=등록일, 그 외=출원일)을 따른다.
+     */
+    public String getCountryFeeBasisOverride(String country) {
+        String value = get(KEY_FEE_RULE_PREFIX + country.toUpperCase() + ".basis");
+        return value == null || value.isBlank() ? null : value.trim().toUpperCase();
+    }
+
+    /** FEE-06: 설정등록 시 일괄 납부 연차 수 오버라이드. 미설정/파싱 실패 시 null. */
+    public Integer getCountryFeeInitialLumpYearsOverride(String country) {
+        return parseIntOrNull(get(KEY_FEE_RULE_PREFIX + country.toUpperCase() + ".initial_lump_years"));
+    }
+
+    /** FEE-06: 납부 주기(개월) 오버라이드. 미설정/파싱 실패 시 null. */
+    public Integer getCountryFeeCycleMonthsOverride(String country) {
+        return parseIntOrNull(get(KEY_FEE_RULE_PREFIX + country.toUpperCase() + ".cycle_months"));
+    }
+
+    private Integer parseIntOrNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 
     @Transactional(readOnly = true)

@@ -14,6 +14,7 @@ public record PatentLookupProperties(
             String servicePath,
             String bibliographyOperation,
             String applicationSearchOperation,
+            String pdfPathOperation,
             String serviceKey,
             List<String> serviceKeys
     ) {

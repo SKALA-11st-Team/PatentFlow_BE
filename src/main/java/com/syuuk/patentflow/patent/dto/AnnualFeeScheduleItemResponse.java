@@ -22,6 +22,8 @@ public record AnnualFeeScheduleItemResponse(
         int countryExtensionMonths,
         String annualFeeBasis,
         String paymentRuleLabel,
+        int initialLumpYears,
+        int nextDueYearNumber,
         List<AnnualFeeAdjustmentHistoryResponse> adjustmentHistory
 ) {
 }

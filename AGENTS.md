@@ -106,7 +106,7 @@ Review target identification
 - Review-request mail payloads, previews, and history records must include the patent original-document URL.
 - Country-specific patent views must distinguish domestic patents from overseas patents because annual-fee payment rules differ by country.
 - Store or expose enough data to visualize and adjust future annual-fee payment dates, including country, base due date, adjusted due date, and adjustment reason/history.
-- 특허 연차료의 기준일은 등록일이 아니라 출원일이다. 연차료 계산, 안내 문구, 필터, mock data, API contract 모두 이 기준을 따른다.
+- 특허 연차료의 기준일은 국가별 규칙을 따른다(FEE-06). KR은 등록일 기준(설정등록 시 1~3년차 일괄 납부, 4년차부터 매년), US는 등록일 기준 3.5/7.5/11.5년 유지료, 그 외 국가는 출원일 기준 매년을 기본값으로 한다. 연차료 계산, 안내 문구, 필터, mock data, API contract 모두 이 기준을 따르며, 국가별 기본값은 system_settings(fee.rule.{CC}.*)로 덮어쓸 수 있다.
 - In business classification, `기존 사업` means an ended business, not an existing/active business.
 - Business classification and technology classification must be administrator-editable reference data: add, delete, rename, and reuse across patent records, filters, dashboards, and AI report output.
 

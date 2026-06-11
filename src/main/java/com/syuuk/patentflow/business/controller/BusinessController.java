@@ -12,9 +12,11 @@ import com.syuuk.patentflow.common.error.PatentFlowException;
 import com.syuuk.patentflow.common.response.ApiResponse;
 import com.syuuk.patentflow.common.response.PageResponse;
 import com.syuuk.patentflow.patent.dto.PatentDetailResponse;
+import com.syuuk.patentflow.patent.dto.PatentFeeScheduleResponse;
 import com.syuuk.patentflow.patent.dto.PatentListFilter;
 import com.syuuk.patentflow.patent.dto.PatentListItemResponse;
 import com.syuuk.patentflow.patent.dto.ReviewWorkflowStatus;
+import com.syuuk.patentflow.patent.service.AnnualFeeScheduleManagementService;
 import com.syuuk.patentflow.patent.service.DashboardSummaryService;
 import com.syuuk.patentflow.patent.service.PatentReviewService;
 import jakarta.validation.Valid;
@@ -34,17 +36,20 @@ public class BusinessController {
     private final PatentReviewService patentReviewService;
     private final AuthService authService;
     private final DashboardSummaryService dashboardSummaryService;
+    private final AnnualFeeScheduleManagementService annualFeeScheduleManagementService;
 
     public BusinessController(
             BusinessFixtureService businessFixtureService,
             PatentReviewService patentReviewService,
             AuthService authService,
-            DashboardSummaryService dashboardSummaryService
+            DashboardSummaryService dashboardSummaryService,
+            AnnualFeeScheduleManagementService annualFeeScheduleManagementService
     ) {
         this.businessFixtureService = businessFixtureService;
         this.patentReviewService = patentReviewService;
         this.authService = authService;
         this.dashboardSummaryService = dashboardSummaryService;
+        this.annualFeeScheduleManagementService = annualFeeScheduleManagementService;
     }
 
     /**
@@ -117,6 +122,20 @@ public class BusinessController {
             throw new PatentFlowException(ErrorCode.UNAUTHORIZED);
         }
         return ApiResponse.ok(detail);
+    }
+
+    /**
+     * @relatedFR FR-LEGAL-24, FR-BUS-01
+     * @relatedUI UI-BUS-02
+     * @description FEE-06: 사업부 배정 특허의 연차료 일정 조회 — 공유 상세 화면의 일정 카드가 사용한다.
+     */
+    @GetMapping("/api/v1/business/patents/{patentId}/fee-schedule")
+    public ApiResponse<PatentFeeScheduleResponse> getBusinessPatentFeeSchedule(
+            @PathVariable String patentId,
+            Authentication authentication
+    ) {
+        assertBusinessDepartmentPatent(patentId, authentication);
+        return ApiResponse.ok(annualFeeScheduleManagementService.getPatentFeeSchedule(patentId));
     }
 
     /**
