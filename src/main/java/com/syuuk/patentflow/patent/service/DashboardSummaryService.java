@@ -92,7 +92,9 @@ public class DashboardSummaryService {
                 targets.size(),
                 aggregate(targets, PatentListItemResponse::businessArea, PatentListItemResponse::departmentName),
                 aggregate(targets, PatentListItemResponse::technologyArea, PatentListItemResponse::businessArea),
-                aggregate(targets, PatentListItemResponse::productName, PatentListItemResponse::technologyArea));
+                aggregate(targets, PatentListItemResponse::productName, PatentListItemResponse::technologyArea),
+                // DASH-F4: 출원 국가별 분포 — TW·UAE 등 KIPRIS 미지원 국가 특허를 국가 기준으로 바로 조회한다.
+                aggregate(targets, PatentListItemResponse::country, PatentListItemResponse::businessArea));
     }
 
     /** 1차값으로 묶어 건수와 (중복 제거된) 보조 라벨을 집계한다. 정렬은 FE에 맡기고 삽입 순서를 보존한다. */

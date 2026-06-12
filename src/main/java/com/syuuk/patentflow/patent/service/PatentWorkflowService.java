@@ -312,7 +312,8 @@ public class PatentWorkflowService {
     ) {
         LocalDate newDueDate = request.legalActionResult() == LegalActionResult.MAINTAINED
                 ? annualFeeScheduleService.advanceAfterMaintenance(
-                        patent.country(), patent.feeDueDate(), patent.expectedExpirationDate())
+                        patent.country(), patent.feeDueDate(), patent.expectedExpirationDate(),
+                        nextMaintainRound(patent.patentId()))
                 : patent.feeDueDate();
         return new PatentDetailResponse(
                 patent.patentId(), patent.managementNumber(), patent.applicationNumber(),
@@ -332,6 +333,16 @@ public class PatentWorkflowService {
                         request.reason(), decidedAt, actor),
                 patent.businessOpinion(), false,
                 patent.jointApplication(), patent.coApplicantConsent());
+    }
+
+    /**
+     * SETTINGS-11: 이번 유지 결정이 몇 회차인지 — 과거 분기 이력의 MAINTAINED 최종 결정 수 + 1.
+     * 첫 유지가 1회차이며, 회차별 연장 기간 설정(country.extension.{CC}.rounds)의 인덱스가 된다.
+     */
+    private int nextMaintainRound(String patentId) {
+        long maintainedCount = reviewHistoryRepository
+                .countByPatentIdAndLegalActionResult(patentId, LegalActionResult.MAINTAINED);
+        return (int) maintainedCount + 1;
     }
 
     private PatentDetailResponse withCoApplicantConsent(
@@ -375,7 +386,8 @@ public class PatentWorkflowService {
         LocalDate newDueDate = request.legalActionResult() == LegalActionResult.MAINTAINED
                 && patent.legalActionResult() != LegalActionResult.MAINTAINED
                 ? annualFeeScheduleService.advanceAfterMaintenance(
-                        patent.country(), patent.feeDueDate(), patent.expectedExpirationDate())
+                        patent.country(), patent.feeDueDate(), patent.expectedExpirationDate(),
+                        nextMaintainRound(patent.patentId()))
                 : patent.feeDueDate();
         String reason = request.reason() != null && !request.reason().isBlank()
                 ? request.reason() : patent.finalDecisionRecord().reason();

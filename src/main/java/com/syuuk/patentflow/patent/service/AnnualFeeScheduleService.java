@@ -175,10 +175,30 @@ public class AnnualFeeScheduleService {
             LocalDate currentDueDate,
             LocalDate expectedExpirationDate
     ) {
+        return advanceAfterMaintenance(country, currentDueDate, expectedExpirationDate, 1);
+    }
+
+    /**
+     * SETTINGS-11: maintainRound회차(1부터) 유지 결정의 납부일 연장. 회차별 연장 기간이
+     * 설정된 국가는 해당 회차 값(초과 회차는 마지막 값)을, 없으면 국가 규칙 주기를 쓴다.
+     */
+    public LocalDate advanceAfterMaintenance(
+            String country,
+            LocalDate currentDueDate,
+            LocalDate expectedExpirationDate,
+            int maintainRound
+    ) {
         if (currentDueDate == null) {
             return null;
         }
-        LocalDate nextDueDate = currentDueDate.plusMonths(ruleFor(country).cycleMonths());
+        String normalized = country == null ? "" : country.trim().toUpperCase();
+        List<Integer> rounds = normalized.isBlank()
+                ? List.of()
+                : systemSettingsService.getCountryExtensionRounds(normalized);
+        int months = rounds.isEmpty()
+                ? ruleFor(country).cycleMonths()
+                : systemSettingsService.getCountryExtensionMonthsForRound(normalized, maintainRound);
+        LocalDate nextDueDate = currentDueDate.plusMonths(months);
         return capAtExpiration(nextDueDate, expectedExpirationDate);
     }
 

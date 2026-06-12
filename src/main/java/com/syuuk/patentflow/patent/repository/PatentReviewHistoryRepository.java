@@ -14,6 +14,10 @@ public interface PatentReviewHistoryRepository extends JpaRepository<PatentRevie
 
     List<PatentReviewHistoryEntity> findByPatentIdOrderByCreatedAtDesc(String patentId);
 
+    /** SETTINGS-11: 유지 결정 회차 산정용 — 해당 특허의 누적 최종 결정(MAINTAINED 등) 건수. */
+    long countByPatentIdAndLegalActionResult(
+            String patentId, com.syuuk.patentflow.patent.dto.LegalActionResult legalActionResult);
+
     Optional<PatentReviewHistoryEntity> findByPatentIdAndQuarterKey(String patentId, String quarterKey);
 
     boolean existsByDepartmentId(String departmentId);

@@ -10,10 +10,17 @@ public record AuditLogEntryResponse(
         String id,
         String type,
         String patentId,
+        // AUDIT-02: 특허 ID만으로는 어떤 특허인지 알 수 없어 관리번호·특허명을 함께 내려준다(삭제된 특허는 null).
+        String managementNumber,
+        String patentTitle,
         String actor,
         String summary,
         OffsetDateTime occurredAt
 ) {
+
+    public AuditLogEntryResponse withPatentInfo(String managementNumber, String patentTitle) {
+        return new AuditLogEntryResponse(id, type, patentId, managementNumber, patentTitle, actor, summary, occurredAt);
+    }
 
     public static final String TYPE_AI_REPORT_EDIT = "AI_REPORT_EDIT";
     public static final String TYPE_FEE_ADJUSTMENT = "FEE_ADJUSTMENT";

@@ -3702,6 +3702,17 @@
             "format" : "int32",
             "maximum" : 240,
             "minimum" : 0
+          },
+          "extensionMonthsByRound" : {
+            "type" : "array",
+            "items" : {
+              "type" : "integer",
+              "format" : "int32",
+              "maximum" : 240,
+              "minimum" : 1
+            },
+            "maxItems" : 12,
+            "minItems" : 0
           }
         }
       },
@@ -3732,6 +3743,13 @@
           "extensionMonths" : {
             "type" : "integer",
             "format" : "int32"
+          },
+          "extensionMonthsByRound" : {
+            "type" : "array",
+            "items" : {
+              "type" : "integer",
+              "format" : "int32"
+            }
           }
         }
       },
@@ -6610,6 +6628,12 @@
             "items" : {
               "$ref" : "#/components/schemas/AreaGroupResponse"
             }
+          },
+          "country" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/AreaGroupResponse"
+            }
           }
         }
       },
@@ -6659,6 +6683,12 @@
             "type" : "string"
           },
           "patentId" : {
+            "type" : "string"
+          },
+          "managementNumber" : {
+            "type" : "string"
+          },
+          "patentTitle" : {
             "type" : "string"
           },
           "actor" : {

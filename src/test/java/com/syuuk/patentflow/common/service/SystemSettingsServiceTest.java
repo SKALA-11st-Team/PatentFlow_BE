@@ -52,6 +52,29 @@ class SystemSettingsServiceTest {
         assertThat(business.values()).containsExactly("Alpha", "Zeta");
     }
 
+    // SETTINGS-11: 회차별 연장 기간 CSV 파싱 — 정상 파싱, 초과 회차는 마지막 값, 미설정은 단일값 폴백.
+    @Test
+    void extensionRoundsParseAndClampToLastRound() {
+        SystemSettingsEntity rounds = new SystemSettingsEntity("country.extension.JP.rounds");
+        rounds.setValue("12,6,24");
+        when(repository.findById("country.extension.JP.rounds")).thenReturn(Optional.of(rounds));
+
+        assertThat(service.getCountryExtensionRounds("JP")).containsExactly(12, 6, 24);
+        assertThat(service.getCountryExtensionMonthsForRound("JP", 2)).isEqualTo(6);
+        assertThat(service.getCountryExtensionMonthsForRound("JP", 9)).isEqualTo(24);
+    }
+
+    @Test
+    void extensionRoundsFallBackToSingleValueWhenUnset() {
+        SystemSettingsEntity single = new SystemSettingsEntity("country.extension.CN");
+        single.setValue("18");
+        when(repository.findById("country.extension.CN.rounds")).thenReturn(Optional.empty());
+        when(repository.findById("country.extension.CN")).thenReturn(Optional.of(single));
+
+        assertThat(service.getCountryExtensionRounds("CN")).isEmpty();
+        assertThat(service.getCountryExtensionMonthsForRound("CN", 3)).isEqualTo(18);
+    }
+
     @Test
     void addClassificationStoresSortedJsonArrayUnderLock() throws Exception {
         SystemSettingsEntity saved = new SystemSettingsEntity("classification.business");

@@ -96,6 +96,25 @@ class AnnualFeeScheduleServiceTest {
         assertThat(next).isEqualTo(LocalDate.of(2028, 8, 1));
     }
 
+    // SETTINGS-11: 회차별 연장 기간이 설정된 국가는 유지 결정 회차에 해당하는 개월수로 연장한다.
+    @Test
+    void advancesByConfiguredExtensionForMaintainRound() {
+        SystemSettingsService settings = settingsWithoutOverrides();
+        when(settings.getCountryExtensionRounds("JP")).thenReturn(java.util.List.of(12, 6, 24));
+        when(settings.getCountryExtensionMonthsForRound("JP", 2)).thenReturn(6);
+        AnnualFeeScheduleService svc = new AnnualFeeScheduleService(settings);
+
+        LocalDate next = svc.advanceAfterMaintenance("JP", LocalDate.of(2026, 6, 1), null, 2);
+        assertThat(next).isEqualTo(LocalDate.of(2026, 12, 1));
+    }
+
+    // SETTINGS-11: 회차 설정이 없으면 기존처럼 국가 규칙 주기(KR 12개월)로 연장한다.
+    @Test
+    void advancesByRuleCycleWhenNoRoundsConfigured() {
+        LocalDate next = service.advanceAfterMaintenance("KR", LocalDate.of(2026, 6, 1), null, 3);
+        assertThat(next).isEqualTo(LocalDate.of(2027, 6, 1));
+    }
+
     @Test
     void fallsBackToYearEndWhenBothDatesMissing() {
         LocalDate due = service.calculateNextDueDate(
