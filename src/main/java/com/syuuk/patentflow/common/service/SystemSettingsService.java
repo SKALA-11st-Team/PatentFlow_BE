@@ -177,7 +177,7 @@ public class SystemSettingsService {
     @Transactional(readOnly = true)
     public List<CountryExtensionResponse> getCountryExtensions() {
         return SUPPORTED_COUNTRIES.stream()
-                .map(c -> new CountryExtensionResponse(c, COUNTRY_LABELS.getOrDefault(c, c), getCountryExtensionMonths(c)))
+                .map(this::toCountryExtensionResponse)
                 .toList();
     }
 
@@ -189,11 +189,61 @@ public class SystemSettingsService {
         return DEFAULT_EXTENSION_MONTHS;
     }
 
+    /**
+     * @relatedFR FR-LEGAL-24
+     * SETTINGS-11: 유지 결정 회차별 연장 기간 목록. {key}.rounds CSV("12,12,24")를 파싱하며,
+     * 미설정·파싱 실패 시 빈 목록을 돌려 호출부가 단일 extensionMonths로 폴백한다.
+     */
+    public List<Integer> getCountryExtensionRounds(String country) {
+        String raw = get(KEY_COUNTRY_EXT_PREFIX + country.toUpperCase() + ".rounds");
+        if (raw == null || raw.isBlank()) {
+            return List.of();
+        }
+        List<Integer> rounds = new java.util.ArrayList<>();
+        for (String token : raw.split(",")) {
+            Integer months = parseIntOrNull(token.trim());
+            if (months == null || months <= 0) {
+                return List.of();
+            }
+            rounds.add(months);
+        }
+        return List.copyOf(rounds);
+    }
+
+    /** SETTINGS-11: round회차(1부터) 유지 결정의 연장 개월 — 회차 설정이 없으면 단일값, 초과 회차는 마지막 값. */
+    public int getCountryExtensionMonthsForRound(String country, int round) {
+        List<Integer> rounds = getCountryExtensionRounds(country);
+        if (rounds.isEmpty()) {
+            return getCountryExtensionMonths(country);
+        }
+        int index = Math.min(Math.max(round, 1), rounds.size()) - 1;
+        return rounds.get(index);
+    }
+
     @Transactional
     public CountryExtensionResponse updateCountryExtension(String country, CountryExtensionRequest request) {
         String upperCountry = country.toUpperCase();
-        set(KEY_COUNTRY_EXT_PREFIX + upperCountry, String.valueOf(request.extensionMonths()));
-        return new CountryExtensionResponse(upperCountry, COUNTRY_LABELS.getOrDefault(upperCountry, upperCountry), request.extensionMonths());
+        List<Integer> rounds = request.extensionMonthsByRound();
+        if (rounds != null && !rounds.isEmpty()) {
+            // 회차 목록 저장 시 단일 키는 1회차 값과 동기화한다(기존 주기 폴백 호환).
+            set(KEY_COUNTRY_EXT_PREFIX + upperCountry + ".rounds",
+                    rounds.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(",")));
+            set(KEY_COUNTRY_EXT_PREFIX + upperCountry, String.valueOf(rounds.get(0)));
+        } else {
+            set(KEY_COUNTRY_EXT_PREFIX + upperCountry, String.valueOf(request.extensionMonths()));
+            set(KEY_COUNTRY_EXT_PREFIX + upperCountry + ".rounds", "");
+        }
+        return toCountryExtensionResponse(upperCountry);
+    }
+
+    private CountryExtensionResponse toCountryExtensionResponse(String country) {
+        int months = getCountryExtensionMonths(country);
+        List<Integer> rounds = getCountryExtensionRounds(country);
+        return new CountryExtensionResponse(
+                country,
+                COUNTRY_LABELS.getOrDefault(country, country),
+                months,
+                rounds.isEmpty() ? List.of(months) : rounds);
     }
 
     /**

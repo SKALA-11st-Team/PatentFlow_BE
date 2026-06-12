@@ -3,6 +3,7 @@ package com.syuuk.patentflow.patent.service;
 import com.syuuk.patentflow.patent.dto.AuditLogEntryResponse;
 import com.syuuk.patentflow.patent.repository.AiReportEditLogRepository;
 import com.syuuk.patentflow.patent.repository.AnnualFeeAdjustmentRepository;
+import com.syuuk.patentflow.patent.repository.PatentMetadataRepository;
 import com.syuuk.patentflow.patent.repository.PatentReviewHistoryRepository;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -23,15 +24,18 @@ public class AuditLogService {
     private final AiReportEditLogRepository editLogRepository;
     private final AnnualFeeAdjustmentRepository adjustmentRepository;
     private final PatentReviewHistoryRepository reviewHistoryRepository;
+    private final PatentMetadataRepository patentMetadataRepository;
 
     public AuditLogService(
             AiReportEditLogRepository editLogRepository,
             AnnualFeeAdjustmentRepository adjustmentRepository,
-            PatentReviewHistoryRepository reviewHistoryRepository
+            PatentReviewHistoryRepository reviewHistoryRepository,
+            PatentMetadataRepository patentMetadataRepository
     ) {
         this.editLogRepository = editLogRepository;
         this.adjustmentRepository = adjustmentRepository;
         this.reviewHistoryRepository = reviewHistoryRepository;
+        this.patentMetadataRepository = patentMetadataRepository;
     }
 
     @Transactional(readOnly = true)
@@ -43,6 +47,8 @@ public class AuditLogService {
                     log.getId(),
                     AuditLogEntryResponse.TYPE_AI_REPORT_EDIT,
                     log.getPatentId(),
+                    null,
+                    null,
                     log.getEditor(),
                     "AI 레포트 %s (%s)".formatted(
                             log.getAction() == com.syuuk.patentflow.patent.domain.AiReportEditLogEntity.Action.REVERT
@@ -55,6 +61,8 @@ public class AuditLogService {
                     adjustment.getAdjustmentId(),
                     AuditLogEntryResponse.TYPE_FEE_ADJUSTMENT,
                     adjustment.getPatentId(),
+                    null,
+                    null,
                     adjustment.getAdjustedBy(),
                     "연차료 납부일 조정 %s → %s (%s)".formatted(
                             adjustment.getPreviousDueDate(), adjustment.getAdjustedDueDate(),
@@ -68,6 +76,8 @@ public class AuditLogService {
                             history.getFinalDecisionId(),
                             AuditLogEntryResponse.TYPE_FINAL_DECISION,
                             history.getPatentId(),
+                            null,
+                            null,
                             history.getFinalDecisionDecidedBy(),
                             "최종 결정 %s (%s)".formatted(
                                     history.getLegalActionResult() == null ? "-" : history.getLegalActionResult().name(),
@@ -75,12 +85,41 @@ public class AuditLogService {
                             history.getFinalDecisionDecidedAt())));
         }
 
-        return entries.stream()
+        List<AuditLogEntryResponse> limited = entries.stream()
                 .filter(entry -> patentId == null || patentId.isBlank() || patentId.equals(entry.patentId()))
                 .sorted(Comparator.comparing(
                         AuditLogEntryResponse::occurredAt,
                         Comparator.nullsLast(Comparator.<OffsetDateTime>reverseOrder())))
                 .limit(Math.max(1, Math.min(limit, 500)))
+                .toList();
+        return enrichWithPatentInfo(limited);
+    }
+
+    /**
+     * AUDIT-02: 화면에서 특허 ID만으로는 식별이 어려워 관리번호·특허명을 일괄 조회해 붙인다.
+     * limit 적용 후 ID 집합만 조회하므로 추가 쿼리는 1회다(삭제된 특허는 null 유지).
+     */
+    private List<AuditLogEntryResponse> enrichWithPatentInfo(List<AuditLogEntryResponse> entries) {
+        List<String> patentIds = entries.stream()
+                .map(AuditLogEntryResponse::patentId)
+                .filter(id -> id != null && !id.isBlank())
+                .distinct()
+                .toList();
+        if (patentIds.isEmpty()) {
+            return entries;
+        }
+        java.util.Map<String, com.syuuk.patentflow.patent.domain.PatentMetadataEntity> patentsById =
+                patentMetadataRepository.findAllById(patentIds).stream()
+                        .collect(java.util.stream.Collectors.toMap(
+                                com.syuuk.patentflow.patent.domain.PatentMetadataEntity::getPatentId,
+                                patent -> patent));
+        return entries.stream()
+                .map(entry -> {
+                    com.syuuk.patentflow.patent.domain.PatentMetadataEntity patent = patentsById.get(entry.patentId());
+                    return patent == null
+                            ? entry
+                            : entry.withPatentInfo(patent.getManagementNumber(), patent.getTitle());
+                })
                 .toList();
     }
 

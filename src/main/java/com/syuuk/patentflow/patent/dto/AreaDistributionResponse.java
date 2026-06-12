@@ -10,11 +10,13 @@ import java.util.List;
  * @param businessArea     사업영역별 분포(보조 라벨 = 부서명).
  * @param technologyArea   기술영역별 분포(보조 라벨 = 사업영역).
  * @param product          제품별 분포(보조 라벨 = 기술영역).
+ * @param country          출원 국가별 분포(보조 라벨 = 사업영역).
  */
 public record AreaDistributionResponse(
         int totalCount,
         List<AreaGroupResponse> businessArea,
         List<AreaGroupResponse> technologyArea,
-        List<AreaGroupResponse> product
+        List<AreaGroupResponse> product,
+        List<AreaGroupResponse> country
 ) {
 }
