@@ -241,8 +241,16 @@ public class AnnualFeeScheduleService {
     // KR: 연차 구간별 연 납부액(KRW), US: 등록 후 개월별 유지료(USD).
     private static final String KR_DEFAULT_FEE_AMOUNTS = "4-6:55000,7-9:130000,10-12:290000,13-25:600000";
     private static final String US_DEFAULT_FEE_AMOUNTS = "42:2000,90:3760,138:7700";
-    private static final java.util.Map<String, String> FEE_CURRENCIES = java.util.Map.of(
-            "KR", "KRW", "US", "USD", "JP", "JPY", "CN", "CNY", "TW", "TWD");
+    private static final String JP_DEFAULT_FEE_AMOUNTS = "1-3:33000,4-6:61000,7-9:111000,10-25:181000";
+    private static final String CN_DEFAULT_FEE_AMOUNTS = "1-3:900,4-6:1200,7-9:2000,10-12:4000,13-15:6000,16-20:8000";
+    private static final String EP_DEFAULT_FEE_AMOUNTS = "1-3:470,4-5:700,6-7:1100,8-9:1650,10-20:2000";
+    private static final java.util.Map<String, String> FEE_CURRENCIES = java.util.Map.ofEntries(
+            java.util.Map.entry("KR", "KRW"),
+            java.util.Map.entry("US", "USD"),
+            java.util.Map.entry("JP", "JPY"),
+            java.util.Map.entry("CN", "CNY"),
+            java.util.Map.entry("EP", "EUR"),
+            java.util.Map.entry("TW", "TWD"));
 
     /**
      * FEE-06: 특허 상세 연차료 일정 항목을 생성한다 — 일괄 납부 구간 1줄 + 직전 납부 최대 3건 +
@@ -366,6 +374,9 @@ public class AnnualFeeScheduleService {
             table = switch (normalized) {
                 case "KR" -> KR_DEFAULT_FEE_AMOUNTS;
                 case "US" -> US_DEFAULT_FEE_AMOUNTS;
+                case "JP" -> JP_DEFAULT_FEE_AMOUNTS;
+                case "CN" -> CN_DEFAULT_FEE_AMOUNTS;
+                case "EP" -> EP_DEFAULT_FEE_AMOUNTS;
                 default -> null;
             };
         }
