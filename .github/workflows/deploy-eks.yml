@@ -328,7 +328,9 @@ jobs:
 
       - name: Rollout status
         id: backend_rollout
-        run: kubectl rollout status deployment/team11-patentflow-be-deployment --namespace="${KUBE_NAMESPACE}" --timeout=180s
+        # Demo startup can run DB bootstrap/seed work and HPA may keep more than two replicas during rollout.
+        # Keep this aligned with the PostgreSQL wait so a slow-but-healthy rollout is not reported as failed.
+        run: kubectl rollout status deployment/team11-patentflow-be-deployment --namespace="${KUBE_NAMESPACE}" --timeout=420s
 
       - name: Diagnose backend rollout failure
         if: ${{ failure() && steps.backend_rollout.outcome == 'failure' }}
