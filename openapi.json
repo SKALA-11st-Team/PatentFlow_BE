@@ -6096,6 +6096,17 @@
               "ABANDONED"
             ]
           },
+          "aiReportReadinessStatus" : {
+            "type" : "string",
+            "enum" : [
+              "READY",
+              "FAILED",
+              "PENDING"
+            ]
+          },
+          "aiReportFailureReason" : {
+            "type" : "string"
+          },
           "originalPatentUrl" : {
             "type" : "string"
           },
@@ -6563,6 +6574,14 @@
             "format" : "int32"
           },
           "pendingReview" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "mailReadySuccessCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "aiReportFailedCount" : {
             "type" : "integer",
             "format" : "int32"
           },

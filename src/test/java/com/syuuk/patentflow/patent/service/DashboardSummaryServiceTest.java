@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.syuuk.patentflow.business.dto.BusinessDashboardSummaryResponse;
+import com.syuuk.patentflow.patent.dto.AiReportReadinessStatus;
 import com.syuuk.patentflow.patent.dto.AreaDistributionResponse;
 import com.syuuk.patentflow.patent.dto.AreaGroupResponse;
 import com.syuuk.patentflow.patent.dto.BusinessOpinionDecision;
@@ -47,7 +48,9 @@ class DashboardSummaryServiceTest {
         when(patentMetadataRepository.count()).thenReturn(40L);
         when(reviewHistoryRepository.countLatestByReviewWorkflowStatusNot(ReviewWorkflowStatus.NOT_IN_REVIEW))
                 .thenReturn(12L);
-        when(reviewHistoryRepository.countLatestByReviewWorkflowStatus(ReviewWorkflowStatus.MAIL_READY)).thenReturn(3L);
+        when(reviewHistoryRepository.countLatestMailReadyWithSuccessfulAiReport(ReviewWorkflowStatus.MAIL_READY))
+                .thenReturn(3L);
+        when(reviewHistoryRepository.countLatestFailedAiReports()).thenReturn(2L);
         when(reviewHistoryRepository.countLatestByReviewWorkflowStatus(ReviewWorkflowStatus.WAITING_BUSINESS_RESPONSE))
                 .thenReturn(4L);
         when(reviewHistoryRepository.countLatestByReviewWorkflowStatus(ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED))
@@ -60,7 +63,9 @@ class DashboardSummaryServiceTest {
 
         assertThat(summary.totalPatents()).isEqualTo(40);
         assertThat(summary.quarterlyTargetCount()).isEqualTo(12);
-        assertThat(summary.pendingReview()).isEqualTo(3);
+        assertThat(summary.pendingReview()).isEqualTo(5);
+        assertThat(summary.mailReadySuccessCount()).isEqualTo(3);
+        assertThat(summary.aiReportFailedCount()).isEqualTo(2);
         assertThat(summary.waitingBusinessResponse()).isEqualTo(4);
         assertThat(summary.businessResponseReceived()).isEqualTo(2);
         assertThat(summary.pendingFinalDecision()).isEqualTo(2);
@@ -127,7 +132,8 @@ class DashboardSummaryServiceTest {
                 "PAT", "MGMT", null, null, "title", null,
                 businessArea, technologyArea, productName, null, null,
                 null, null, null, "DEPT", departmentName,
-                null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null,
+                AiReportReadinessStatus.PENDING, null, null,
                 false, null);
     }
 }

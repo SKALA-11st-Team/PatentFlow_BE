@@ -41,7 +41,10 @@ public class DashboardSummaryService {
         // DASH-01: 이번 분기 검토 대상 수(NOT_IN_REVIEW 제외 최신 상태) — KPI 분모 단일 출처.
         int quarterlyTargetCount = Math.toIntExact(
                 reviewHistoryRepository.countLatestByReviewWorkflowStatusNot(ReviewWorkflowStatus.NOT_IN_REVIEW));
-        int pendingReview = countLatest(ReviewWorkflowStatus.MAIL_READY);
+        int mailReadySuccessCount = Math.toIntExact(
+                reviewHistoryRepository.countLatestMailReadyWithSuccessfulAiReport(ReviewWorkflowStatus.MAIL_READY));
+        int aiReportFailedCount = Math.toIntExact(reviewHistoryRepository.countLatestFailedAiReports());
+        int pendingReview = mailReadySuccessCount + aiReportFailedCount;
         int waitingBusiness = countLatest(ReviewWorkflowStatus.WAITING_BUSINESS_RESPONSE);
         int businessReceived = countLatest(ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED);
         int pendingFinalDecision = Math.toIntExact(reviewHistoryRepository.countLatestPendingLegalAction(
@@ -51,6 +54,8 @@ public class DashboardSummaryService {
                 total,
                 quarterlyTargetCount,
                 pendingReview,
+                mailReadySuccessCount,
+                aiReportFailedCount,
                 waitingBusiness,
                 businessReceived,
                 pendingFinalDecision,

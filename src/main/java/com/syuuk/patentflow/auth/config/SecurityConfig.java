@@ -33,15 +33,19 @@ public class SecurityConfig {
 
     private final List<String> allowedOrigins;
     private final AuthProperties authProperties;
+    // E2E/로컬 검증 전용(기본 true): false면 CSRF 보호를 끈다. 운영/데모에서는 절대 끄지 않는다.
+    private final boolean csrfEnabled;
 
     public SecurityConfig(
             @Value("${patentflow.cors.allowed-origins}") String allowedOrigins,
+            @Value("${patentflow.security.csrf-enabled:true}") boolean csrfEnabled,
             AuthProperties authProperties
     ) {
         this.allowedOrigins = Arrays.stream(allowedOrigins.split(","))
                 .map(String::trim)
                 .filter(origin -> !origin.isBlank())
                 .toList();
+        this.csrfEnabled = csrfEnabled;
         this.authProperties = authProperties;
     }
 
@@ -74,13 +78,20 @@ public class SecurityConfig {
             http.addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class);
         }
         return http
-            .csrf(csrf -> csrf
+            .csrf(csrf -> {
+                if (!csrfEnabled) {
+                    // E2E/로컬 전용 — 운영/데모에서는 기본값 true로 항상 켜진다.
+                    csrf.disable();
+                    return;
+                }
+                csrf
                     .csrfTokenRepository(csrfTokenRepository())
                     .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler())
                     .ignoringRequestMatchers(
                             "/api/v1/auth/login",
                             "/api/v1/auth/refresh",
-                            "/api/v1/auth/logout"))
+                            "/api/v1/auth/logout");
+            })
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))

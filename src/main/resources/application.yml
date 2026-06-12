@@ -78,6 +78,12 @@ patentflow:
       client-secret: ${GOOGLE_OAUTH2_CLIENT_SECRET:}
       redirect-uri: ${GOOGLE_OAUTH2_REDIRECT_URI:http://localhost:8080/api/v1/admin/settings/mail/oauth2/google/callback}
       frontend-settings-uri: ${GOOGLE_OAUTH2_FRONTEND_URI:http://localhost:5173/admin/settings}
+  # E2E/로컬 검증 전용(기본 false): OAuth2 미연동이어도 메일 draft를 SENT로 기록해 워크플로우 전이를 검증한다.
+  mailing:
+    simulate-delivery: ${PATENTFLOW_MAILING_SIMULATE_DELIVERY:false}
+  # 보안 토글. csrf-enabled는 기본 true(운영/데모) — E2E에서만 false로 끈다.
+  security:
+    csrf-enabled: ${PATENTFLOW_SECURITY_CSRF_ENABLED:true}
   bootstrap:
     admin:
       email: ${PATENTFLOW_BOOTSTRAP_ADMIN_EMAIL:${PATENTFLOW_BOOTSTRAP_ADMIN_USERNAME:}}

@@ -5,30 +5,36 @@ import com.syuuk.patentflow.settings.domain.QuarterSettingEntity;
 import com.syuuk.patentflow.settings.domain.ReviewPeriodTemplateEntity;
 import com.syuuk.patentflow.settings.repository.QuarterSettingRepository;
 import com.syuuk.patentflow.settings.repository.ReviewPeriodTemplateRepository;
-import jakarta.annotation.PostConstruct;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.List;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.DependsOn;
+import org.springframework.core.annotation.Order;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
  * 분기 자동 활성화 스케줄러.
- * - 서버 시작 시(@PostConstruct) 즉시 한 번 실행해 이미 검토 시작일이 지난 분기를 활성화한다.
+ * - 서버 시작 시(ApplicationRunner, 시드 이후) 즉시 한 번 실행해 이미 검토 시작일이 지난 분기를 활성화한다.
  * - 매일 자정(KST)에도 실행해 새로 검토 시작일에 도달한 분기를 자동 활성화한다.
  * - 활성화 조건: 오늘 >= 검토 시작일(납부 기간 시작일 - mailLeadMonths개월)
  *               AND 오늘 <= 납부 기간 종료일
  */
 @Component
-// SETTINGS-09: 시작 시(@PostConstruct) 검토 기간 템플릿에 의존하므로 시더 선행을 보장한다.
+// SETTINGS-09: 시작 시 검토 기간 템플릿에 의존하므로 시더 선행을 보장한다.
+// 기동 활성화는 @PostConstruct가 아니라 ApplicationRunner(@Order(10))로 실행한다 —
+// 빈 DB에서 @PostConstruct가 LocalDemoSeedRunner(@Order(0))보다 먼저 돌면 특허 0건 상태로
+// 분기가 activated=true가 되어 검토 대상이 영구히 생성되지 않는 기동 순서 결함이 있었다.
 @DependsOn("reviewPeriodTemplateSeeder")
 @ConditionalOnProperty(name = "patentflow.review.scheduler.enabled", havingValue = "true", matchIfMissing = true)
-public class QuarterActivationScheduler {
+@Order(10)
+public class QuarterActivationScheduler implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(QuarterActivationScheduler.class);
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
@@ -49,9 +55,9 @@ public class QuarterActivationScheduler {
         this.systemSettingsService = systemSettingsService;
     }
 
-    // 서버 시작 시 즉시 실행 — 검토 시작일이 이미 지난 분기를 활성화
-    @PostConstruct
-    public void runOnStartup() {
+    // 서버 시작 시(시드 러너들 이후) 즉시 실행 — 검토 시작일이 이미 지난 분기를 활성화
+    @Override
+    public void run(ApplicationArguments args) {
         run();
     }
 

@@ -69,6 +69,11 @@ public class MailingService {
     private final MailOAuth2Service mailOAuth2Service;
     private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
+    // E2E/로컬 검증 전용(기본 false): OAuth2 미연동이어도 draft를 SENT로 기록해 워크플로우 전이를 일으킨다.
+    // 운영/데모 환경에서는 켜지 않는다 — 실제 메일은 한 통도 나가지 않는다.
+    @org.springframework.beans.factory.annotation.Value("${patentflow.mailing.simulate-delivery:false}")
+    private boolean simulateDelivery;
+
     public MailingService(
             MailingHistoryRepository mailingHistoryRepository,
             PatentReviewService patentReviewService,
@@ -164,6 +169,13 @@ public class MailingService {
                     saveHistory(mailingBatchId, draft, STATUS_FAILED, departmentIdsByEmail, sentBy);
                     failedCount++;
                 }
+            }
+        } else if (simulateDelivery) {
+            // E2E/로컬 검증 전용 — SMTP 호출 없이 SENT로 기록해 markMailingSent 전이를 검증 가능하게 한다.
+            log.warn("patentflow.mailing.simulate-delivery enabled; recording drafts as SENT without SMTP delivery.");
+            for (BusinessReviewMailSendDraft draft : request.drafts()) {
+                saveHistory(mailingBatchId, draft, STATUS_SENT, departmentIdsByEmail, sentBy);
+                sentDrafts.add(draft);
             }
         } else {
             // OAuth2 미연동 — 실제 발송 없이 이력만 기록한다. RECORDED는 워크플로우 전이 대상이 아니다.

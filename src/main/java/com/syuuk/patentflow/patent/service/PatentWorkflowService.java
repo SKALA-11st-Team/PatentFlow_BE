@@ -444,7 +444,9 @@ public class PatentWorkflowService {
                         .toList();
         Integer totalScore = totalScore(agent, scores);
         Double averageScore = averageScore(agent, totalScore, scores);
-        boolean degraded = Boolean.TRUE.equals(agent.degraded()) || scores.stream().noneMatch(s -> s.score() != null);
+        boolean degraded = Boolean.TRUE.equals(agent.degraded())
+                || hasFailureReason(agent)
+                || scores.stream().noneMatch(s -> s.score() != null);
         String failureReason = failureReason(agent, degraded);
         String summary = agent.summaryText();
         String rawMarkdown = normalizeMarkdown(agent.reportMarkdown(), summary, scores, agent.recommendation());
@@ -529,6 +531,10 @@ public class PatentWorkflowService {
             return "AI 평가 점수 또는 근거가 충분히 생성되지 않았습니다.";
         }
         return null;
+    }
+
+    private boolean hasFailureReason(AgentEvaluateResponse agent) {
+        return agent.failureReason() != null && !agent.failureReason().isBlank();
     }
 
     private String normalizeMarkdown(

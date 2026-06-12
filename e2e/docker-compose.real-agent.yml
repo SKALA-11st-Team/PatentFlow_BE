@@ -1,0 +1,22 @@
+# 실제 Agent 스모크용 오버레이 — LLM 비용이 들고 1건당 수 분~20분 소요. 발표 전 1~2회만 실행.
+#
+#   OPENAI_API_KEY=sk-... docker compose -f docker-compose.e2e.yml -f docker-compose.real-agent.yml up --build -d
+#   npx playwright test --project=real-agent
+services:
+  e2e-real-agent:
+    build: ../PatentFlow_Agent
+    container_name: patentflow-e2e-real-agent
+    ports:
+      - "18001:8000"
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      KIPRIS_SERVICE_KEYS: ${KIPRIS_SERVICE_KEYS:-}
+      PGVECTOR_DATABASE_URL: postgresql://patentflow:patentflow@e2e-postgres:5432/patentflow?options=-csearch_path%3Dpatentflow%2Cpublic
+      UNIFIED_API_BASE_URL: http://e2e-be:8080
+    depends_on:
+      e2e-postgres:
+        condition: service_healthy
+
+  e2e-be:
+    environment:
+      PATENTFLOW_AGENT_URL: http://e2e-real-agent:8000

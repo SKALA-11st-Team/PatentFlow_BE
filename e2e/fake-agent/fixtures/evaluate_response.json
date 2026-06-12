@@ -1,0 +1,80 @@
+{
+  "patentId": "PLACEHOLDER",
+  "scores": [
+    {
+      "category": "권리성",
+      "score": 82,
+      "grade": "A",
+      "evidence": "독립항 2건과 종속항 8건으로 권리 범위가 구체적이며, 무효 사유로 지적될 만한 선행문헌이 확인되지 않았습니다. (e2e fixture)",
+      "evidenceDetails": [
+        {
+          "text": "청구항 구조 분석: 독립항이 핵심 구성요소를 명확히 한정.",
+          "source": { "title": "KIPRIS 서지 정보 (fixture)", "url": "https://example.com/kipris/fixture" }
+        }
+      ]
+    },
+    {
+      "category": "기술성",
+      "score": 78,
+      "grade": "B",
+      "evidence": "동일 분야 최신 출원 대비 차별화된 전처리 구조를 보유하나, 대체 기술의 등장 속도가 빠른 영역입니다. (e2e fixture)",
+      "evidenceDetails": [
+        {
+          "text": "유사 특허군 대비 인용 빈도 상위 30%.",
+          "source": { "title": "선행기술 조사 (fixture)", "url": "https://example.com/prior-art/fixture" }
+        }
+      ]
+    },
+    {
+      "category": "시장성",
+      "score": 74,
+      "grade": "B",
+      "evidence": "관련 시장은 연평균 12% 성장 중이나 직접 적용 사례는 제한적입니다. (e2e fixture)",
+      "evidenceDetails": [
+        {
+          "text": "산업 보고서: 국내 관련 시장 규모 추정 1.2조 원.",
+          "source": { "title": "산업 동향 보고서 (fixture)", "url": "https://example.com/industry/fixture" }
+        }
+      ]
+    },
+    {
+      "category": "사업 연계성",
+      "score": 80,
+      "grade": "A",
+      "evidence": "현재 운영 중인 사업 라인과 직접 연계 가능한 기술 요소를 포함합니다. (e2e fixture)",
+      "evidenceDetails": [
+        {
+          "text": "사내 제품 로드맵과의 적합성 확인.",
+          "source": { "title": "SK AX 사이트 (fixture)", "url": "https://example.com/skax/fixture" }
+        }
+      ]
+    }
+  ],
+  "recommendation": "유지",
+  "summaryMarkdown": "## 특허 요약 (e2e fixture)\n\n본 특허는 데이터 전처리 파이프라인의 병목을 줄이는 구조를 제안합니다.\n\n### 해결 과제\n대량 비정형 데이터 처리 시의 지연 문제.\n\n### 핵심 기술 포인트\n- 단계별 캐시 무효화 전략\n- 분산 워커 간 부하 재배치",
+  "valuationReportMarkdown": "# AI 특허 평가 레포트 (e2e fixture)\n\n## 종합 의견\n4개 평가축 평균 78.5점으로 **유지**를 권고합니다.\n\n## 축별 평가\n| 축 | 점수 | 등급 |\n|---|---|---|\n| 권리성 | 82 | A |\n| 기술성 | 78 | B |\n| 시장성 | 74 | B |\n| 사업 연계성 | 80 | A |\n\n## 판단 근거\n- 권리 범위가 명확하고 무효 리스크가 낮음\n- 운영 사업과의 직접 연계 가능성 확인\n\n## 권고\n유지 (연차료 납부 지속)",
+  "artifactDir": null,
+  "totalScore": 314,
+  "averageScore": 78.5,
+  "finalGrade": "B",
+  "finalIndicator": "유지 권고",
+  "degraded": false,
+  "failureReason": null,
+  "warnings": [],
+  "evidenceConfidence": "높음",
+  "missingInformation": [],
+  "keyEvidence": "독립항 중심의 명확한 권리 범위와 사내 사업 라인 직접 연계 가능성 (e2e fixture)",
+  "judgementGrounds": [
+    "권리성·사업 연계성 축이 A 등급으로 유지 측 근거가 우세",
+    "시장성은 B 등급이나 성장 추세로 하방 리스크 제한적"
+  ],
+  "businessCheckRequests": [
+    "해당 기술이 현재 제품 로드맵에 실제 반영 중인지 확인 요청"
+  ],
+  "externalSources": [
+    { "title": "KIPRIS 서지 정보 (fixture)", "url": "https://example.com/kipris/fixture" },
+    { "title": "산업 동향 보고서 (fixture)", "url": "https://example.com/industry/fixture" }
+  ],
+  "appliedValuationConfig": null,
+  "generatedAt": "2026-06-12T00:00:00Z"
+}

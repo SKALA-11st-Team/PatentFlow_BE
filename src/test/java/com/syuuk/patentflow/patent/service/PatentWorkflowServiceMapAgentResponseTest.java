@@ -10,8 +10,16 @@ import com.syuuk.patentflow.patent.client.AiReportAgentClient;
 import com.syuuk.patentflow.patent.client.AiReportAgentClient.AgentEvaluateResponse;
 import com.syuuk.patentflow.patent.client.AiReportAgentClient.AgentScoreItem;
 import com.syuuk.patentflow.patent.dto.AiEvaluationReportResponse;
+import com.syuuk.patentflow.patent.dto.BusinessOpinionResponse;
+import com.syuuk.patentflow.patent.dto.FinalDecisionRecordResponse;
+import com.syuuk.patentflow.patent.dto.PatentDetailResponse;
+import com.syuuk.patentflow.patent.dto.PatentLifecycleStatus;
+import com.syuuk.patentflow.patent.dto.PatentSummaryResponse;
+import com.syuuk.patentflow.patent.dto.Recommendation;
+import com.syuuk.patentflow.patent.dto.ReviewWorkflowStatus;
 import com.syuuk.patentflow.patent.repository.PatentMetadataRepository;
 import com.syuuk.patentflow.patent.repository.PatentReviewHistoryRepository;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,14 +52,25 @@ class PatentWorkflowServiceMapAgentResponseTest {
     }
 
     private AgentEvaluateResponse agentResponse(List<AgentScoreItem> scores, Integer totalScore) {
-        return agentResponse(scores, totalScore, "# 보고서", null);
+        return agentResponse(scores, totalScore, "# 보고서", null, false, null);
     }
 
     private AgentEvaluateResponse agentResponse(
             List<AgentScoreItem> scores, Integer totalScore, String rawMarkdown, String summaryMarkdown) {
+        return agentResponse(scores, totalScore, rawMarkdown, summaryMarkdown, false, null);
+    }
+
+    private AgentEvaluateResponse agentResponse(
+            List<AgentScoreItem> scores,
+            Integer totalScore,
+            String rawMarkdown,
+            String summaryMarkdown,
+            boolean degraded,
+            String failureReason
+    ) {
         return new AgentEvaluateResponse(
                 "PAT-VAL09", scores, "포기 검토", summaryMarkdown, rawMarkdown,
-                totalScore, null, "D", "포기 검토", null, false, null, OffsetDateTime.now(),
+                totalScore, null, "D", "포기 검토", null, degraded, failureReason, OffsetDateTime.now(),
                 List.of(), null, List.of(), List.of(), List.of(), null);
     }
 
@@ -80,6 +99,52 @@ class PatentWorkflowServiceMapAgentResponseTest {
     }
 
     @Test
+    void failureReasonMarksReportDegradedEvenWhenScoresExist() {
+        AgentEvaluateResponse agent = agentResponse(
+                List.of(score("권리성", 82), score("기술성", 77)),
+                159,
+                "# 보고서",
+                "요약",
+                false,
+                "AI 평가 서비스 연결 실패: timeout");
+
+        AiEvaluationReportResponse report = service.mapAgentResponse(agent, "PAT-VAL09");
+
+        assertThat(report.degraded()).isTrue();
+        assertThat(report.failureReason()).isEqualTo("AI 평가 서비스 연결 실패: timeout");
+    }
+
+    @Test
+    void degradedReportDoesNotAdvanceWorkflowToMailReady() {
+        PatentDetailResponse patent = reviewStartedPatent();
+        AiEvaluationReportResponse report = service.mapAgentResponse(
+                agentResponse(
+                        List.of(score("권리성", 82), score("기술성", 77)),
+                        159,
+                        "# 보고서",
+                        "요약",
+                        false,
+                        "AI 평가 서비스 오류 응답"),
+                patent.patentId());
+
+        PatentDetailResponse updated = service.withAiReport(patent, report, "요약");
+
+        assertThat(updated.reviewWorkflowStatus()).isEqualTo(ReviewWorkflowStatus.REVIEW_QUARTER_STARTED);
+    }
+
+    @Test
+    void healthyReportAdvancesWorkflowToMailReady() {
+        PatentDetailResponse patent = reviewStartedPatent();
+        AiEvaluationReportResponse report = service.mapAgentResponse(
+                agentResponse(List.of(score("권리성", 82), score("기술성", 77)), 159),
+                patent.patentId());
+
+        PatentDetailResponse updated = service.withAiReport(patent, report, "요약");
+
+        assertThat(updated.reviewWorkflowStatus()).isEqualTo(ReviewWorkflowStatus.MAIL_READY);
+    }
+
+    @Test
     void missingReportMarkdownBuildsSyntheticReportInsteadOfPassingSummaryAsReport() {
         // 전체 레포트가 없으면 요약문이 레포트로 둔갑하지 않고, 합성 레포트(요약+점수+권고)가 생성된다.
         AgentEvaluateResponse agent = agentResponse(
@@ -90,5 +155,39 @@ class PatentWorkflowServiceMapAgentResponseTest {
         assertThat(report.rawMarkdown()).startsWith("# AI 특허 평가 레포트");
         assertThat(report.rawMarkdown()).contains("# 특허 요약 한 줄");
         assertThat(report.rawMarkdown()).contains("## 평가 점수");
+    }
+
+    private PatentDetailResponse reviewStartedPatent() {
+        return new PatentDetailResponse(
+                "PAT-VAL09",
+                "P-VAL09",
+                "10-2026-0000001",
+                null,
+                "테스트 특허",
+                "테스트 특허",
+                "AI",
+                "문서처리",
+                "PatentFlow",
+                "KR",
+                "없음",
+                LocalDate.parse("2024-01-01"),
+                LocalDate.parse("2025-01-01"),
+                LocalDate.parse("2044-01-01"),
+                "DEPT-AI",
+                "AI사업부",
+                PatentLifecycleStatus.ACTIVE,
+                ReviewWorkflowStatus.REVIEW_QUARTER_STARTED,
+                LocalDate.parse("2026-06-30"),
+                "연차료 납부 검토 시점 도래",
+                Recommendation.HOLD,
+                null,
+                null,
+                new PatentSummaryResponse("작성 필요", "작성 필요", List.of(), "작성 필요", List.of()),
+                null,
+                new FinalDecisionRecordResponse(null, null, null, null),
+                new BusinessOpinionResponse(null, null, null),
+                true,
+                false,
+                null);
     }
 }

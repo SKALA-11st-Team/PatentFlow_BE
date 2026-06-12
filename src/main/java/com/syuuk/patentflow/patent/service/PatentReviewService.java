@@ -9,6 +9,7 @@ import com.syuuk.patentflow.common.response.PageResponse;
 import com.syuuk.patentflow.patent.domain.PatentMetadataEntity;
 import com.syuuk.patentflow.patent.domain.PatentReviewHistoryEntity;
 import com.syuuk.patentflow.patent.dto.AiEvaluationReportResponse;
+import com.syuuk.patentflow.patent.dto.AiReportReadinessStatus;
 import com.syuuk.patentflow.patent.dto.AiReportOverrides;
 import com.syuuk.patentflow.patent.dto.SourceResponse;
 import com.syuuk.patentflow.patent.dto.BusinessOpinionDecision;
@@ -1320,9 +1321,36 @@ public class PatentReviewService {
                 detail.currentRecommendation(),
                 detail.businessOpinionDecision(),
                 detail.legalActionResult(),
+                aiReportReadinessStatus(detail),
+                aiReportFailureReason(detail),
                 originalPatentUrl(detail.country(), detail.applicationNumber(), detail.registrationNumber()),
                 detail.inReview(),
                 currentQuarterKey);
+    }
+
+    private AiReportReadinessStatus aiReportReadinessStatus(PatentDetailResponse detail) {
+        AiEvaluationReportResponse report = detail.aiEvaluationReport();
+        if (report != null && (report.degraded() || hasText(report.failureReason()))) {
+            return AiReportReadinessStatus.FAILED;
+        }
+        if (detail.reviewWorkflowStatus() == ReviewWorkflowStatus.MAIL_READY
+                && report != null
+                && hasText(report.reportId())) {
+            return AiReportReadinessStatus.READY;
+        }
+        return AiReportReadinessStatus.PENDING;
+    }
+
+    private String aiReportFailureReason(PatentDetailResponse detail) {
+        AiEvaluationReportResponse report = detail.aiEvaluationReport();
+        if (report == null || !hasText(report.failureReason())) {
+            return null;
+        }
+        return report.failureReason();
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     /** 특허 원문 URL 생성 규칙(MAIL-10) — PDF 폴백(MAIL-12) 등에서 재사용하도록 공개한다. */

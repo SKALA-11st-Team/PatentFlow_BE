@@ -1,0 +1,78 @@
+# PatentFlow E2E 스택: Postgres(pgvector) + BE + fake-agent.
+# FE는 Playwright webServer가 dev 서버(5174)로 띄운다 (VITE_API_BASE_URL=http://localhost:18080).
+# 포트는 로컬 개발 스택(BE 8080, FE 5173, Postgres 5432)과 충돌하지 않게 분리되어 있다.
+#
+#   docker compose -f docker-compose.e2e.yml up --build -d   # 기동
+#   docker compose -f docker-compose.e2e.yml down -v         # 클린 리셋 (시드 재생성)
+#
+# 시드: LocalDemoSeedRunner(local 프로필)가 빈 DB에 SK AX 특허 185건 + 부서/계정/분기를 멱등 시드한다.
+# 분기 활성화는 QuarterActivationScheduler가 기동 직후 자동 수행 → 검토 대상까지 자동 생성.
+services:
+  e2e-postgres:
+    image: ankane/pgvector:v0.5.1
+    container_name: patentflow-e2e-postgres
+    ports:
+      - "55432:5432"
+    environment:
+      POSTGRES_DB: patentflow
+      POSTGRES_USER: patentflow
+      POSTGRES_PASSWORD: patentflow
+    volumes:
+      - e2e-postgres-data:/var/lib/postgresql/data
+      - ../PatentFlow_BE/docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U patentflow -d patentflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  e2e-fake-agent:
+    build: ./fake-agent
+    container_name: patentflow-e2e-fake-agent
+    ports:
+      - "18000:8000"
+    environment:
+      # 평가 응답까지의 지연(초) — FE의 PENDING→RUNNING→완료 폴링 UI를 실제로 거치게 한다.
+      FAKE_AGENT_DELAY_SECONDS: "4"
+      # 특허별 첫 호출 degraded: 분기 활성화 자동 배치가 검토 대상을 소진하지 않게 하고,
+      # journey의 수동 생성(2번째 호출)이 성공하게 한다. main.py 주석 참고.
+      FAKE_AGENT_DEGRADE_FIRST_CALL: "true"
+
+  e2e-be:
+    build: ../PatentFlow_BE
+    container_name: patentflow-e2e-be
+    ports:
+      # 로컬 개발 BE(8080)와 충돌하지 않도록 18080 사용
+      - "18080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_DATASOURCE_URL: jdbc:postgresql://e2e-postgres:5432/patentflow?currentSchema=patentflow
+      SPRING_DATASOURCE_USERNAME: patentflow
+      SPRING_DATASOURCE_PASSWORD: patentflow
+      PATENTFLOW_DB_SCHEMA: patentflow
+      PATENTFLOW_CORS_ALLOWED_ORIGINS: http://localhost:5174,http://127.0.0.1:5174
+      PATENTFLOW_AGENT_URL: http://e2e-fake-agent:8000
+      PATENTFLOW_AI_REPORT_STORAGE_DIR: /app/storage/ai-reports
+      # E2E 전용: OAuth2 미연동이어도 메일을 SENT로 기록해 워크플로 전이를 검증한다. 실제 메일은 발송되지 않는다.
+      PATENTFLOW_MAILING_SIMULATE_DELIVERY: "true"
+      # E2E 전용: 컨텍스트마다 신선 로그인(회전 리프레시 토큰과의 충돌 회피)하므로
+      # 인증 엔드포인트 IP 레이트리밋(기본 30/60s)을 끈다.
+      PATENTFLOW_RATELIMIT_ENABLED: "false"
+      # E2E 전용: CSRF 토큰 발급↔삭제 핑퐁([BE-14])이 변형 요청을 간헐 401로 만들어
+      # 워크플로 검증을 불안정하게 한다. 운영/데모에서는 기본값(true)으로 항상 켜진다.
+      PATENTFLOW_SECURITY_CSRF_ENABLED: "false"
+      # 알려진 비밀번호로 시드 계정을 upsert — Playwright 로그인 셋업이 사용한다.
+      PATENTFLOW_BOOTSTRAP_ADMIN_EMAIL: admin@syuuk.test
+      PATENTFLOW_BOOTSTRAP_ADMIN_PASSWORD: E2eAdmin!2026
+      PATENTFLOW_BOOTSTRAP_BUSINESS_EMAIL: ict.manager@syuuk.test
+      PATENTFLOW_BOOTSTRAP_BUSINESS_PASSWORD: E2eBusiness!2026
+      PATENTFLOW_BOOTSTRAP_BUSINESS_DEPARTMENT_ID: DEPT-ICT
+    depends_on:
+      e2e-postgres:
+        condition: service_healthy
+      e2e-fake-agent:
+        condition: service_started
+
+volumes:
+  e2e-postgres-data:

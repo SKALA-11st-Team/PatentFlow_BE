@@ -1,0 +1,17 @@
+{
+  "name": "patentflow-e2e",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "stack:up": "docker compose -f docker-compose.e2e.yml up --build -d",
+    "stack:down": "docker compose -f docker-compose.e2e.yml down",
+    "stack:reset": "docker compose -f docker-compose.e2e.yml down -v",
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:prod": "playwright test --grep @prod",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}

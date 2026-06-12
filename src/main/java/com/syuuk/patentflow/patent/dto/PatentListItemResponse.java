@@ -26,6 +26,8 @@ public record PatentListItemResponse(
         Recommendation currentRecommendation,
         BusinessOpinionDecision businessOpinionDecision,
         LegalActionResult legalActionResult,
+        AiReportReadinessStatus aiReportReadinessStatus,
+        String aiReportFailureReason,
         String originalPatentUrl,
         boolean inReview,           // 현재 분기 검토 대상 여부 (patents.is_in_review 반영)
         String currentQuarterKey    // 현재 속한 검토 분기 키 (예: "2026-Q2"), 검토 아님이면 null
