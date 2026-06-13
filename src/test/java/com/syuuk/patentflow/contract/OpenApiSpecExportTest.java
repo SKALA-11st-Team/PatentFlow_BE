@@ -6,7 +6,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.core.util.DefaultIndenter;
 import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
@@ -71,7 +70,10 @@ class OpenApiSpecExportTest {
 
     /** 원본 JSON을 트리로 읽어 키 정렬 + 2-space + LF 로 재직렬화한다(끝에 개행 1줄 보장). */
     private String canonicalize(String rawJson) throws Exception {
-        JsonNode tree = canonicalMapper.readTree(rawJson);
+        // ORDER_MAP_ENTRIES_BY_KEYS는 Map 직렬화에만 적용되고 ObjectNode 필드는 정렬하지 않는다.
+        // readTree(JsonNode)로 받으면 springdoc의 리플렉션 순서 비결정성이 그대로 노출돼
+        // 같은 코드에서도 실행마다 스냅샷이 어긋난다 — Map 트리로 읽어 전 레벨 키 정렬을 보장한다.
+        Object tree = canonicalMapper.readValue(rawJson, Object.class);
         DefaultIndenter indenter = new DefaultIndenter("  ", "\n");
         DefaultPrettyPrinter printer = new DefaultPrettyPrinter();
         printer.indentObjectsWith(indenter);
