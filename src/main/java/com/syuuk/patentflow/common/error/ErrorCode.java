@@ -15,6 +15,8 @@ public enum ErrorCode {
     AI_REPORT_EDIT_CONFLICT(HttpStatus.CONFLICT, "AI 레포트가 다른 곳에서 변경되었습니다. 새로고침 후 다시 시도해주세요."),
     MAIL_NOT_CONFIGURED(HttpStatus.BAD_REQUEST, "Gmail 메일 발송 설정이 완료되지 않았습니다. 설정 페이지에서 Gmail 계정과 앱 비밀번호를 등록해 주세요."),
     MAIL_SEND_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "메일 발송에 실패했습니다. Gmail 설정을 확인해 주세요."),
+    CSRF_TOKEN_INVALID(HttpStatus.FORBIDDEN, "보안 토큰이 유효하지 않습니다. 잠시 후 다시 시도해 주세요."),
+    ACCESS_DENIED(HttpStatus.FORBIDDEN, "접근 권한이 없습니다."),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 처리 중 오류가 발생했습니다.");
 
     private final HttpStatus status;

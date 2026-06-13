@@ -1,8 +1,10 @@
 package com.syuuk.patentflow.auth.config;
 
 import com.syuuk.patentflow.auth.security.CsrfCookieFilter;
+import com.syuuk.patentflow.auth.security.JsonAccessDeniedHandler;
 import com.syuuk.patentflow.auth.security.JwtAuthenticationFilter;
 import com.syuuk.patentflow.auth.security.SpaCsrfTokenRequestHandler;
+import com.syuuk.patentflow.auth.security.StableCsrfTokenRepository;
 import com.syuuk.patentflow.common.ratelimit.RateLimitFilter;
 import java.util.Arrays;
 import java.util.List;
@@ -24,6 +26,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -53,7 +56,7 @@ public class SecurityConfig {
      * CSRF 토큰 쿠키(XSRF-TOKEN) 설정. 크로스 서브도메인(FE patentflow.live ↔ BE api.patentflow.live)
      * 환경에서 SPA가 JS로 쿠키를 읽을 수 있도록 상위 도메인을 지정한다(설정값이 있을 때).
      */
-    private CookieCsrfTokenRepository csrfTokenRepository() {
+    private CsrfTokenRepository csrfTokenRepository() {
         CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
         repository.setCookieCustomizer(builder -> {
             builder.secure(authProperties.isCookieSecure());
@@ -63,13 +66,15 @@ public class SecurityConfig {
                 builder.domain(cookieDomain);
             }
         });
-        return repository;
+        // BE-14: 인증 시 토큰 회전(삭제·재발급)을 억제해 동시 요청 핑퐁(간헐 403)을 제거한다.
+        return new StableCsrfTokenRepository(repository);
     }
 
     @Bean
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             JwtAuthenticationFilter jwtAuthenticationFilter,
+            JsonAccessDeniedHandler jsonAccessDeniedHandler,
             ObjectProvider<RateLimitFilter> rateLimitFilterProvider
     ) throws Exception {
         // P6 BE-RATELIMIT: 활성화된 경우에만 인증 처리 앞단에 레이트리밋 필터를 배치한다.
@@ -94,10 +99,16 @@ public class SecurityConfig {
             })
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .exceptionHandling(exception -> exception.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
+                // BE-14: 403을 sendError 없이 직접 JSON으로 응답 — ERROR dispatch가 401로 바꿔치기하는
+                // CSRF 핑퐁 차단. CsrfFilter도 이 핸들러를 사용한다(ExceptionHandlingConfigurer 공유).
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
+                        .accessDeniedHandler(jsonAccessDeniedHandler))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout").permitAll()
+                        // BE-14: XSRF-TOKEN 쿠키 프라이밍용 no-op GET — 로그인 전에도 토큰을 받을 수 있어야 한다.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/auth/csrf").permitAll()
                         // AUTH-06: 실제 매핑된 콜백은 /admin/settings/... 하나뿐. 컨트롤러가 없는
                         // orphan permitAll(/api/v1/settings/mail/oauth2/google/callback)을 제거해 미인증 표면을 축소한다.
                         .requestMatchers(
@@ -108,6 +119,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/business/checklist-items").authenticated()
                         // I3: 역할 분리 — 검토 업무(특허·연차료·메일·legal 대시보드)는 ADMIN+LEGAL,
                         // 운영(admin 설정·계정/부서 관리·시스템 설정)은 ADMIN 전용으로 유지한다.
+                        // FE-01: 부서 목록 조회는 LEGAL 검토 화면(담당부서 표시·메일 수신처)에서도 필요 —
+                        // 읽기 전용 GET만 LEGAL에 허용한다(첫 매치 우선, 변형은 /admin/departments로 ADMIN 전용).
+                        .requestMatchers(HttpMethod.GET, "/api/v1/departments").hasAnyRole("ADMIN", "LEGAL")
                         .requestMatchers("/api/v1/admin/**", "/api/v1/settings/**",
                                 "/api/v1/departments/**").hasRole("ADMIN")
                         .requestMatchers("/api/v1/legal/**", "/api/v1/mailings/**").hasAnyRole("ADMIN", "LEGAL")

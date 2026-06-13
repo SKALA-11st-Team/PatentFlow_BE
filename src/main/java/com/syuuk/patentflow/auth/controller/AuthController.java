@@ -60,6 +60,15 @@ public class AuthController {
         return ApiResponse.ok(result.response());
     }
 
+    /**
+     * BE-14: SPA가 XSRF-TOKEN 쿠키를 강제 재발급받기 위한 no-op GET.
+     * CsrfCookieFilter가 deferred 토큰을 렌더링해 응답에 Set-Cookie를 싣는다.
+     */
+    @GetMapping("/csrf")
+    public ApiResponse<Void> csrf() {
+        return ApiResponse.ok(null);
+    }
+
     @GetMapping("/me")
     public ApiResponse<UserPrincipalResponse> me(Authentication authentication) {
         return ApiResponse.ok(authService.currentUser(authentication));
