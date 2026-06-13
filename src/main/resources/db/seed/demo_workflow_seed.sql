@@ -2,14 +2,14 @@
 -- This script creates presentation-friendly workflow states and histories.
 -- It is intentionally loaded only by LocalDemoSeedRunner for local/demo profiles.
 
-INSERT INTO users (id, username, password, role, department_id, display_name, created_at) VALUES
+INSERT INTO users (id, email, password, role, department_id, username, created_at) VALUES
     ('USER-business-demo', 'business@business.com', '$2a$10$8Cs9O/CKSYzHkTU4/5WBguCSVaE0fWcP8w3pizKrhkoGNOT7nl78e', 'BUSINESS', 'DEPT-ICT', '사업부 데모 담당자', CURRENT_TIMESTAMP)
 ON CONFLICT (id) DO UPDATE SET
-    username = EXCLUDED.username,
+    email = EXCLUDED.email,
     password = EXCLUDED.password,
     role = EXCLUDED.role,
     department_id = EXCLUDED.department_id,
-    display_name = EXCLUDED.display_name;
+    username = EXCLUDED.username;
 
 WITH demo_reviews (
     patent_id,
