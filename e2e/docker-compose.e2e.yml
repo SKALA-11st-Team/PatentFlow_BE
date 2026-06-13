@@ -59,9 +59,9 @@ services:
       # E2E 전용: 컨텍스트마다 신선 로그인(회전 리프레시 토큰과의 충돌 회피)하므로
       # 인증 엔드포인트 IP 레이트리밋(기본 30/60s)을 끈다.
       PATENTFLOW_RATELIMIT_ENABLED: "false"
-      # E2E 전용: CSRF 토큰 발급↔삭제 핑퐁([BE-14])이 변형 요청을 간헐 401로 만들어
-      # 워크플로 검증을 불안정하게 한다. 운영/데모에서는 기본값(true)으로 항상 켜진다.
-      PATENTFLOW_SECURITY_CSRF_ENABLED: "false"
+      # [BE-14] 해결 후: CSRF 토큰 회전(인증 시 삭제·재발급) 제거로 핑퐁이 사라져
+      # 운영과 동일하게 CSRF를 켠 채로 e2e를 돌린다(회귀 가드). 17 passed/1 skip 확인.
+      PATENTFLOW_SECURITY_CSRF_ENABLED: "true"
       # 알려진 비밀번호로 시드 계정을 upsert — Playwright 로그인 셋업이 사용한다.
       PATENTFLOW_BOOTSTRAP_ADMIN_EMAIL: admin@syuuk.test
       PATENTFLOW_BOOTSTRAP_ADMIN_PASSWORD: E2eAdmin!2026
