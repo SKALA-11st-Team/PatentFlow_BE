@@ -12,20 +12,23 @@ ON CONFLICT (department_id) DO UPDATE SET
     department_name = EXCLUDED.department_name,
     updated_at = EXCLUDED.updated_at;
 
-INSERT INTO users (id, email, password, role, department_id, username, created_at) VALUES
-    ('USER-admin', 'admin@syuuk.test', '$2a$10$./V2Hi1S3qoucv7eCn3UPevz.heOde1x3SehhcAJCss8OXimprQFC', 'ADMIN', NULL, '특허관리자', CURRENT_TIMESTAMP),
-    ('USER-rnd-manager', 'rnd.manager@syuuk.test', '$2a$10$8Cs9O/CKSYzHkTU4/5WBguCSVaE0fWcP8w3pizKrhkoGNOT7nl78e', 'BUSINESS', 'DEPT-RND', 'R&D 담당자', CURRENT_TIMESTAMP),
-    ('USER-platform-manager', 'platform.manager@syuuk.test', '$2a$10$8Cs9O/CKSYzHkTU4/5WBguCSVaE0fWcP8w3pizKrhkoGNOT7nl78e', 'BUSINESS', 'DEPT-PLATFORM', '플랫폼 담당자', CURRENT_TIMESTAMP),
-    ('USER-esg-manager', 'esg.manager@syuuk.test', '$2a$10$8Cs9O/CKSYzHkTU4/5WBguCSVaE0fWcP8w3pizKrhkoGNOT7nl78e', 'BUSINESS', 'DEPT-ESG', 'ESG 담당자', CURRENT_TIMESTAMP),
-    ('USER-ict-manager', 'ict.manager@syuuk.test', '$2a$10$8Cs9O/CKSYzHkTU4/5WBguCSVaE0fWcP8w3pizKrhkoGNOT7nl78e', 'BUSINESS', 'DEPT-ICT', 'ICT 담당자', CURRENT_TIMESTAMP),
-    ('USER-mfg-manager', 'mfg.manager@syuuk.test', '$2a$10$8Cs9O/CKSYzHkTU4/5WBguCSVaE0fWcP8w3pizKrhkoGNOT7nl78e', 'BUSINESS', 'DEPT-MFG', '제조 담당자', CURRENT_TIMESTAMP),
-    ('USER-biz-manager', 'biz.manager@syuuk.test', '$2a$10$8Cs9O/CKSYzHkTU4/5WBguCSVaE0fWcP8w3pizKrhkoGNOT7nl78e', 'BUSINESS', 'DEPT-BIZ', '사업기획 담당자', CURRENT_TIMESTAMP)
+-- status: 초대 온보딩 상태(ACTIVE | PENDING | INACTIVE). 초대가 PENDING/REVOKED인 계정은 일관되게 맞춘다.
+--   USER-esg-manager → 초대 미수락(PENDING), USER-rnd-manager → 초대 회수(INACTIVE). 그 외 ACTIVE.
+INSERT INTO users (id, email, password, role, department_id, username, status, created_at) VALUES
+    ('USER-admin', 'admin@syuuk.test', '$2a$10$./V2Hi1S3qoucv7eCn3UPevz.heOde1x3SehhcAJCss8OXimprQFC', 'ADMIN', NULL, '특허관리자', 'ACTIVE', CURRENT_TIMESTAMP),
+    ('USER-rnd-manager', 'rnd.manager@syuuk.test', '$2a$10$8Cs9O/CKSYzHkTU4/5WBguCSVaE0fWcP8w3pizKrhkoGNOT7nl78e', 'BUSINESS', 'DEPT-RND', 'R&D 담당자', 'INACTIVE', CURRENT_TIMESTAMP),
+    ('USER-platform-manager', 'platform.manager@syuuk.test', '$2a$10$8Cs9O/CKSYzHkTU4/5WBguCSVaE0fWcP8w3pizKrhkoGNOT7nl78e', 'BUSINESS', 'DEPT-PLATFORM', '플랫폼 담당자', 'ACTIVE', CURRENT_TIMESTAMP),
+    ('USER-esg-manager', 'esg.manager@syuuk.test', '$2a$10$8Cs9O/CKSYzHkTU4/5WBguCSVaE0fWcP8w3pizKrhkoGNOT7nl78e', 'BUSINESS', 'DEPT-ESG', 'ESG 담당자', 'PENDING', CURRENT_TIMESTAMP),
+    ('USER-ict-manager', 'ict.manager@syuuk.test', '$2a$10$8Cs9O/CKSYzHkTU4/5WBguCSVaE0fWcP8w3pizKrhkoGNOT7nl78e', 'BUSINESS', 'DEPT-ICT', 'ICT 담당자', 'ACTIVE', CURRENT_TIMESTAMP),
+    ('USER-mfg-manager', 'mfg.manager@syuuk.test', '$2a$10$8Cs9O/CKSYzHkTU4/5WBguCSVaE0fWcP8w3pizKrhkoGNOT7nl78e', 'BUSINESS', 'DEPT-MFG', '제조 담당자', 'ACTIVE', CURRENT_TIMESTAMP),
+    ('USER-biz-manager', 'biz.manager@syuuk.test', '$2a$10$8Cs9O/CKSYzHkTU4/5WBguCSVaE0fWcP8w3pizKrhkoGNOT7nl78e', 'BUSINESS', 'DEPT-BIZ', '사업기획 담당자', 'ACTIVE', CURRENT_TIMESTAMP)
 ON CONFLICT (id) DO UPDATE SET
     email = EXCLUDED.email,
     password = EXCLUDED.password,
     role = EXCLUDED.role,
     department_id = EXCLUDED.department_id,
-    username = EXCLUDED.username;
+    username = EXCLUDED.username,
+    status = EXCLUDED.status;
 
 INSERT INTO system_settings (setting_key, setting_value, updated_at) VALUES
     ('country.extension.KR', '12', CURRENT_TIMESTAMP),

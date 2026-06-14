@@ -9,8 +9,12 @@ import static org.mockito.Mockito.when;
 
 import com.syuuk.patentflow.common.error.PatentFlowException;
 import com.syuuk.patentflow.common.service.SystemSettingsService;
+import com.syuuk.patentflow.invitation.domain.InvitationEntity;
+import com.syuuk.patentflow.invitation.domain.InvitationStatus;
+import com.syuuk.patentflow.invitation.service.InvitationService;
 import com.syuuk.patentflow.mailing.repository.DepartmentRepository;
 import com.syuuk.patentflow.mailing.service.MailOAuth2Service;
+import com.syuuk.patentflow.settings.service.SettingsService;
 import com.syuuk.patentflow.user.domain.UserEntity;
 import com.syuuk.patentflow.user.dto.CreateUserRequest;
 import com.syuuk.patentflow.user.dto.ResetPasswordResponse;
@@ -42,12 +46,24 @@ class AdminUserServiceTest {
     @Mock
     private MailOAuth2Service mailOAuth2Service;
 
+    @Mock
+    private InvitationService invitationService;
+
+    @Mock
+    private SettingsService settingsService;
+
     private TestAdminUserService service;
 
     @BeforeEach
     void setUp() {
         service = new TestAdminUserService(userRepository, departmentRepository, passwordEncoder,
-                systemSettingsService, mailOAuth2Service);
+                systemSettingsService, mailOAuth2Service, invitationService, settingsService);
+    }
+
+    private static InvitationEntity stubInvitation(UserEntity user) {
+        return new InvitationEntity("INV-TEST", user.getId(), user.getDepartmentId(), "hash",
+                InvitationStatus.PENDING, null,
+                java.time.OffsetDateTime.now(), java.time.OffsetDateTime.now().plusDays(7));
     }
 
     @Test
@@ -140,6 +156,9 @@ class AdminUserServiceTest {
         when(departmentRepository.existsById("DEPT-ICT")).thenReturn(true);
         when(passwordEncoder.encode(any())).thenReturn("encoded-temp-password");
         when(userRepository.save(any(UserEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(invitationService.createInvitation(any(UserEntity.class), any()))
+                .thenAnswer(invocation -> new InvitationService.CreatedInvitation(
+                        stubInvitation(invocation.getArgument(0)), "raw-token"));
 
         service.createUser(new CreateUserRequest("business@test.com", "BUSINESS", " DEPT-ICT ", "사업부"));
 
@@ -161,8 +180,11 @@ class AdminUserServiceTest {
                 DepartmentRepository departmentRepository,
                 PasswordEncoder passwordEncoder,
                 SystemSettingsService systemSettingsService,
-                MailOAuth2Service mailOAuth2Service) {
-            super(userRepository, departmentRepository, passwordEncoder, systemSettingsService, mailOAuth2Service);
+                MailOAuth2Service mailOAuth2Service,
+                InvitationService invitationService,
+                SettingsService settingsService) {
+            super(userRepository, departmentRepository, passwordEncoder, systemSettingsService, mailOAuth2Service,
+                    invitationService, settingsService);
         }
 
         @Override

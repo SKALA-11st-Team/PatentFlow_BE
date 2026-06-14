@@ -78,6 +78,9 @@ patentflow:
       client-secret: ${GOOGLE_OAUTH2_CLIENT_SECRET:}
       redirect-uri: ${GOOGLE_OAUTH2_REDIRECT_URI:http://localhost:8080/api/v1/admin/settings/mail/oauth2/google/callback}
       frontend-settings-uri: ${GOOGLE_OAUTH2_FRONTEND_URI:http://localhost:5173/admin/settings}
+  # 사업부 초대 메일의 수락 링크 베이스 URL(FE 도메인). 미설정 시 상대경로 폴백.
+  invite:
+    base-url: ${PATENTFLOW_INVITE_BASE_URL:}
   # E2E/로컬 검증 전용(기본 false): OAuth2 미연동이어도 메일 draft를 SENT로 기록해 워크플로우 전이를 검증한다.
   mailing:
     simulate-delivery: ${PATENTFLOW_MAILING_SIMULATE_DELIVERY:false}

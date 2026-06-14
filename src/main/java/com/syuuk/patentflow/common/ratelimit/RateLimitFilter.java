@@ -13,8 +13,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * P6 BE-RATELIMIT: 미인증 인증 엔드포인트(login/refresh/logout)에 IP+경로 단위 요청 한도를 적용한다.
+ * P6 BE-RATELIMIT: 미인증 인증 엔드포인트(login/refresh/logout)와 공개 초대 토큰 엔드포인트(/invitations/**)에
+ * IP+경로 단위 요청 한도를 적용한다.
  * 계정 락아웃(LoginAttemptService)이 '계정' 단위라면, 본 필터는 '요청' 단위 브루트포스/남용을 막는다.
+ * 초대 토큰 검증/수락은 토큰 추측(브루트포스) 표면이므로 동일 한도로 보호한다.
  * 한도 초과 시 429를 반환한다. patentflow.ratelimit.enabled=false면 비활성(테스트 기본 false).
  */
 @Component
@@ -25,6 +27,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
             "/api/v1/auth/login",
             "/api/v1/auth/refresh",
             "/api/v1/auth/logout");
+    // 공개 초대 토큰 검증(GET /invitations/{token})·수락(POST /invitations/accept) — 토큰 추측 방지.
+    private static final String INVITATION_PREFIX = "/api/v1/invitations";
 
     private final RateLimitStore store;
     private final int limit;
@@ -47,7 +51,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
         String path = request.getRequestURI();
-        if (!"OPTIONS".equalsIgnoreCase(request.getMethod()) && LIMITED_PATHS.contains(path)) {
+        boolean limited = LIMITED_PATHS.contains(path) || path.startsWith(INVITATION_PREFIX);
+        if (!"OPTIONS".equalsIgnoreCase(request.getMethod()) && limited) {
             String key = clientIp(request) + ":" + path;
             if (!store.tryConsume(key, limit, window)) {
                 response.setStatus(429);

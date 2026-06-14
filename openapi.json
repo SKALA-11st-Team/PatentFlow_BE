@@ -446,6 +446,21 @@
         },
         "type" : "object"
       },
+      "ApiResponseBusinessInvitationStatusResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/BusinessInvitationStatusResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ApiResponseBusinessSubmissionVersionResponse" : {
         "properties" : {
           "data" : {
@@ -552,6 +567,21 @@
         },
         "type" : "object"
       },
+      "ApiResponseInvitationValidationResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/InvitationValidationResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ApiResponseLegalDashboardSummaryResponse" : {
         "properties" : {
           "data" : {
@@ -608,6 +638,24 @@
           "data" : {
             "items" : {
               "$ref" : "#/components/schemas/BusinessChecklistItemResponse"
+            },
+            "type" : "array"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponseListBusinessInvitationStatusResponse" : {
+        "properties" : {
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/BusinessInvitationStatusResponse"
             },
             "type" : "array"
           },
@@ -1550,6 +1598,52 @@
         },
         "type" : "object"
       },
+      "BusinessInvitationStatusResponse" : {
+        "properties" : {
+          "acceptedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "accountStatus" : {
+            "type" : "string"
+          },
+          "departmentId" : {
+            "type" : "string"
+          },
+          "departmentName" : {
+            "type" : "string"
+          },
+          "email" : {
+            "type" : "string"
+          },
+          "expiresAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "invitationStatus" : {
+            "type" : "string"
+          },
+          "invitedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "lastAccessAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "responseDeadline" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "userId" : {
+            "type" : "string"
+          },
+          "username" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "BusinessOpinionResponse" : {
         "properties" : {
           "decision" : {
@@ -2153,6 +2247,42 @@
               "LEGAL_ACTION_RECORDED"
             ],
             "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "InvitationAcceptRequest" : {
+        "properties" : {
+          "newPassword" : {
+            "maxLength" : 72,
+            "minLength" : 8,
+            "type" : "string"
+          },
+          "token" : {
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "newPassword",
+          "token"
+        ],
+        "type" : "object"
+      },
+      "InvitationValidationResponse" : {
+        "properties" : {
+          "email" : {
+            "type" : "string"
+          },
+          "responseDeadline" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "valid" : {
+            "type" : "boolean"
           }
         },
         "type" : "object"
@@ -3685,6 +3815,26 @@
         ]
       }
     },
+    "/api/v1/admin/invitations" : {
+      "get" : {
+        "operationId" : "getInvitations",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListBusinessInvitationStatusResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [
+          "admin-invitation-controller"
+        ]
+      }
+    },
     "/api/v1/admin/settings/mail/oauth2/google" : {
       "delete" : {
         "operationId" : "disconnect",
@@ -3925,6 +4075,36 @@
         },
         "tags" : [
           "admin-user-controller"
+        ]
+      }
+    },
+    "/api/v1/admin/users/{userId}/invitation/resend" : {
+      "post" : {
+        "operationId" : "resendInvitation",
+        "parameters" : [
+          {
+            "in" : "path",
+            "name" : "userId",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseBusinessInvitationStatusResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [
+          "admin-invitation-controller"
         ]
       }
     },
@@ -4542,6 +4722,66 @@
         },
         "tags" : [
           "department-controller"
+        ]
+      }
+    },
+    "/api/v1/invitations/accept" : {
+      "post" : {
+        "operationId" : "accept",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/InvitationAcceptRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [
+          "invitation-controller"
+        ]
+      }
+    },
+    "/api/v1/invitations/{token}" : {
+      "get" : {
+        "operationId" : "validate",
+        "parameters" : [
+          {
+            "in" : "path",
+            "name" : "token",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseInvitationValidationResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [
+          "invitation-controller"
         ]
       }
     },

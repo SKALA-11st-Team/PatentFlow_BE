@@ -95,7 +95,9 @@ public class SecurityConfig {
                     .ignoringRequestMatchers(
                             "/api/v1/auth/login",
                             "/api/v1/auth/refresh",
-                            "/api/v1/auth/logout");
+                            "/api/v1/auth/logout",
+                            // 공개 초대 수락(미인증 POST) — CSRF 토큰 없이 호출되므로 면제.
+                            "/api/v1/invitations/accept");
             })
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -109,6 +111,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout").permitAll()
                         // BE-14: XSRF-TOKEN 쿠키 프라이밍용 no-op GET — 로그인 전에도 토큰을 받을 수 있어야 한다.
                         .requestMatchers(HttpMethod.GET, "/api/v1/auth/csrf").permitAll()
+                        // FR-LEGAL-12: 공개 초대 토큰 검증·수락(미인증). 관리자용 /api/v1/admin/invitations 와는 별개 경로.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/invitations/*").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/invitations/accept").permitAll()
                         // AUTH-06: 실제 매핑된 콜백은 /admin/settings/... 하나뿐. 컨트롤러가 없는
                         // orphan permitAll(/api/v1/settings/mail/oauth2/google/callback)을 제거해 미인증 표면을 축소한다.
                         .requestMatchers(

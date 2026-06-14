@@ -22,7 +22,11 @@ import com.syuuk.patentflow.patent.service.AnnualFeeScheduleManagementService;
 import com.syuuk.patentflow.patent.service.DashboardSummaryService;
 import com.syuuk.patentflow.patent.service.PatentPdfService;
 import com.syuuk.patentflow.patent.service.PatentReviewService;
+import com.syuuk.patentflow.settings.dto.QuarterSettingResponse;
+import com.syuuk.patentflow.settings.service.SettingsService;
 import jakarta.validation.Valid;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -42,6 +46,9 @@ public class BusinessController {
     private final DashboardSummaryService dashboardSummaryService;
     private final AnnualFeeScheduleManagementService annualFeeScheduleManagementService;
     private final PatentPdfService patentPdfService;
+    private final SettingsService settingsService;
+
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     public BusinessController(
             BusinessFixtureService businessFixtureService,
@@ -49,7 +56,8 @@ public class BusinessController {
             AuthService authService,
             DashboardSummaryService dashboardSummaryService,
             AnnualFeeScheduleManagementService annualFeeScheduleManagementService,
-            PatentPdfService patentPdfService
+            PatentPdfService patentPdfService,
+            SettingsService settingsService
     ) {
         this.businessFixtureService = businessFixtureService;
         this.patentReviewService = patentReviewService;
@@ -57,6 +65,7 @@ public class BusinessController {
         this.dashboardSummaryService = dashboardSummaryService;
         this.annualFeeScheduleManagementService = annualFeeScheduleManagementService;
         this.patentPdfService = patentPdfService;
+        this.settingsService = settingsService;
     }
 
     /**
@@ -215,8 +224,26 @@ public class BusinessController {
             throw new PatentFlowException(ErrorCode.INVALID_REQUEST);
         }
         assertBusinessDepartmentPatent(patentId, authentication);
+        // FR-LEGAL-12/23: 회신 기한(활성 분기 submissionDeadline) 경과 후에는 의견 제출을 거부한다(접근 윈도우 게이트).
+        // 로그인·읽기는 이번 범위에서 막지 않는다(읽기 허용) — 차단은 쓰기 액션인 제출에만 한정한다.
+        assertWithinResponseDeadline();
         // BIZ-09: 인증 사용자명을 제출자(submittedBy)로 전달해 검증된 작성자를 기록한다.
         return ApiResponse.ok(businessFixtureService.submit(patentId, request, authService.currentUser(authentication).username()));
+    }
+
+    /**
+     * 접근 윈도우 게이트: 활성 분기 회신 기한(submissionDeadline)이 경과했으면 제출을 거부한다.
+     * 활성 분기가 없거나 기한 미설정이면 게이트를 적용하지 않는다(기존 동작 보존).
+     */
+    private void assertWithinResponseDeadline() {
+        QuarterSettingResponse active = settingsService.getActiveQuarter();
+        if (active == null || active.submissionDeadline() == null) {
+            return;
+        }
+        if (LocalDate.now(KST).isAfter(active.submissionDeadline())) {
+            throw new PatentFlowException(ErrorCode.INVALID_WORKFLOW_STATUS,
+                    "회신 기한이 종료되어 의견을 제출할 수 없습니다.");
+        }
     }
 
     private String getDepartmentId(Authentication authentication) {

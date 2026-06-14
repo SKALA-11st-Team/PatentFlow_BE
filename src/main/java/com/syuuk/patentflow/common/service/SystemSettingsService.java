@@ -30,6 +30,8 @@ public class SystemSettingsService {
     // 회신 기한 = 검토 시작일(활성화일) + N개월 + M일. 개월과 일을 분리 저장해 세밀한 설정 허용
     static final String KEY_RESPONSE_DEADLINE_MONTHS = "review.response.deadline.months";
     static final String KEY_RESPONSE_DEADLINE_DAYS = "review.response.deadline.days";
+    // 사업부 초대 토큰 유효기간(일). 미설정 시 기본 7일.
+    static final String KEY_INVITATION_TTL_DAYS = "invitation.ttl.days";
     private static final String KEY_COUNTRY_EXT_PREFIX = "country.extension.";
     private static final String KEY_FEE_RULE_PREFIX = "fee.rule.";
     private static final String KEY_CLASSIFICATION_PREFIX = "classification.";
@@ -46,6 +48,7 @@ public class SystemSettingsService {
     private static final int DEFAULT_MAIL_LEAD_MONTHS = 2;
     private static final int DEFAULT_RESPONSE_DEADLINE_MONTHS = 1;
     private static final int DEFAULT_RESPONSE_DEADLINE_DAYS = 0;
+    private static final int DEFAULT_INVITATION_TTL_DAYS = 7;
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final TypeReference<List<String>> STRING_LIST = new TypeReference<>() {};
     private static final List<String> DEFAULT_BUSINESS_CLASSIFICATIONS = List.of(
@@ -172,6 +175,32 @@ public class SystemSettingsService {
         }
         set(KEY_RESPONSE_DEADLINE_MONTHS, String.valueOf(months));
         set(KEY_RESPONSE_DEADLINE_DAYS, String.valueOf(days));
+    }
+
+    // ── 사업부 초대 토큰 TTL ──────────────────────────────────
+    // mailLeadMonths와 동일한 저장/조회 패턴. 하드코딩 금지(기본 상수 + 설정 오버라이드).
+
+    public int getInvitationTtlDays() {
+        String value = get(KEY_INVITATION_TTL_DAYS);
+        if (value != null) {
+            try {
+                int parsed = Integer.parseInt(value);
+                if (parsed >= 1 && parsed <= 90) {
+                    return parsed;
+                }
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return DEFAULT_INVITATION_TTL_DAYS;
+    }
+
+    @Transactional
+    public int updateInvitationTtlDays(int ttlDays) {
+        if (ttlDays < 1 || ttlDays > 90) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "초대 토큰 유효기간은 1일 이상 90일 이하로 설정해야 합니다.");
+        }
+        set(KEY_INVITATION_TTL_DAYS, String.valueOf(ttlDays));
+        return ttlDays;
     }
 
     @Transactional(readOnly = true)

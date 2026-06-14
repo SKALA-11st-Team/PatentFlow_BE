@@ -3,26 +3,35 @@ package com.syuuk.patentflow.user.service;
 import com.syuuk.patentflow.common.error.ErrorCode;
 import com.syuuk.patentflow.common.error.PatentFlowException;
 import com.syuuk.patentflow.common.service.SystemSettingsService;
+import com.syuuk.patentflow.invitation.domain.InvitationEntity;
+import com.syuuk.patentflow.invitation.dto.BusinessInvitationStatusResponse;
+import com.syuuk.patentflow.invitation.service.InvitationService;
 import com.syuuk.patentflow.mailing.repository.DepartmentRepository;
 import com.syuuk.patentflow.mailing.service.MailOAuth2Service;
+import com.syuuk.patentflow.settings.dto.QuarterSettingResponse;
+import com.syuuk.patentflow.settings.service.SettingsService;
 import com.syuuk.patentflow.user.domain.UserEntity;
 import com.syuuk.patentflow.user.dto.CreateUserRequest;
 import com.syuuk.patentflow.user.dto.PageResponse;
 import com.syuuk.patentflow.user.dto.ResetPasswordResponse;
 import com.syuuk.patentflow.user.dto.UserResponse;
 import com.syuuk.patentflow.user.repository.UserRepository;
-import jakarta.mail.MessagingException;
 import jakarta.mail.Session;
 import jakarta.mail.Transport;
 import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
+import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -46,15 +55,23 @@ public class AdminUserService {
     private final PasswordEncoder passwordEncoder;
     private final SystemSettingsService systemSettingsService;
     private final MailOAuth2Service mailOAuth2Service;
+    private final InvitationService invitationService;
+    private final SettingsService settingsService;
+    // 초대 수락 링크 베이스 URL(FE 도메인). 미설정 시 상대경로 폴백.
+    @Value("${patentflow.invite.base-url:}")
+    private String inviteBaseUrl;
 
     public AdminUserService(UserRepository userRepository, DepartmentRepository departmentRepository,
             PasswordEncoder passwordEncoder,
-            SystemSettingsService systemSettingsService, MailOAuth2Service mailOAuth2Service) {
+            SystemSettingsService systemSettingsService, MailOAuth2Service mailOAuth2Service,
+            InvitationService invitationService, SettingsService settingsService) {
         this.userRepository = userRepository;
         this.departmentRepository = departmentRepository;
         this.passwordEncoder = passwordEncoder;
         this.systemSettingsService = systemSettingsService;
         this.mailOAuth2Service = mailOAuth2Service;
+        this.invitationService = invitationService;
+        this.settingsService = settingsService;
     }
 
     @Transactional(readOnly = true)
@@ -83,19 +100,87 @@ public class AdminUserService {
             throw new PatentFlowException(ErrorCode.INVALID_REQUEST,
                     "이미 존재하는 계정입니다: " + request.email());
         }
+        // 임시 비밀번호로 자리만 채우고(초대 수락 시 사용자가 직접 설정), 계정은 PENDING으로 둔다.
         String tempPassword = generatePassword();
         String id = "USER-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase();
         UserEntity user = new UserEntity(id, request.email(),
                 passwordEncoder.encode(tempPassword),
                 request.role(), departmentId, request.username());
+        user.setStatus("PENDING");
         userRepository.save(user);
-        // USER-06: 메일 발송 실패가 계정 생성을 롤백시키지 않도록 분리한다(커밋된 계정은 보존, 발송 실패는 로깅).
+        // 초대 토큰 생성 + 초대 메일 발송. USER-06: 메일 실패가 계정/초대 생성을 롤백시키지 않는다.
+        LocalDate responseDeadline = activeResponseDeadline();
+        InvitationService.CreatedInvitation created = invitationService.createInvitation(user, responseDeadline);
         try {
-            sendWelcomeEmail(user.getEmail(), user.getUsername(), tempPassword);
+            sendInvitationEmail(user.getEmail(), user.getUsername(), created.rawToken(), responseDeadline);
         } catch (RuntimeException mailError) {
-            log.warn("계정은 생성됐으나 환영 메일 발송 실패: recipient={} — {}", user.getEmail(), mailError.getMessage());
+            log.warn("계정·초대는 생성됐으나 초대 메일 발송 실패: recipient={} — {}", user.getEmail(), mailError.getMessage());
         }
         return UserResponse.from(user);
+    }
+
+    /**
+     * @relatedFR FR-LEGAL-12, FR-LEGAL-23
+     * 초대 재발송: 사용자의 PENDING 초대를 rotate 후 새 초대 생성 + 메일 발송.
+     * USER-06: 메일 실패가 초대 rotate/생성을 롤백시키지 않는다(커밋된 새 초대는 보존).
+     */
+    @Transactional
+    public BusinessInvitationStatusResponse resendInvitation(String userId) {
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new PatentFlowException(ErrorCode.INVALID_REQUEST,
+                        "사용자를 찾을 수 없습니다: " + userId));
+        if (!ROLE_BUSINESS.equals(user.getRole())) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "사업부 계정에만 초대를 발송할 수 있습니다.");
+        }
+        // 이미 수락한 계정은 다시 PENDING으로 되돌려 재초대한다(접근 회수 후 재온보딩 시나리오).
+        user.setStatus("PENDING");
+        userRepository.save(user);
+        LocalDate responseDeadline = activeResponseDeadline();
+        InvitationService.CreatedInvitation created = invitationService.createInvitation(user, responseDeadline);
+        try {
+            sendInvitationEmail(user.getEmail(), user.getUsername(), created.rawToken(), responseDeadline);
+        } catch (RuntimeException mailError) {
+            log.warn("초대는 재생성됐으나 메일 발송 실패: recipient={} — {}", user.getEmail(), mailError.getMessage());
+        }
+        return toInvitationStatus(user, created.invitation(), responseDeadline);
+    }
+
+    /**
+     * @relatedFR FR-LEGAL-12, FR-LEGAL-23
+     * 사업부(BUSINESS) 계정별 초대/접근 상태 목록.
+     */
+    @Transactional(readOnly = true)
+    public List<BusinessInvitationStatusResponse> getBusinessInvitationStatuses() {
+        // 표시용 회신 기한은 초대 발송 시점 스냅샷이 아니라 현재 활성 분기의 회신 기한(라이브)을 쓴다.
+        // 사업부 제출 게이트(BusinessController)와 동일 출처를 사용해 "표시 ≠ 실제 접근 기한" 불일치를 막는다.
+        // 초대 행의 response_deadline 스냅샷은 초대 메일에 기재한 이력 용도로만 보존한다.
+        LocalDate responseDeadline = activeResponseDeadline();
+        return userRepository.findByRoleOrderByCreatedAtAsc(ROLE_BUSINESS).stream()
+                .map(user -> toInvitationStatus(user, invitationService.currentInvitation(user.getId()), responseDeadline))
+                .toList();
+    }
+
+    private BusinessInvitationStatusResponse toInvitationStatus(
+            UserEntity user, InvitationEntity invitation, LocalDate responseDeadline) {
+        return new BusinessInvitationStatusResponse(
+                user.getId(),
+                user.getEmail(),
+                user.getUsername(),
+                user.getDepartmentId(),
+                user.getDepartmentName(),
+                user.getStatus(),
+                invitation != null ? invitation.getStatus().name() : null,
+                responseDeadline,
+                invitation != null ? invitation.getInvitedAt() : null,
+                invitation != null ? invitation.getExpiresAt() : null,
+                invitation != null ? invitation.getAcceptedAt() : null,
+                user.getLastAccessAt());
+    }
+
+    /** 현재 활성 분기의 회신 기한(submissionDeadline). 활성 분기·기한이 없으면 null. */
+    private LocalDate activeResponseDeadline() {
+        QuarterSettingResponse active = settingsService.getActiveQuarter();
+        return active != null ? active.submissionDeadline() : null;
     }
 
     @Transactional
@@ -135,6 +220,12 @@ public class AdminUserService {
         userRepository.delete(user);
     }
 
+    /**
+     * @deprecated 임시 비밀번호 평문 발급 방식은 초대 토큰 재발송({@link #resendInvitation})으로 대체됐다.
+     *             사업부 계정 자격증명 복구는 초대 재발송이 단일 경로다. 본 메서드는 하위 호환을 위해서만 유지하며
+     *             신규 흐름에서 호출하지 않는다(관리자 본인 비밀번호 변경은 별도 changePassword 경로).
+     */
+    @Deprecated
     @Transactional
     public ResetPasswordResponse resetPassword(String userId) {
         UserEntity user = userRepository.findById(userId)
@@ -199,12 +290,29 @@ public class AdminUserService {
         return sb.toString();
     }
 
-    private void sendWelcomeEmail(String email, String username, String tempPassword) {
-        String subject = "[PatentFlow] 계정이 생성되었습니다";
+    private void sendInvitationEmail(String email, String username, String rawToken, LocalDate responseDeadline) {
+        int ttlDays = systemSettingsService.getInvitationTtlDays();
+        String acceptLink = buildAcceptLink(rawToken);
+        String deadlineLine = responseDeadline != null
+                ? String.format("회신 기한: %s\n", responseDeadline)
+                : "";
+        String subject = "[PatentFlow] 계정 초대 — 접속을 위해 비밀번호를 설정해 주세요";
         String body = String.format(
-                "%s 님, PatentFlow 계정이 생성되었습니다.\n\n계정: %s\n임시 비밀번호: %s\n\n최초 로그인 후 비밀번호를 변경해 주세요.",
-                username, email, tempPassword);
-        sendEmail(email, subject, body, tempPassword);
+                "%s 님, PatentFlow 사업부 계정에 초대되었습니다.\n\n계정: %s\n%s"
+                        + "\n아래 링크에서 비밀번호를 설정하면 계정 사용을 시작할 수 있습니다(유효기간 %d일).\n%s\n",
+                username, email, deadlineLine, ttlDays, acceptLink);
+        sendEmail(email, subject, body, rawToken);
+    }
+
+    /** 초대 수락 링크. 베이스 URL(FE 도메인) 설정 시 절대경로, 미설정 시 상대경로 폴백. */
+    private String buildAcceptLink(String rawToken) {
+        String encoded = URLEncoder.encode(rawToken, StandardCharsets.UTF_8);
+        String base = inviteBaseUrl == null ? "" : inviteBaseUrl.trim();
+        if (base.isBlank()) {
+            return "/invite/accept?token=" + encoded;
+        }
+        String normalized = base.endsWith("/") ? base.substring(0, base.length() - 1) : base;
+        return normalized + "/invite/accept?token=" + encoded;
     }
 
     private void sendPasswordResetEmail(String email, String username, String tempPassword) {

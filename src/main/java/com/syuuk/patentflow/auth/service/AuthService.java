@@ -81,6 +81,7 @@ public class AuthService {
         loginAttemptService.recordSuccess(request.email());
         auditLogger.record(SecurityAuditLogger.Event.LOGIN_SUCCESS, request.email());
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+        recordLastAccess((UserDetailsImpl) userDetails);
         return issueTokens((UserDetailsImpl) userDetails);
     }
 
@@ -158,6 +159,14 @@ public class AuthService {
             return null;
         }
         return value.substring("Bearer ".length());
+    }
+
+    // 명시적 로그인 성공 시에만 마지막 접근 시각(KST)을 기록한다. refresh 경로에는 적용하지 않는다.
+    private void recordLastAccess(UserDetailsImpl userDetails) {
+        userRepository.findById(userDetails.getUser().getId()).ifPresent(user -> {
+            user.setLastAccessAt(OffsetDateTime.now(KST).withNano(0));
+            userRepository.save(user);
+        });
     }
 
     private AuthResult issueTokens(UserDetailsImpl userDetails) {

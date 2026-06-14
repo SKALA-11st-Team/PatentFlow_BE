@@ -2,14 +2,48 @@
 -- This script creates presentation-friendly workflow states and histories.
 -- It is intentionally loaded only by LocalDemoSeedRunner for local/demo profiles.
 
-INSERT INTO users (id, email, password, role, department_id, username, created_at) VALUES
-    ('USER-business-demo', 'business@business.com', '$2a$10$8Cs9O/CKSYzHkTU4/5WBguCSVaE0fWcP8w3pizKrhkoGNOT7nl78e', 'BUSINESS', 'DEPT-ICT', '사업부 데모 담당자', CURRENT_TIMESTAMP)
+INSERT INTO users (id, email, password, role, department_id, username, status, created_at) VALUES
+    ('USER-business-demo', 'business@business.com', '$2a$10$8Cs9O/CKSYzHkTU4/5WBguCSVaE0fWcP8w3pizKrhkoGNOT7nl78e', 'BUSINESS', 'DEPT-ICT', '사업부 데모 담당자', 'ACTIVE', CURRENT_TIMESTAMP)
 ON CONFLICT (id) DO UPDATE SET
     email = EXCLUDED.email,
     password = EXCLUDED.password,
     role = EXCLUDED.role,
     department_id = EXCLUDED.department_id,
-    username = EXCLUDED.username;
+    username = EXCLUDED.username,
+    status = EXCLUDED.status;
+
+-- 사업부 초대 토큰 데모 분포: 대부분 ACCEPTED(수락 완료), 1건 PENDING(미수락), 1건 EXPIRED(만료), 1건 REVOKED(회수).
+-- token_hash는 placeholder hex 64자(수락에 사용되지 않음). response_deadline은 활성 분기(2026-Q2) 회신 기한 스냅샷.
+-- PENDING/REVOKED 초대 대상 user는 core seed에서 users.status를 PENDING/INACTIVE로 일관되게 맞춰 둔다.
+INSERT INTO invitations (
+    id, user_id, department_id, token_hash, status,
+    response_deadline, invited_at, expires_at, accepted_at
+) VALUES
+    ('INV-DEMO-ICT-0001', 'USER-business-demo', 'DEPT-ICT',
+     '1111111111111111111111111111111111111111111111111111111111111111', 'ACCEPTED',
+     DATE '2026-05-01', TIMESTAMP WITH TIME ZONE '2026-04-15 09:00:00+09',
+     TIMESTAMP WITH TIME ZONE '2026-05-15 09:00:00+09', TIMESTAMP WITH TIME ZONE '2026-04-16 10:20:00+09'),
+    ('INV-DEMO-MFG-0001', 'USER-mfg-manager', 'DEPT-MFG',
+     '2222222222222222222222222222222222222222222222222222222222222222', 'ACCEPTED',
+     DATE '2026-05-01', TIMESTAMP WITH TIME ZONE '2026-04-15 09:00:00+09',
+     TIMESTAMP WITH TIME ZONE '2026-05-15 09:00:00+09', TIMESTAMP WITH TIME ZONE '2026-04-15 14:05:00+09'),
+    ('INV-DEMO-PLATFORM-0001', 'USER-platform-manager', 'DEPT-PLATFORM',
+     '3333333333333333333333333333333333333333333333333333333333333333', 'ACCEPTED',
+     DATE '2026-05-01', TIMESTAMP WITH TIME ZONE '2026-04-15 09:00:00+09',
+     TIMESTAMP WITH TIME ZONE '2026-05-15 09:00:00+09', TIMESTAMP WITH TIME ZONE '2026-04-17 09:45:00+09'),
+    ('INV-DEMO-ESG-0001', 'USER-esg-manager', 'DEPT-ESG',
+     '4444444444444444444444444444444444444444444444444444444444444444', 'PENDING',
+     DATE '2026-05-01', TIMESTAMP WITH TIME ZONE '2026-04-15 09:00:00+09',
+     TIMESTAMP WITH TIME ZONE '2026-05-15 09:00:00+09', NULL),
+    ('INV-DEMO-BIZ-0001', 'USER-biz-manager', 'DEPT-BIZ',
+     '5555555555555555555555555555555555555555555555555555555555555555', 'EXPIRED',
+     DATE '2026-05-01', TIMESTAMP WITH TIME ZONE '2026-04-01 09:00:00+09',
+     TIMESTAMP WITH TIME ZONE '2026-04-08 09:00:00+09', NULL),
+    ('INV-DEMO-RND-0001', 'USER-rnd-manager', 'DEPT-RND',
+     '6666666666666666666666666666666666666666666666666666666666666666', 'REVOKED',
+     DATE '2026-05-01', TIMESTAMP WITH TIME ZONE '2026-04-15 09:00:00+09',
+     TIMESTAMP WITH TIME ZONE '2026-05-15 09:00:00+09', NULL)
+ON CONFLICT (id) DO NOTHING;
 
 WITH demo_reviews (
     patent_id,
