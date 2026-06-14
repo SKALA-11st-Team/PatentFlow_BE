@@ -9,6 +9,11 @@ data:
   SPRING_DATASOURCE_USERNAME: "patentflow"
   PATENTFLOW_DB_SCHEMA: "patentflow"
   PATENTFLOW_CORS_ALLOWED_ORIGINS: "https://patentflow.live,http://localhost:5173"
+  # Gmail OAuth2 메일 연동(시크릿 아님 — client-id/secret만 secret.yaml). 운영 토폴로지 URL을
+  # 명시하지 않으면 application.yml의 localhost 기본값으로 떨어져 연동이 실패한다.
+  # redirect-uri는 Google Cloud Console > 승인된 리디렉션 URI와 반드시 일치해야 함.
+  GOOGLE_OAUTH2_REDIRECT_URI: "https://api.patentflow.live/api/v1/admin/settings/mail/oauth2/google/callback"
+  GOOGLE_OAUTH2_FRONTEND_URI: "https://patentflow.live/admin/settings"
   PATENTFLOW_AGENT_URL: "http://team11-patentflow-agent-svc:8000"
   PATENTFLOW_AI_REPORT_STORAGE_DIR: "/app/storage/ai-reports"
   PATENTFLOW_COOKIE_SECURE: "true"

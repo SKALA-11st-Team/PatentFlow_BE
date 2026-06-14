@@ -1,7 +1,12 @@
 package com.syuuk.patentflow.settings.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -124,6 +129,34 @@ class SettingsServiceTest {
                 new QuarterSettingRequest(null, null, null, LocalDate.of(2026, 10, 1))))
                 .isInstanceOf(PatentFlowException.class)
                 .hasMessageContaining("분기 종료일");
+    }
+
+    @Test
+    void activateQuarterClampsAutoDueDateToQuarterEndInsteadOfRollingBackActivation() {
+        // 회귀(be-settings-2): 분기 마지막 달에 처음 활성화 자격이 생기면 자동 계산 회신 기한이
+        // 분기 종료일을 넘어 전체 활성화 트랜잭션이 롤백되어 검토 대상이 영구 미생성되던 결함.
+        // 종료일이 오늘인 분기(=자동 계산 회신 기한이 종료일을 초과)를 활성화해도 예외 없이
+        // 진행되고, 회신 기한은 종료일로 clamp되며 검토 대상 생성/AI 배치가 수행되어야 한다.
+        LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
+        LocalDate startDate = LocalDate.of(today.getYear(), 1, 1);
+        QuarterSettingEntity target = quarter(
+                today.getYear() + "-Q1", today.getYear(), 1, startDate, today);
+
+        when(quarterSettingRepository.findByIdForUpdate(target.getQuarterKey()))
+                .thenReturn(Optional.of(target));
+        when(quarterSettingRepository.findActiveForUpdate()).thenReturn(List.of());
+        when(systemSettingsService.getResponseDeadlineMonths()).thenReturn(1);
+        when(systemSettingsService.getResponseDeadlineDays()).thenReturn(0);
+        lenient().when(systemSettingsService.getMailLeadMonths()).thenReturn(2);
+        when(patentReviewService.createQuarterReviewTargets(eq(target.getQuarterKey()), any(), any()))
+                .thenReturn(List.of("KR1020230000001"));
+
+        assertThatCode(() -> service.activateQuarter(target.getQuarterKey())).doesNotThrowAnyException();
+
+        assertThat(target.isActivated()).isTrue();
+        assertThat(target.getSubmissionDeadline()).isEqualTo(today);
+        verify(patentReviewService).createQuarterReviewTargets(eq(target.getQuarterKey()), any(), any());
+        verify(aiReportBatchService).generateReportsForQuarter(anyList(), eq(target.getQuarterKey()));
     }
 
     private QuarterSettingEntity quarter(

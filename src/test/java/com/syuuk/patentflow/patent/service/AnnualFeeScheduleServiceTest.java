@@ -89,6 +89,23 @@ class AnnualFeeScheduleServiceTest {
         assertThat(second).isEqualTo(LocalDate.of(2028, 8, 1));
     }
 
+    // FEE-06: 미등록 US 특허는 유지료가 발생하지 않으므로 출원일 기준 매년 도래로 폴백하지 않고
+    // 기산일 미확정 신호(올해 12/31)를 반환한다.
+    @Test
+    void unregisteredUsDoesNotFallBackToApplicationDateAnniversary() {
+        LocalDate due = service.calculateNextDueDate(
+                "US", LocalDate.of(2020, 1, 10), null, null, LocalDate.of(2026, 1, 1));
+        assertThat(due).isEqualTo(LocalDate.of(2026, 12, 31));
+    }
+
+    // FEE-06: 미등록 US 특허의 일정은 출원일 기준 매년(주기 개월) 항목을 만들지 않는다(저장값 없으면 빈 목록).
+    @Test
+    void unregisteredUsScheduleHasNoFabricatedAnnualEntries() {
+        assertThat(service.buildScheduleEntries(
+                "US", LocalDate.of(2020, 1, 10), null, null, null, false, 2, LocalDate.of(2026, 1, 1)))
+                .isEmpty();
+    }
+
     @Test
     void advancesUsMaintenanceFeeByFortyEightMonths() {
         LocalDate next = service.advanceAfterMaintenance(

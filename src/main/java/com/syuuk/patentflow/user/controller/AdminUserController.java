@@ -2,7 +2,7 @@ package com.syuuk.patentflow.user.controller;
 
 import com.syuuk.patentflow.common.response.ApiResponse;
 import com.syuuk.patentflow.user.dto.CreateUserRequest;
-import com.syuuk.patentflow.user.dto.PageResponse;
+import com.syuuk.patentflow.common.response.PageResponse;
 import com.syuuk.patentflow.user.dto.ResetPasswordResponse;
 import com.syuuk.patentflow.user.dto.UserResponse;
 import com.syuuk.patentflow.user.security.UserDetailsImpl;

@@ -61,4 +61,18 @@ class SecretCipherTest {
         // enc:v1: prefix가 없는 레거시 평문은 복호화 시 그대로 통과(무중단 마이그레이션).
         assertThat(cipher.decrypt("legacy-plaintext")).isEqualTo("legacy-plaintext");
     }
+
+    @Test
+    void keyRotationMakesPreviousCiphertextDecryptToNullInsteadOfThrowing() {
+        // be-common-infra-5: 키 회전/불일치 시 복호화 실패가 예외(→500)로 번지지 않고
+        // '미설정'(null)으로 폴백해 관리자가 Gmail 재연동으로 복구할 수 있어야 한다.
+        SecretCipher oldCipher = new SecretCipher(KEY_32);
+        String encrypted = oldCipher.encrypt("refresh-token-value");
+
+        byte[] rotatedKeyBytes = new byte[32];
+        rotatedKeyBytes[0] = 1; // 이전 키(전부 0)와 다른 키
+        SecretCipher rotatedCipher = new SecretCipher(Base64.getEncoder().encodeToString(rotatedKeyBytes));
+
+        assertThat(rotatedCipher.decrypt(encrypted)).isNull();
+    }
 }

@@ -52,6 +52,14 @@ class AiReportAgentContractTest {
                 {"title": "한국경제", "url": "https://example.com/1"},
                 {"title": "KIET", "url": null}
               ],
+              "summaryBrief": {"one_line_summary": "한 줄 요약", "core_idea": "핵심 아이디어"},
+              "reportSections": {
+                "evaluationScope": "평가 범위 본문",
+                "judgmentBasis": "판단 근거 본문",
+                "axisDetails": "축별 상세 본문",
+                "roleChecklist": "역할별 확인 본문",
+                "finalOpinion": "최종 의견 본문"
+              },
               "generatedAt": "2026-06-09T00:00:00Z"
             }
             """;
@@ -78,6 +86,16 @@ class AiReportAgentContractTest {
         assertThat(response.externalSources().get(0).title()).isEqualTo("한국경제");
         assertThat(response.externalSources().get(0).url()).isEqualTo("https://example.com/1");
         assertThat(response.externalSources().get(1).url()).isNull();
+
+        // 계약 신호: warnings·evidenceConfidence가 @JsonIgnoreProperties로 드롭되지 않는다.
+        assertThat(response.warnings()).containsExactly("w1");
+        assertThat(response.evidenceConfidence()).isEqualTo("high");
+
+        // 구조화 렌더링 필드(summaryBrief·reportSections)가 드롭되지 않는다.
+        assertThat(response.summaryBrief()).containsEntry("one_line_summary", "한 줄 요약");
+        assertThat(response.reportSections())
+                .containsEntry("evaluationScope", "평가 범위 본문")
+                .containsEntry("finalOpinion", "최종 의견 본문");
 
         // 축별 evidenceDetails(클릭형 출처)가 드롭되지 않는다.
         assertThat(response.scores()).hasSize(1);

@@ -57,6 +57,11 @@ class ValuationCriteriaServiceTest {
         assertThat(current.config().get("gradeCutoffs")).isEqualTo(Map.of("A", 80.0, "B", 60.0, "C", 40.0));
         assertThat(current.config().get("maintainThreshold")).isEqualTo(60.0);
         assertThat(current.config().get("version")).isEqualTo(0);
+        // subscore 배점도 agent DEFAULT_SUBSCORE_WEIGHTS(schemas/valuation.py)와 동일해야 한다 — 드리프트 방지.
+        assertThat(current.config().get("subscoreWeights")).isEqualTo(Map.of(
+                "legal", Map.of("right_stability", 40, "claim_protection", 40, "portfolio_defensive_value", 20),
+                "business_fit", Map.of("official_business_evidence", 30, "product_function_direct_match", 45,
+                        "business_context_fit", 25)));
         // 미설정 상태에서는 agent에 config를 보내지 않는다(agent 자체 기본값 사용 — 구 agent 호환).
         assertThat(service.currentConfigForAgent()).isNull();
     }

@@ -7,6 +7,8 @@ import java.util.Base64;
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -23,6 +25,8 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class SecretCipher {
+
+    private static final Logger log = LoggerFactory.getLogger(SecretCipher.class);
 
     private static final String PREFIX = "enc:v1:";
     private static final String TRANSFORM = "AES/GCM/NoPadding";
@@ -62,7 +66,14 @@ public class SecretCipher {
         }
     }
 
-    /** enc:v1: 포맷이면 복호화, 아니면(평문 레거시·키 미설정) 입력을 그대로 반환한다. */
+    /**
+     * enc:v1: 포맷이면 복호화, 아니면(평문 레거시·키 미설정) 입력을 그대로 반환한다.
+     *
+     * <p>키 회전/변경으로 기존 저장값을 복호화할 수 없으면(AES-GCM 태그 검증 실패 등)
+     * 예외를 던지지 않고 {@code null}("미설정")로 폴백한다. 호출부(메일/Gmail OAuth2 조회)는
+     * null/blank를 미설정으로 취급하므로, 500으로 흐름 전체가 깨지는 대신 관리자가
+     * Gmail 재연동으로 복구할 수 있다.
+     */
     public String decrypt(String stored) {
         if (stored == null || !stored.startsWith(PREFIX) || key == null) {
             return stored;
@@ -75,7 +86,10 @@ public class SecretCipher {
             cipher.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(TAG_BITS, iv));
             return new String(cipher.doFinal(ciphertext), StandardCharsets.UTF_8);
         } catch (Exception exception) {
-            throw new IllegalStateException("시크릿 복호화에 실패했습니다.", exception);
+            // 키 불일치/회전 등으로 복호화 불가 — '미설정'으로 폴백해 재연동으로 복구 가능하게 한다.
+            log.warn("저장된 시크릿 복호화에 실패해 미설정으로 폴백합니다(키 회전/불일치 가능). 재연동이 필요합니다.",
+                    exception);
+            return null;
         }
     }
 }

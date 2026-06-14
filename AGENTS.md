@@ -211,9 +211,10 @@ const REVIEW_WORKFLOW_STATUSES = [
   "MAIL_READY",
   "WAITING_BUSINESS_RESPONSE",
   "BUSINESS_RESPONSE_RECEIVED",
+  "LEGAL_ACTION_RECORDED",
 ] as const;
 
-const RECOMMENDATIONS = ["MAINTAIN", "REVIEW_AGAIN", "ABANDON", "HOLD"] as const;
+const RECOMMENDATIONS = ["MAINTAIN", "REVIEW_AGAIN", "ABANDON", "CONDITIONAL_MAINTAIN"] as const;
 
 const BUSINESS_OPINION_DECISIONS = ["MAINTAIN", "ABANDON"] as const;
 
@@ -234,10 +235,11 @@ Current display labels include:
 | ReviewWorkflowStatus | `MAIL_READY` | 메일 발송 대기 |
 | ReviewWorkflowStatus | `WAITING_BUSINESS_RESPONSE` | 사업부 응답 대기 |
 | ReviewWorkflowStatus | `BUSINESS_RESPONSE_RECEIVED` | 사업부 응답 완료 |
+| ReviewWorkflowStatus | `LEGAL_ACTION_RECORDED` | 처리 완료 |
 | Recommendation | `MAINTAIN` | 유지 권고 |
 | Recommendation | `REVIEW_AGAIN` | 추가 정보 필요 |
 | Recommendation | `ABANDON` | 포기 검토 |
-| Recommendation | `HOLD` | 추가 정보 필요 |
+| Recommendation | `CONDITIONAL_MAINTAIN` | 조건부 유지 |
 | BusinessOpinionDecision | `MAINTAIN` | 유지 |
 | BusinessOpinionDecision | `ABANDON` | 포기 |
 | LegalActionResult | `MAINTAINED` | 유지 처리 |

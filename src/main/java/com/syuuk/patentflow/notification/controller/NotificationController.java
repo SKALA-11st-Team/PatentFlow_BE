@@ -29,7 +29,7 @@ public class NotificationController {
     }
 
     /**
-     * @relatedFR COM-04
+     * @relatedFR FR-COM-02
      * @relatedUI UI-COM-03
      * @description 역할 기반 알림 목록을 조회한다.
      */
@@ -45,6 +45,11 @@ public class NotificationController {
         return ApiResponse.ok(notificationService.getNotifications(role, currentUserId(authentication)));
     }
 
+    /**
+     * @relatedFR FR-COM-02
+     * @relatedUI UI-COM-03
+     * @description 읽지 않은 알림 개수를 조회한다.
+     */
     @GetMapping("/unread-count")
     public ApiResponse<NotificationUnreadCountResponse> unreadCount(
             @RequestParam(required = false, defaultValue = "COMMON") String role,
@@ -59,7 +64,7 @@ public class NotificationController {
     }
 
     /**
-     * @relatedFR COM-05
+     * @relatedFR FR-COM-02
      * @relatedUI UI-COM-03
      * @description 알림 읽음/읽지 않음 상태를 변경한다.
      */
@@ -73,6 +78,11 @@ public class NotificationController {
                 notificationId, request.isRead(), currentRole(authentication), currentUserId(authentication)));
     }
 
+    /**
+     * @relatedFR FR-COM-02
+     * @relatedUI UI-COM-03
+     * @description 역할 기반 알림을 모두 읽음 처리한다.
+     */
     @PatchMapping("/read-all")
     public ApiResponse<Void> markAllRead(
             @RequestParam(required = false, defaultValue = "COMMON") String role,
@@ -90,10 +100,12 @@ public class NotificationController {
         if (authentication == null) {
             throw new PatentFlowException(ErrorCode.UNAUTHORIZED);
         }
-        return authentication.getAuthorities().stream()
-                .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()))
-                ? "ADMIN"
-                : "BUSINESS";
+        // LEGAL은 검토 업무에서 관리자와 동일한 1급 역할이며 ADMIN 대상 알림을 공유한다.
+        // 알림 targetRole 모델은 ADMIN/BUSINESS/COMMON뿐이므로 ROLE_LEGAL을 ADMIN으로 매핑한다.
+        boolean adminLike = authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority())
+                        || "ROLE_LEGAL".equals(authority.getAuthority()));
+        return adminLike ? "ADMIN" : "BUSINESS";
     }
 
     private String currentUserId(Authentication authentication) {

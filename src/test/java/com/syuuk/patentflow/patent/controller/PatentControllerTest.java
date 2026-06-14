@@ -159,12 +159,16 @@ class PatentControllerTest {
                 null,
                 false,
                 null,
+                List.of(),
+                null,
                 OffsetDateTime.parse("2026-05-22T00:00:00Z"),
                 List.of(),
                 null,
                 List.of(),
                 List.of(),
                 List.of(),
+                null,
+                null,
                 null
         ));
 

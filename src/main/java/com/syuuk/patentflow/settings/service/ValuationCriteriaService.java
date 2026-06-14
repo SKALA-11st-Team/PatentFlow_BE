@@ -52,7 +52,7 @@ public class ValuationCriteriaService {
         config.put("gradeCutoffs", Map.of("A", 80.0, "B", 60.0, "C", 40.0));
         config.put("maintainThreshold", 60.0);
         Map<String, Object> subscores = new LinkedHashMap<>();
-        subscores.put("legal", Map.of("right_stability", 35, "claim_protection", 40, "portfolio_defensive_value", 25));
+        subscores.put("legal", Map.of("right_stability", 40, "claim_protection", 40, "portfolio_defensive_value", 20));
         subscores.put("business_fit",
                 Map.of("official_business_evidence", 30, "product_function_direct_match", 45, "business_context_fit", 25));
         config.put("subscoreWeights", subscores);

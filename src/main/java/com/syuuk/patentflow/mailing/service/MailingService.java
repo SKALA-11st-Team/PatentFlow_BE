@@ -138,9 +138,11 @@ public class MailingService {
         return getRecipientMappings(departmentId).get(0);
     }
 
-    // 전체 원자성(MAIL-02): 이력 저장과 워크플로우 전이를 한 트랜잭션으로 묶고, 발송 중 하나라도 실패하면
-    // 예외를 전파해 전체 롤백한다(올오어낫싱). 이미 물리적으로 전송된 메일 자체는 되돌릴 수 없으나,
-    // DB 상태(이력·워크플로우 전이)는 항상 일관되게 유지된다.
+    // 트랜잭션 경계(MAIL-02): 이력 저장과 워크플로우 전이를 한 트랜잭션으로 묶어 DB 상태(이력·워크플로우 전이)를
+    // 항상 일관되게 유지한다. 실패 처리 방식은 단계별로 다르다 —
+    //   토큰 획득(getValidAccessToken): 실패 시 예외를 전파해 전체 롤백(이력 미기록).
+    //   개별 발송(sendEmailOAuth2): 1건의 SMTP 실패가 나머지를 막지 않도록 건별 격리하고 FAILED 이력으로 기록한다.
+    // 이미 물리적으로 전송된 메일 자체는 되돌릴 수 없으나 DB 상태는 일관되게 유지된다.
     @Transactional
     public MailingSendResponse send(MailingSendRequest request) {
         // OAuth2 연동 우선 → 미발송 기록
@@ -158,11 +160,14 @@ public class MailingService {
         if (oauth2Connected) {
             String senderEmail = systemSettingsService.getGmailOAuth2ConnectedEmail();
             // 토큰 획득 실패 시 예외를 전파해 전체 롤백한다(이력 미기록).
-            String accessToken = mailOAuth2Service.getValidAccessToken();
+            mailOAuth2Service.getValidAccessToken();
             // I1: 건별 처리 — 1건의 SMTP 실패가 나머지 발송·이력 기록을 막지 않는다.
             // 실패 건은 FAILED 이력으로 남겨 메일 이력 화면에서 식별·재발송할 수 있게 한다.
             for (BusinessReviewMailSendDraft draft : request.drafts()) {
                 try {
+                    // 매 건마다 유효 토큰을 재조회한다 — 캐시 적중 시 비용 0, 만료 임박 시 자동 갱신.
+                    // 대량/장시간 배치가 토큰 잔여수명을 넘겨도 만료 이후 건이 전량 인증 실패하지 않는다.
+                    String accessToken = mailOAuth2Service.getValidAccessToken();
                     sendEmailOAuth2(senderEmail, accessToken, draft);
                     saveHistory(mailingBatchId, draft, STATUS_SENT, departmentIdsByEmail, sentBy);
                     sentDrafts.add(draft);

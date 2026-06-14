@@ -1449,30 +1449,36 @@
       "BusinessChecklistItemRequest" : {
         "properties" : {
           "category" : {
-            "minLength" : 1,
+            "maxLength" : 128,
+            "minLength" : 0,
             "type" : "string"
           },
           "description" : {
             "type" : "string"
           },
           "score1Label" : {
-            "minLength" : 1,
+            "maxLength" : 500,
+            "minLength" : 0,
             "type" : "string"
           },
           "score2Label" : {
-            "minLength" : 1,
+            "maxLength" : 500,
+            "minLength" : 0,
             "type" : "string"
           },
           "score3Label" : {
-            "minLength" : 1,
+            "maxLength" : 500,
+            "minLength" : 0,
             "type" : "string"
           },
           "score4Label" : {
-            "minLength" : 1,
+            "maxLength" : 500,
+            "minLength" : 0,
             "type" : "string"
           },
           "title" : {
-            "minLength" : 1,
+            "maxLength" : 256,
+            "minLength" : 0,
             "type" : "string"
           }
         },
@@ -6515,6 +6521,42 @@
       }
     },
     "/api/v1/settings/classifications/{type}" : {
+      "delete" : {
+        "operationId" : "deleteClassification",
+        "parameters" : [
+          {
+            "in" : "path",
+            "name" : "type",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "in" : "query",
+            "name" : "value",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseClassificationResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [
+          "settings-controller"
+        ]
+      },
       "post" : {
         "operationId" : "addClassification",
         "parameters" : [
@@ -6552,44 +6594,6 @@
         "tags" : [
           "settings-controller"
         ]
-      }
-    },
-    "/api/v1/settings/classifications/{type}/{value}" : {
-      "delete" : {
-        "operationId" : "deleteClassification",
-        "parameters" : [
-          {
-            "in" : "path",
-            "name" : "type",
-            "required" : true,
-            "schema" : {
-              "type" : "string"
-            }
-          },
-          {
-            "in" : "path",
-            "name" : "value",
-            "required" : true,
-            "schema" : {
-              "type" : "string"
-            }
-          }
-        ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseClassificationResponse"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "tags" : [
-          "settings-controller"
-        ]
       },
       "put" : {
         "operationId" : "renameClassification",
@@ -6603,7 +6607,7 @@
             }
           },
           {
-            "in" : "path",
+            "in" : "query",
             "name" : "value",
             "required" : true,
             "schema" : {

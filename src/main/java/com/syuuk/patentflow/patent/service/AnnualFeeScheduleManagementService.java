@@ -247,7 +247,9 @@ public class AnnualFeeScheduleManagementService {
                 effectiveDueDate,
                 latestAdjustment == null ? null : latestAdjustment.adjustedDueDate(),
                 latestAdjustment == null ? null : latestAdjustment.reason(),
-                annualFeeScheduleService.getCountryExtensionMonths(patent.getCountry()),
+                // be-annualfee-3: 도래일 계산/roll-forward와 동일한 국가 규칙 주기를 노출해 응답 내 일관성을 맞춘다.
+                // US(고정 윈도우)는 48, KR·기타는 규칙 주기(기본 12, 설정 오버라이드 반영)를 그대로 쓴다.
+                rule.cycleMonths(),
                 rule.basis(),
                 rule.label(),
                 rule.initialLumpYears(),

@@ -42,7 +42,11 @@ public class DemoWorkflowSeedRunner implements ApplicationRunner {
                 "SELECT COUNT(*) FROM patent_review_history WHERE quarter_key = '2026-Q2'",
                 Integer.class);
         if (q2HistoryCount == null || q2HistoryCount == 0) {
-            log.info("Skipping demo workflow seed: Q2 review history rows not yet created.");
+            // 데모 시드는 발표 분기(2026-Q2)에 고정돼 있다. 분기가 넘어가면 매칭 행이 없어
+            // 시드가 적용되지 않으므로, 조용한 no-op 대신 WARN으로 운영자가 인지하게 한다.
+            log.warn(
+                    "Skipping demo workflow seed: no patent_review_history rows for hard-coded quarter '2026-Q2'."
+                            + " If the demo quarter has rolled over, update DemoWorkflowSeedRunner and demo_workflow_seed.sql.");
             return;
         }
 

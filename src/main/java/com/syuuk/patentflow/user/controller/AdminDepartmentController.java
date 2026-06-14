@@ -3,7 +3,7 @@ package com.syuuk.patentflow.user.controller;
 import com.syuuk.patentflow.common.response.ApiResponse;
 import com.syuuk.patentflow.mailing.dto.DepartmentRecipientMappingResponse;
 import com.syuuk.patentflow.user.dto.CreateDepartmentRequest;
-import com.syuuk.patentflow.user.dto.PageResponse;
+import com.syuuk.patentflow.common.response.PageResponse;
 import com.syuuk.patentflow.user.dto.UpdateDepartmentRequest;
 import com.syuuk.patentflow.user.service.AdminDepartmentService;
 import jakarta.validation.Valid;

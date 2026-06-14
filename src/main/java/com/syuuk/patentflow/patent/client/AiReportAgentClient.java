@@ -112,14 +112,52 @@ public class AiReportAgentClient {
             HttpRequest request = builder.build();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) {
-                log.warn("FastAPI evaluate returned {} for patent {}", response.statusCode(), patentId);
-                return fallback(patentId, "AI 평가 서비스가 오류 응답을 반환했습니다. status=" + response.statusCode());
+                int status = response.statusCode();
+                // agent는 워크플로 실패/용량초과 사유를 본문 detail에 담아준다(api.py). status 코드만 남기지 않고
+                // detail을 failureReason에 포함해 운영 진단성을 보존한다.
+                String detail = extractDetail(response.body());
+                log.warn("FastAPI evaluate returned {} for patent {}: {}", status, patentId, detail);
+                if (status == 429) {
+                    // 429는 일시적 백프레셔(동시 평가 슬롯 초과) — 재시도/지연 가능 신호로 구분 처리한다.
+                    return fallback(patentId,
+                            "AI 평가 서비스 일시 과부하(재시도 가능). status=429"
+                                    + (detail == null ? "" : " detail=" + detail));
+                }
+                return fallback(patentId,
+                        "AI 평가 서비스가 오류 응답을 반환했습니다. status=" + status
+                                + (detail == null ? "" : " detail=" + detail));
             }
             return objectMapper.readValue(response.body(), AgentEvaluateResponse.class);
+        } catch (java.net.http.HttpTimeoutException e) {
+            // 하드 실패(에이전트 미응답): 타임아웃을 연결 실패와 구분해 운영 알림/표시를 분리할 수 있게 태그한다.
+            log.warn("FastAPI evaluate timed out for patent {} (timeout={}): {}", patentId, timeout, e.getMessage());
+            return fallback(patentId, "AI 평가 서비스 응답 시간 초과(에이전트 미응답). timeout=" + timeout);
+        } catch (java.net.ConnectException e) {
+            // 하드 실패(에이전트 미응답): 연결 자체 실패.
+            log.warn("FastAPI evaluate connection failed for patent {}: {}", patentId, e.getMessage());
+            return fallback(patentId, "AI 평가 서비스 연결 실패(에이전트 미응답): " + e.getMessage());
         } catch (Exception e) {
             log.warn("FastAPI evaluate failed for patent {} (timeout={}): {}", patentId, timeout, e.getMessage());
             return fallback(patentId, "AI 평가 서비스 연결 실패: " + e.getMessage());
         }
+    }
+
+    // 비200 응답 본문에서 FastAPI 표준 오류 형식의 detail 메시지를 best-effort 추출한다.
+    // 파싱 불가/빈 본문이면 null을 반환해 호출 측이 status만으로 폴백 사유를 구성하게 한다.
+    private String extractDetail(String body) {
+        if (body == null || body.isBlank()) {
+            return null;
+        }
+        try {
+            com.fasterxml.jackson.databind.JsonNode node = objectMapper.readTree(body);
+            com.fasterxml.jackson.databind.JsonNode detail = node.get("detail");
+            if (detail != null && detail.isTextual() && !detail.asText().isBlank()) {
+                return detail.asText();
+            }
+        } catch (Exception ignored) {
+            // JSON이 아니거나 파싱 불가 — detail 없이 status만으로 폴백 사유를 구성한다.
+        }
+        return null;
     }
 
     public List<ValuationPromptResponse> listValuationPrompts() {
@@ -191,6 +229,9 @@ public class AiReportAgentClient {
                 null,
                 true,
                 failureReason,
+                // 폴백은 agent 응답이 없으므로 경고 없음·근거 신뢰도 미상(null).
+                List.of(),
+                null,
                 OffsetDateTime.now(),
                 // ORCH-06/AIREPORT-02: 폴백은 리치 근거가 없으므로 빈 값.
                 List.of(),
@@ -198,6 +239,9 @@ public class AiReportAgentClient {
                 List.of(),
                 List.of(),
                 List.of(),
+                // 폴백은 구조화 렌더링 산출물이 없으므로 빈 값.
+                null,
+                null,
                 null
         );
     }
@@ -216,6 +260,11 @@ public class AiReportAgentClient {
             String artifactDir,
             Boolean degraded,
             String failureReason,
+            // 계약 신호: agent가 항상 내보내는 운영/사용자 노출용 경고 목록·근거 신뢰도(HIGH/MEDIUM/LOW).
+            // record가 그동안 미정의여서 @JsonIgnoreProperties로 조용히 드롭되던 필드 — 최소한 BE 경계에서
+            // 보존해 downstream 풀스루(DTO/openapi/FE)가 가능하도록 한다.
+            List<String> warnings,
+            String evidenceConfidence,
             OffsetDateTime generatedAt,
             // ORCH-06/AIREPORT-02: 에이전트가 산출하는 리포트 레벨 리치 근거(그동안 record 미정의로 폐기되던 필드).
             List<String> missingInformation,
@@ -223,6 +272,10 @@ public class AiReportAgentClient {
             List<String> judgementGrounds,
             List<String> businessCheckRequests,
             List<AgentSourceRef> externalSources,
+            // agent가 산출하는 구조화 렌더링 필드(FE 카드용 요약 summaryBrief, 섹션별 본문 reportSections).
+            // record 미정의로 드롭되던 필드 — BE 경계에서 보존한다.
+            Map<String, Object> summaryBrief,
+            Map<String, String> reportSections,
             // 계약 C1: agent가 실제 적용한 가치평가 기준 스냅샷(source=request|default). 구 agent는 null.
             Map<String, Object> appliedValuationConfig
     ) {

@@ -26,6 +26,8 @@ import org.springframework.transaction.annotation.Transactional;
  * @relatedFR FR-LEGAL-12, FR-LEGAL-23
  * @description 사업부 계정 초대 토큰 생성/회전/수락/검증. 원문 토큰은 저장하지 않고 SHA-256 해시만
  *   보관하며 원문은 호출부(메일 발송)에만 반환한다. 만료는 스케줄러 없이 조회/검증 시점 lazy 판정한다.
+ *   만료 전이의 영속화는 read-write 트랜잭션(accept/validate)에서 managed 엔티티 dirty checking으로 이뤄지고,
+ *   read-only 목록 조회 경로에서는 표시 전용 in-memory 전이로만 동작한다.
  */
 @Service
 public class InvitationService {
@@ -78,6 +80,12 @@ public class InvitationService {
     /**
      * 토큰 수락: 해시로 조회 → PENDING·미만료 검증 → BCrypt 비밀번호 설정,
      * invitation ACCEPTED/acceptedAt, user.status ACTIVE.
+     *
+     * <p>순차 재수락은 PENDING 검사에서 invalidStateException(ACCEPTED)으로 멱등 거절된다.
+     * 단, 동일 유효 토큰의 '거의 동시' 두 요청은 둘 다 PENDING 검사를 통과해 마지막 커밋이
+     * 비밀번호를 덮어쓸 수 있다 — 완전한 직렬화는 InvitationEntity의 @Version(낙관적 락) 또는
+     * findByTokenHash의 @Lock(PESSIMISTIC_WRITE)이 필요하며, 둘 다 이 서비스 밖(엔티티/리포지토리)
+     * 변경이라 여기서는 다루지 않는다. 빈도는 동일 사용자 본인의 중복 제출 + 레이트리밋으로 제한된다.
      */
     @Transactional
     public void accept(String rawToken, String newPassword) {
@@ -139,13 +147,18 @@ public class InvitationService {
         }
     }
 
-    /** 만료 lazy 판정: PENDING이고 now>expiresAt면 EXPIRED로 영속화하고 반환. 그 외는 현재 상태 그대로. */
+    /**
+     * 만료 lazy 판정: PENDING이고 now>expiresAt면 in-memory로 EXPIRED 전이 후 반환. 그 외는 현재 상태 그대로.
+     * 영속화는 명시적 save가 아니라 managed 엔티티의 dirty checking에 맡긴다 — accept/validate 같은
+     * read-write 트랜잭션에서는 커밋 시 자동 flush되어 EXPIRED가 DB에 반영되고, 목록 조회 같은
+     * read-only 트랜잭션(getBusinessInvitationStatuses)에서는 flush가 일어나지 않아 표시 전용으로만 쓰인다.
+     * (read-only 트랜잭션에 합류하면 어차피 명시적 save도 flush되지 않으므로, 의도와 어긋나는 no-op save를 두지 않는다.)
+     */
     private InvitationStatus lazyExpire(InvitationEntity invitation) {
         if (invitation.getStatus() == InvitationStatus.PENDING
                 && invitation.getExpiresAt() != null
                 && OffsetDateTime.now(KST).isAfter(invitation.getExpiresAt())) {
             invitation.setStatus(InvitationStatus.EXPIRED);
-            invitationRepository.save(invitation);
         }
         return invitation.getStatus();
     }

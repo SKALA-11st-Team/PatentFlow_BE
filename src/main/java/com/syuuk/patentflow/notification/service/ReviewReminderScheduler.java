@@ -1,6 +1,8 @@
 package com.syuuk.patentflow.notification.service;
 
 import com.syuuk.patentflow.common.service.SystemSettingsService;
+import com.syuuk.patentflow.notification.domain.NotificationEntity;
+import com.syuuk.patentflow.notification.repository.NotificationRepository;
 import com.syuuk.patentflow.patent.domain.PatentMetadataEntity;
 import com.syuuk.patentflow.patent.domain.PatentReviewHistoryEntity;
 import com.syuuk.patentflow.patent.dto.PatentLifecycleStatus;
@@ -21,8 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
  * F3: 검토 일정 자동 리마인드.
  * - 검토 시작일(납부일 - 메일 리드 개월) 도래: 관리자에게 "검토 시작" 알림.
  * - 납부 예정일 임박(D-30·D-7): 미회신(사업부 응답 대기) 특허를 사업부·관리자에게 에스컬레이션.
- * 매일 자정(KST) 실행, 같은 날 중복 발행은 알림 메시지 기준으로 자연 차단되지 않으므로
- * 하루 1회 실행 주기로 중복을 방지한다.
+ * 매일 자정(KST) 실행. 멀티 레플리카(EKS) 환경에서 모든 인스턴스가 동시에 run()을 실행하므로
+ * 하루 1회 실행 주기만으로는 중복을 막지 못한다. 발행 시 "오늘(KST)·동일 제목·동일 대상 역할"의
+ * 알림이 이미 존재하면 건너뛰는 멱등 발행으로 인스턴스 간 중복을 방지한다.
  */
 @Component
 public class ReviewReminderScheduler {
@@ -35,21 +38,24 @@ public class ReviewReminderScheduler {
     private final PatentReviewHistoryRepository reviewHistoryRepository;
     private final SystemSettingsService systemSettingsService;
     private final NotificationService notificationService;
+    private final NotificationRepository notificationRepository;
 
     public ReviewReminderScheduler(
             PatentMetadataRepository patentMetadataRepository,
             PatentReviewHistoryRepository reviewHistoryRepository,
             SystemSettingsService systemSettingsService,
-            NotificationService notificationService
+            NotificationService notificationService,
+            NotificationRepository notificationRepository
     ) {
         this.patentMetadataRepository = patentMetadataRepository;
         this.reviewHistoryRepository = reviewHistoryRepository;
         this.systemSettingsService = systemSettingsService;
         this.notificationService = notificationService;
+        this.notificationRepository = notificationRepository;
     }
 
     @Scheduled(cron = "0 10 0 * * *", zone = "Asia/Seoul")
-    @Transactional(readOnly = true)
+    @Transactional
     public void run() {
         LocalDate today = LocalDate.now(KST);
         remindReviewStart(today);
@@ -67,7 +73,7 @@ public class ReviewReminderScheduler {
         if (due.isEmpty()) {
             return;
         }
-        notificationService.addNotification(
+        publishOnce(
                 "연차료 검토 시작 알림",
                 "오늘 검토를 시작할 특허가 %d건 있습니다(납부 예정 %d개월 전).".formatted(due.size(), leadMonths),
                 "ADMIN",
@@ -90,17 +96,39 @@ public class ReviewReminderScheduler {
             if (waiting.isEmpty()) {
                 continue;
             }
-            notificationService.addNotification(
+            publishOnce(
                     "검토 회신 요청 (납부 D-%d)".formatted(daysBefore),
                     "납부 예정일이 %d일 남은 미회신 특허가 %d건 있습니다. 의견을 제출해 주세요.".formatted(daysBefore, waiting.size()),
                     "BUSINESS",
                     "/business/dashboard");
-            notificationService.addNotification(
+            publishOnce(
                     "사업부 회신 지연 주의 (납부 D-%d)".formatted(daysBefore),
                     "납부 D-%d 미회신 특허 %d건 — 후속 조치를 검토해 주세요.".formatted(daysBefore, waiting.size()),
                     "ADMIN",
                     "/admin/review-targets");
             log.info("회신 에스컬레이션 발행 — D-{} {}건", daysBefore, waiting.size());
         }
+    }
+
+    /**
+     * 멱등 발행 — 오늘(KST) 동일 제목·동일 대상 역할의 알림이 이미 있으면 발행을 건너뛴다.
+     * EKS 멀티 레플리카에서 동일 스케줄 잡이 여러 인스턴스에 동시 실행돼도 사용자에게
+     * 같은 알림이 중복으로 쌓이지 않도록 보장한다.
+     */
+    private void publishOnce(String title, String message, String targetRole, String link) {
+        if (alreadyPublishedToday(title, targetRole)) {
+            log.debug("중복 발행 건너뜀 — 제목='{}', 역할={}", title, targetRole);
+            return;
+        }
+        notificationService.addNotification(title, message, targetRole, link);
+    }
+
+    private boolean alreadyPublishedToday(String title, String targetRole) {
+        LocalDate today = LocalDate.now(KST);
+        return notificationRepository.findByTargetRoleInOrderByCreatedAtDesc(List.of(targetRole)).stream()
+                .filter(notification -> title.equals(notification.getTitle()))
+                .map(NotificationEntity::getCreatedAt)
+                .anyMatch(createdAt -> createdAt != null
+                        && createdAt.atZoneSameInstant(KST).toLocalDate().equals(today));
     }
 }

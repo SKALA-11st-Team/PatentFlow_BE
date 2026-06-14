@@ -299,18 +299,21 @@ public class SettingsController {
         return ApiResponse.ok(systemSettingsService.addClassification(type, request.value()));
     }
 
-    @PutMapping("/classifications/{type}/{value}")
+    // 대상 분류값은 쿼리 파라미터(value)로 받는다. '금융/전략'처럼 '/'가 포함된 값은
+    // PathVariable 한 세그먼트로 매칭되지 않고 %2F 인코딩도 StrictHttpFirewall이 400으로 차단하므로,
+    // add와 같이 값을 경로 밖(쿼리/바디)에서 받아 모든 분류값의 이름변경·삭제를 가능하게 한다. (FR-LEGAL-25)
+    @PutMapping("/classifications/{type}")
     public ApiResponse<ClassificationResponse> renameClassification(
             @PathVariable String type,
-            @PathVariable String value,
+            @RequestParam String value,
             @Valid @RequestBody ClassificationRequest request) {
         return ApiResponse.ok(systemSettingsService.renameClassification(type, value, request.value()));
     }
 
-    @DeleteMapping("/classifications/{type}/{value}")
+    @DeleteMapping("/classifications/{type}")
     public ApiResponse<ClassificationResponse> deleteClassification(
             @PathVariable String type,
-            @PathVariable String value) {
+            @RequestParam String value) {
         return ApiResponse.ok(systemSettingsService.deleteClassification(type, value));
     }
 

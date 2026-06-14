@@ -95,7 +95,8 @@ public class SecurityConfig {
                     .ignoringRequestMatchers(
                             "/api/v1/auth/login",
                             "/api/v1/auth/refresh",
-                            "/api/v1/auth/logout",
+                            // be-auth-3: logout은 인증된 세션을 파괴(쿠키 삭제·토큰 revoke)하는 상태 변경이므로
+                            // CSRF 토큰을 요구한다. FE는 X-XSRF-TOKEN 헤더를 첨부하고 실패 시 로컬 세션만 정리한다.
                             // 공개 초대 수락(미인증 POST) — CSRF 토큰 없이 호출되므로 면제.
                             "/api/v1/invitations/accept");
             })

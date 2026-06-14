@@ -7,6 +7,7 @@ import com.syuuk.patentflow.common.ratelimit.RedisRateLimitStore;
 import com.syuuk.patentflow.mailing.service.RedisOAuthStateStore;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -85,6 +86,22 @@ class RedisStoresTest {
         store.reset("a@x.com");
         assertThat(store.isLocked("a@x.com")).isFalse();
         assertThat(store.incrementFailures("a@x.com", window)).isEqualTo(1);
+    }
+
+    @Test
+    void loginAttemptStoreSlidesWindowOnEachFailure() {
+        RedisLoginAttemptStore store = new RedisLoginAttemptStore(redisTemplate);
+        String failKey = "login:fail:slide@x.com";
+
+        // 첫 실패 — 짧은 윈도우로 TTL 설정.
+        store.incrementFailures("slide@x.com", Duration.ofSeconds(30));
+        Long firstTtl = redisTemplate.getExpire(failKey, TimeUnit.SECONDS);
+        assertThat(firstTtl).isNotNull().isBetween(1L, 30L);
+
+        // 두 번째 실패 — 더 긴 윈도우로 TTL이 갱신(슬라이딩)되어야 한다(고정 윈도우면 갱신 안 됨).
+        store.incrementFailures("slide@x.com", Duration.ofSeconds(300));
+        Long secondTtl = redisTemplate.getExpire(failKey, TimeUnit.SECONDS);
+        assertThat(secondTtl).isNotNull().isGreaterThan(30L);
     }
 
     @Test

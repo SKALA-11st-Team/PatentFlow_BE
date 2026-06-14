@@ -235,6 +235,9 @@ public class BusinessFixtureService {
     private BusinessSubmissionVersionResponse toSeedVersion(PatentDetailResponse patent) {
         BusinessOpinionDecision decision = patent.businessOpinion().decision();
         int qualitativeScore = decision == BusinessOpinionDecision.MAINTAIN ? 3 : -3;
+        // CONTRACT-02: 라이브 toVersion 경로와 동일하게 aiTotalScore는 0~400 원문 합(totalScore)이 아니라
+        // 0~100 평균(getAiAverageScore)을 사용해 척도를 통일한다(AI 점수 0~100과 체크리스트 1~4 혼동 방지).
+        Integer aiAverageScore = patentReviewService.getAiAverageScore(patent.patentId());
 
         return new BusinessSubmissionVersionResponse(
                 "%s-SUB-01".formatted(patent.patentId()),
@@ -245,9 +248,7 @@ public class BusinessFixtureService {
                 patent.businessOpinion().submittedAt(),
                 patent.aiEvaluationReport().createdAt(),
                 patent.currentRecommendation(),
-                patent.aiEvaluationReport().totalScore() == null
-                        ? 0
-                        : patent.aiEvaluationReport().totalScore(),
+                aiAverageScore == null ? 0 : aiAverageScore,
                 qualitativeScore,
                 List.of(),
                 qualitativeScore);

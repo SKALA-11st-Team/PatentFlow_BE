@@ -7,6 +7,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.syuuk.patentflow.auth.service.AuthSessionService;
 import com.syuuk.patentflow.common.error.PatentFlowException;
 import com.syuuk.patentflow.common.service.SystemSettingsService;
 import com.syuuk.patentflow.invitation.domain.InvitationEntity;
@@ -52,12 +53,16 @@ class AdminUserServiceTest {
     @Mock
     private SettingsService settingsService;
 
+    @Mock
+    private AuthSessionService authSessionService;
+
     private TestAdminUserService service;
 
     @BeforeEach
     void setUp() {
         service = new TestAdminUserService(userRepository, departmentRepository, passwordEncoder,
-                systemSettingsService, mailOAuth2Service, invitationService, settingsService);
+                systemSettingsService, mailOAuth2Service, invitationService, settingsService,
+                authSessionService);
     }
 
     private static InvitationEntity stubInvitation(UserEntity user) {
@@ -151,6 +156,42 @@ class AdminUserServiceTest {
     }
 
     @Test
+    void resendInvitationRevokesExistingSessionsToReclaimAccess() {
+        UserEntity businessUser = user("USER-business", "business@test.com", "BUSINESS", "DEPT-ICT");
+        businessUser.setStatus("ACTIVE");
+        when(userRepository.findById("USER-business")).thenReturn(Optional.of(businessUser));
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(invitationService.createInvitation(any(UserEntity.class), any()))
+                .thenAnswer(invocation -> new InvitationService.CreatedInvitation(
+                        stubInvitation(invocation.getArgument(0)), "raw-token"));
+
+        service.resendInvitation("USER-business");
+
+        // 재초대 = 접근 회수: status를 PENDING으로 되돌리고 발급된 세션을 무효화해야 한다.
+        assertThat(businessUser.getStatus()).isEqualTo("PENDING");
+        verify(authSessionService).revokeAll("USER-business");
+    }
+
+    @Test
+    void createBusinessUserReturnsResolvedDepartmentNameInResponse() {
+        when(userRepository.existsByEmail("business@test.com")).thenReturn(false);
+        when(departmentRepository.existsById("DEPT-ICT")).thenReturn(true);
+        when(departmentRepository.findById("DEPT-ICT")).thenReturn(Optional.of(
+                new com.syuuk.patentflow.mailing.domain.DepartmentEntity("DEPT-ICT", "ICT사업부", null)));
+        when(passwordEncoder.encode(any())).thenReturn("encoded-temp-password");
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(invitationService.createInvitation(any(UserEntity.class), any()))
+                .thenAnswer(invocation -> new InvitationService.CreatedInvitation(
+                        stubInvitation(invocation.getArgument(0)), "raw-token"));
+
+        var response = service.createUser(new CreateUserRequest("business@test.com", "BUSINESS", "DEPT-ICT", "사업부"));
+
+        // department 연관(insertable=false)에 의존하지 않고 departmentId로 조회한 사업부명을 반환한다.
+        assertThat(response.departmentName()).isEqualTo("ICT사업부");
+        assertThat(response.departmentId()).isEqualTo("DEPT-ICT");
+    }
+
+    @Test
     void createBusinessUserPersistsOnlyValidatedDepartmentId() {
         when(userRepository.existsByEmail("business@test.com")).thenReturn(false);
         when(departmentRepository.existsById("DEPT-ICT")).thenReturn(true);
@@ -182,9 +223,10 @@ class AdminUserServiceTest {
                 SystemSettingsService systemSettingsService,
                 MailOAuth2Service mailOAuth2Service,
                 InvitationService invitationService,
-                SettingsService settingsService) {
+                SettingsService settingsService,
+                AuthSessionService authSessionService) {
             super(userRepository, departmentRepository, passwordEncoder, systemSettingsService, mailOAuth2Service,
-                    invitationService, settingsService);
+                    invitationService, settingsService, authSessionService);
         }
 
         @Override

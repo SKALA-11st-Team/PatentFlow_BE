@@ -164,8 +164,14 @@ public class SettingsService {
         int mailLeadMonths = systemSettingsService.getMailLeadMonths();
         LocalDate activationDate = LocalDate.now(KST);
 
-        LocalDate businessResponseDueDate = activationDate.plusMonths(responseDeadlineMonths).plusDays(responseDeadlineDays);
-        validateBusinessResponseDueDate(quarter, businessResponseDueDate);
+        // 자동 활성화는 항상 성공해야 한다 — 분기 마지막 달에 처음 활성화 자격이 생기면(늦은 배포/복구)
+        // 자동 계산 회신 기한이 분기 종료일을 넘겨 INVALID_REQUEST로 전체 트랜잭션이 롤백되고
+        // 검토 대상이 영구히 생성되지 않는 결함이 있었다. 종료일을 넘으면 종료일로 clamp한다.
+        // 분기 종료일 상한 검증은 관리자가 명시적으로 회신 기한을 입력하는 updateQuarterSetting 경로에만 적용한다.
+        LocalDate computedDueDate = activationDate.plusMonths(responseDeadlineMonths).plusDays(responseDeadlineDays);
+        LocalDate businessResponseDueDate = computedDueDate.isAfter(quarter.getEndDate())
+                ? quarter.getEndDate()
+                : computedDueDate;
         quarter.setSubmissionDeadline(businessResponseDueDate);
         quarter.setMailLeadMonthsSnapshot(mailLeadMonths);
         quarter.setActivated(true);

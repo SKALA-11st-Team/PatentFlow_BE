@@ -9,7 +9,8 @@ import com.syuuk.patentflow.mailing.repository.MailingHistoryRepository;
 import com.syuuk.patentflow.patent.repository.PatentReviewHistoryRepository;
 import com.syuuk.patentflow.patent.service.PatentReviewService;
 import com.syuuk.patentflow.user.dto.CreateDepartmentRequest;
-import com.syuuk.patentflow.user.dto.PageResponse;
+import com.syuuk.patentflow.common.response.PageInfo;
+import com.syuuk.patentflow.common.response.PageResponse;
 import com.syuuk.patentflow.user.dto.UpdateDepartmentRequest;
 import com.syuuk.patentflow.user.repository.UserRepository;
 import java.time.LocalDate;
@@ -58,7 +59,8 @@ public class AdminDepartmentService {
                 ? mailingRecipientMappingRepository.findAll(pageable)
                 : mailingRecipientMappingRepository.findByDepartmentIdContainingIgnoreCaseOrDepartmentNameContainingIgnoreCase(
                         search.trim(), search.trim(), pageable);
-        return PageResponse.from(departments.map(this::toResponse));
+        return PageResponse.ok(departments.map(this::toResponse).getContent(),
+                new PageInfo(departments.getNumber(), departments.getSize(), departments.getTotalElements(), departments.getTotalPages()));
     }
 
     @Transactional
@@ -73,13 +75,8 @@ public class AdminDepartmentService {
                 LocalDate.now());
         mailingRecipientMappingRepository.save(entity);
         patentReviewService.refreshDepartmentCache();
-        return new DepartmentRecipientMappingResponse(
-                request.departmentId(),
-                request.departmentName(),
-                "",
-                "",
-                List.of(),
-                LocalDate.now().toString());
+        // 응답 updatedAt은 저장된 엔티티의 시각을 그대로 사용해 LocalDate.now() 재호출로 인한 미세 불일치를 제거한다.
+        return toResponse(entity);
     }
 
     @Transactional

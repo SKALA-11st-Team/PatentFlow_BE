@@ -326,7 +326,9 @@ public class PatentReviewService {
     }
 
     /**
-     * 연차료 납부 기준일이 지난 보유 중 특허를 포기 상태로 일괄 보정한다.
+     * 연차료 납부 기준일이 지난 보유 중 특허를 소멸(EXPIRED) 상태로 일괄 보정한다.
+     * 사람이 기록한 포기(ABANDONED='포기 완료')와 달리, 기준일 경과만으로 자동 전환되는 경로는
+     * '소멸'(EXPIRED) 의미를 갖는다 — 두 라벨이 섞이지 않도록 자동 보정은 EXPIRED로 둔다.
      */
     private void correctOverdueActivePatents() {
         List<PatentMetadataEntity> overdue = patentMetadataRepository
@@ -335,7 +337,7 @@ public class PatentReviewService {
             return;
         }
         overdue.forEach(entity -> {
-            entity.setPatentStatus(PatentLifecycleStatus.ABANDONED);
+            entity.setPatentStatus(PatentLifecycleStatus.EXPIRED);
             entity.setInReview(false);
             entity.setCurrentQuarterKey(null);
         });
@@ -358,12 +360,16 @@ public class PatentReviewService {
                         HashMap::new));
     }
 
+    @Transactional
     public List<PatentListItemResponse> getReviewTargets(
             String quarter,
             String country,
             LocalDate dateFrom,
             LocalDate dateTo,
             ReviewWorkflowStatus reviewWorkflowStatus) {
+        // 과기 ACTIVE 특허를 EXPIRED로 일괄 보정 — getPatents와 동일하게 쓰기 트랜잭션에서 수행한다.
+        // (조회 매핑은 부수효과 없이 멱등하므로 보정은 이 진입점에서 일관되게 일으킨다.)
+        correctOverdueActivePatents();
         String normalizedQuarter = quarter == null ? null : quarter.trim().toUpperCase(Locale.ROOT);
         String normalizedCountry = country == null ? null : country.trim().toUpperCase(Locale.ROOT);
 
@@ -438,7 +444,11 @@ public class PatentReviewService {
      * @relatedUI UI-LEGAL-04
      * @description AI 특허 평가 레포트와 최종 판단을 분리해 특허 상세를 조회한다.
      */
+    @Transactional
     public PatentDetailResponse getPatentDetail(String patentId) {
+        // 과기 ACTIVE 특허를 EXPIRED로 일괄 보정 — getPatents와 동일하게 쓰기 트랜잭션에서 수행한다.
+        // (조회 매핑 patentFromMetadataEntity는 부수효과 없이 멱등하므로 보정은 진입점에서 일관되게 일으킨다.)
+        correctOverdueActivePatents();
         return findPatent(patentId);
     }
 
@@ -664,7 +674,16 @@ public class PatentReviewService {
      */
     public PatentUpsertResponse updatePatent(String patentId, PatentUpsertRequest request) {
         updatePatent(patentId, patent -> withUpsertRequest(patent, request));
-        patentMetadataRepository.save(metadataEntityFromRequest(patentId, request));
+        // 기본정보 컬럼은 metadataEntityFromRequest가 갱신하지만, 그 생성자는 inReview=false·
+        // patentStatus=ACTIVE·currentQuarterKey=null로 초기화한다. 직전 updatePatent→persistPatentState가
+        // 보존한 워크플로우 상태(검토 대상 여부·포기/소멸 라벨·분기 키)를 새 엔티티에 복원한 뒤 저장한다.
+        PatentMetadataEntity updated = metadataEntityFromRequest(patentId, request);
+        patentMetadataRepository.findById(patentId).ifPresent(existing -> {
+            updated.setPatentStatus(existing.getPatentStatus());
+            updated.setInReview(existing.isInReview());
+            updated.setCurrentQuarterKey(existing.getCurrentQuarterKey());
+        });
+        patentMetadataRepository.save(updated);
         return new PatentUpsertResponse(patentId, "UPDATED");
     }
 
@@ -674,6 +693,13 @@ public class PatentReviewService {
     }
 
     public PatentDetailResponse assignDepartment(String patentId, String departmentId) {
+        // 참조 무결성: 존재하지 않는 departmentId를 부서명으로 폴백 저장하지 않도록 사전 검증한다.
+        // (없으면 단건은 명확한 오류, bulk는 Controller try/catch로 건별 failed 분류된다.)
+        if (departmentId != null && !departmentId.isBlank()
+                && !mailingRecipientMappingRepository.existsById(departmentId)) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST,
+                    "존재하지 않는 사업부입니다: " + departmentId);
+        }
         String departmentName = resolvedDepartmentName(departmentId);
         PatentDetailResponse updated = updatePatent(patentId, patent -> withDepartment(patent, departmentId, departmentName));
         persistPatentState(updated);
@@ -939,13 +965,12 @@ public class PatentReviewService {
                         entity.getCountry(), entity.getApplicationDate(),
                         entity.getRegistrationDate(), expectedExpirationDate);
 
+        // 기준일 경과 보유 중 특허는 응답상 소멸(EXPIRED)로 표시한다. 영속 보정은
+        // correctOverdueActivePatents()가 쓰기 트랜잭션에서 일괄 수행한다 — 조회(매핑)는 부수효과 없이
+        // 멱등하게 둔다(읽기가 write를 유발하지 않도록). 자동 경로는 '소멸', 사람 결정은 '포기(ABANDONED)'.
         if (ls == PatentLifecycleStatus.ACTIVE && baseFeeDate != null
                 && baseFeeDate.isBefore(LocalDate.now(KST))) {
-            ls = PatentLifecycleStatus.ABANDONED;
-            entity.setPatentStatus(PatentLifecycleStatus.ABANDONED);
-            entity.setInReview(false);
-            entity.setCurrentQuarterKey(null);
-            patentMetadataRepository.save(entity);
+            ls = PatentLifecycleStatus.EXPIRED;
         }
 
         PatentDetailResponse basePatent = new PatentDetailResponse(
