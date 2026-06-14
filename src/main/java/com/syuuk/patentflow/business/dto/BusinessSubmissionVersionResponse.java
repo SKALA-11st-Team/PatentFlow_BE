@@ -18,7 +18,10 @@ public record BusinessSubmissionVersionResponse(
         int aiTotalScore,
         int checklistTotal,
         List<BusinessSubmissionChecklistScoreResponse> checklistScores,
-        int qualitativeScore
+        int qualitativeScore,
+        String qualitativeMemo,
+        String additionalNeeds,
+        String evaluatedAt
 ) {
     @JsonProperty("finalOpinion")
     public BusinessOpinionDecision finalOpinion() {

@@ -177,6 +177,18 @@ public class PatentReviewHistoryEntity extends BaseEntity {
     @Column(name = "business_checklist_scores_json", columnDefinition = "TEXT")
     private String businessChecklistScoresJson;
 
+    // 사업부 정성 메모(자유 서술) — 입력만 받고 폐기되던 것을 영속화
+    @Column(name = "business_qualitative_memo", columnDefinition = "TEXT")
+    private String businessQualitativeMemo;
+
+    // 사업부가 추가로 확인 필요하다고 적은 사항
+    @Column(name = "business_additional_needs", columnDefinition = "TEXT")
+    private String businessAdditionalNeeds;
+
+    // 사업부가 입력한 평가일(사용자 입력 문자열)
+    @Column(name = "business_evaluated_at", length = 64)
+    private String businessEvaluatedAt;
+
     // 체크리스트 제출 시점의 AI 레포트 스냅샷 — 사업부가 참고한 AI 정보 이력 보존
     @Column(name = "business_ai_report_created_at")
     private OffsetDateTime businessAiReportCreatedAt;
@@ -558,6 +570,30 @@ public class PatentReviewHistoryEntity extends BaseEntity {
 
     public void setBusinessChecklistScoresJson(String businessChecklistScoresJson) {
         this.businessChecklistScoresJson = businessChecklistScoresJson;
+    }
+
+    public String getBusinessQualitativeMemo() {
+        return businessQualitativeMemo;
+    }
+
+    public void setBusinessQualitativeMemo(String businessQualitativeMemo) {
+        this.businessQualitativeMemo = businessQualitativeMemo;
+    }
+
+    public String getBusinessAdditionalNeeds() {
+        return businessAdditionalNeeds;
+    }
+
+    public void setBusinessAdditionalNeeds(String businessAdditionalNeeds) {
+        this.businessAdditionalNeeds = businessAdditionalNeeds;
+    }
+
+    public String getBusinessEvaluatedAt() {
+        return businessEvaluatedAt;
+    }
+
+    public void setBusinessEvaluatedAt(String businessEvaluatedAt) {
+        this.businessEvaluatedAt = businessEvaluatedAt;
     }
 
     public OffsetDateTime getBusinessAiReportCreatedAt() {

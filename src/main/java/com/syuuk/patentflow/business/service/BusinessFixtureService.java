@@ -139,7 +139,10 @@ public class BusinessFixtureService {
                 valueOrZero(entity.getBusinessAiTotalScore()),
                 valueOrZero(entity.getBusinessChecklistTotal()),
                 readChecklistScores(entity.getBusinessChecklistScoresJson()),
-                valueOrZero(entity.getBusinessQualitativeScore()));
+                valueOrZero(entity.getBusinessQualitativeScore()),
+                entity.getBusinessQualitativeMemo(),
+                entity.getBusinessAdditionalNeeds(),
+                entity.getBusinessEvaluatedAt());
     }
 
     private void applySubmission(PatentReviewHistoryEntity history, BusinessSubmissionVersionResponse submission) {
@@ -152,6 +155,9 @@ public class BusinessFixtureService {
         history.setBusinessAiTotalScore(submission.aiTotalScore());
         history.setBusinessChecklistTotal(submission.checklistTotal());
         history.setBusinessQualitativeScore(submission.qualitativeScore());
+        history.setBusinessQualitativeMemo(submission.qualitativeMemo());
+        history.setBusinessAdditionalNeeds(submission.additionalNeeds());
+        history.setBusinessEvaluatedAt(submission.evaluatedAt());
         history.setBusinessChecklistScoresJson(writeChecklistScores(submission.checklistScores()));
     }
 
@@ -229,7 +235,10 @@ public class BusinessFixtureService {
                 aiAverageScore == null ? 0 : aiAverageScore,
                 checklistTotal,
                 checklistScores,
-                request.qualitativeScore());
+                request.qualitativeScore(),
+                request.qualitativeMemo(),
+                request.additionalNeeds(),
+                request.evaluatedAt());
     }
 
     private BusinessSubmissionVersionResponse toSeedVersion(PatentDetailResponse patent) {
@@ -251,7 +260,10 @@ public class BusinessFixtureService {
                 aiAverageScore == null ? 0 : aiAverageScore,
                 qualitativeScore,
                 List.of(),
-                qualitativeScore);
+                qualitativeScore,
+                null,
+                null,
+                null);
     }
 
     private String submissionId(String patentId) {

@@ -1774,6 +1774,9 @@
       },
       "BusinessSubmissionVersionResponse" : {
         "properties" : {
+          "additionalNeeds" : {
+            "type" : "string"
+          },
           "aiRecommendation" : {
             "enum" : [
               "MAINTAIN",
@@ -1808,11 +1811,17 @@
             ],
             "type" : "string"
           },
+          "evaluatedAt" : {
+            "type" : "string"
+          },
           "finalOpinion" : {
             "enum" : [
               "MAINTAIN",
               "ABANDON"
             ],
+            "type" : "string"
+          },
+          "qualitativeMemo" : {
             "type" : "string"
           },
           "qualitativeScore" : {
