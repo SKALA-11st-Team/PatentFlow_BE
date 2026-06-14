@@ -50,16 +50,8 @@ public class AiReportAgentClient {
         }
     }
 
-    public AgentEvaluateResponse evaluate(String patentId) {
-        return doEvaluate(patentId, TIMEOUT, null);
-    }
-
-    /** @param valuationConfig 가치평가 기준(계약 C1 valuationConfig). null이면 agent 기본값으로 평가. */
-    public AgentEvaluateResponse evaluate(String patentId, Object valuationConfig) {
-        return doEvaluate(patentId, TIMEOUT, valuationConfig);
-    }
-
-    // 배치 자동 생성 전용 — 에이전트 응답에 10분 이상 소요될 수 있으므로 타임아웃을 20분으로 설정
+    // 온디맨드/배치 모두 비동기 잡에서 호출 — 에이전트 응답에 10분 이상 소요될 수 있으므로 타임아웃을 20분으로 설정.
+    // 인터랙티브 30초 evaluate 경로는 LLM 장시간 실행과 맞지 않아 제거했다.
     public AgentEvaluateResponse evaluateForBatch(String patentId) {
         return doEvaluate(patentId, BATCH_TIMEOUT, null);
     }

@@ -101,22 +101,8 @@ public class PatentWorkflowService {
 
     // ── AI 레포트 생성 ────────────────────────────────────────
 
-    public PatentDetailResponse generateAiReport(String patentId) {
-        PatentDetailResponse patent = patentReviewService.findPatent(patentId);
-        if (!AI_REPORT_GENERATABLE_STATUSES.contains(patent.reviewWorkflowStatus())) {
-            throw new PatentFlowException(ErrorCode.INVALID_WORKFLOW_STATUS,
-                    "AI 레포트는 검토 진행 중(최종 처리 완료 전) 상태에서만 생성/재생성할 수 있습니다.");
-        }
-        // UI-008: 현재 활성 가치평가 기준을 agent에 전달한다(미설정 시 null → agent 기본값).
-        AgentEvaluateResponse agentResponse =
-                aiReportAgentClient.evaluate(patentId, valuationCriteriaService.currentConfigForAgent());
-        AiEvaluationReportResponse report = mapAgentResponse(agentResponse, patentId);
-        // 기존 법무 편집 위에서 재생성되면 편집은 보존(stale 처리)하고 감사 로그만 남긴다.
-        aiReportEditService.logRegeneratedOverEdit(patentId, "SYSTEM");
-        return patentReviewService.updatePatentInternal(patentId, p -> withAiReport(p, report, agentResponse.summaryText()));
-    }
-
-    // 배치 자동 생성 전용 — evaluateForBatch(20분 타임아웃)로 장시간 실행 허용
+    // 온디맨드/배치 모두 비동기 잡(evaluateForBatch, 20분 타임아웃)으로 생성한다.
+    // 인터랙티브 30초 동기 경로는 LLM 장시간 실행과 맞지 않아 제거했다(항상 타임아웃 강등 위험).
     public PatentDetailResponse generateAiReportForBatch(String patentId) {
         PatentDetailResponse patent = patentReviewService.findPatent(patentId);
         if (!AI_REPORT_GENERATABLE_STATUSES.contains(patent.reviewWorkflowStatus())) {

@@ -477,10 +477,6 @@ public class PatentReviewService {
         return findPatent(patentId).aiEvaluationReport().createdAt();
     }
 
-    public PatentDetailResponse generateAiReport(String patentId) {
-        return workflowService.generateAiReport(patentId);
-    }
-
     // 배치 자동 생성 전용 — PatentWorkflowService.generateAiReportForBatch 참조
     public PatentDetailResponse generateAiReportForBatch(String patentId) {
         return workflowService.generateAiReportForBatch(patentId);
