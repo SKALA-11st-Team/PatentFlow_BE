@@ -53,6 +53,18 @@ public class PatentWorkflowService {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
+    /**
+     * FR-LEGAL-06/18: AI 레포트 (재)생성이 허용되는 검토 워크플로우 상태.
+     * 최초 생성(REVIEW_QUARTER_STARTED)뿐 아니라 레포트가 이미 존재하는 진행 상태(MAIL_READY,
+     * WAITING_BUSINESS_RESPONSE, BUSINESS_RESPONSE_RECEIVED)에서 법무팀·사업부가 재생성할 수 있다.
+     * 최종 처리 완료(LEGAL_ACTION_RECORDED)와 검토 분기 아님(NOT_IN_REVIEW)은 제외해 완료 기록을 보호한다.
+     */
+    public static final java.util.Set<ReviewWorkflowStatus> AI_REPORT_GENERATABLE_STATUSES = java.util.EnumSet.of(
+            ReviewWorkflowStatus.REVIEW_QUARTER_STARTED,
+            ReviewWorkflowStatus.MAIL_READY,
+            ReviewWorkflowStatus.WAITING_BUSINESS_RESPONSE,
+            ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED);
+
     // @Lazy: PatentReviewService ↔ PatentWorkflowService 순환 의존성을 런타임 프록시로 해소
     private final PatentReviewService patentReviewService;
     private final PatentMetadataRepository patentMetadataRepository;
@@ -91,9 +103,9 @@ public class PatentWorkflowService {
 
     public PatentDetailResponse generateAiReport(String patentId) {
         PatentDetailResponse patent = patentReviewService.findPatent(patentId);
-        if (patent.reviewWorkflowStatus() != ReviewWorkflowStatus.REVIEW_QUARTER_STARTED) {
+        if (!AI_REPORT_GENERATABLE_STATUSES.contains(patent.reviewWorkflowStatus())) {
             throw new PatentFlowException(ErrorCode.INVALID_WORKFLOW_STATUS,
-                    "AI 레포트는 검토 시작(REVIEW_QUARTER_STARTED) 상태에서만 생성할 수 있습니다.");
+                    "AI 레포트는 검토 진행 중(최종 처리 완료 전) 상태에서만 생성/재생성할 수 있습니다.");
         }
         // UI-008: 현재 활성 가치평가 기준을 agent에 전달한다(미설정 시 null → agent 기본값).
         AgentEvaluateResponse agentResponse =
@@ -107,9 +119,9 @@ public class PatentWorkflowService {
     // 배치 자동 생성 전용 — evaluateForBatch(20분 타임아웃)로 장시간 실행 허용
     public PatentDetailResponse generateAiReportForBatch(String patentId) {
         PatentDetailResponse patent = patentReviewService.findPatent(patentId);
-        if (patent.reviewWorkflowStatus() != ReviewWorkflowStatus.REVIEW_QUARTER_STARTED) {
+        if (!AI_REPORT_GENERATABLE_STATUSES.contains(patent.reviewWorkflowStatus())) {
             throw new PatentFlowException(ErrorCode.INVALID_WORKFLOW_STATUS,
-                    "AI 레포트는 검토 시작(REVIEW_QUARTER_STARTED) 상태에서만 생성할 수 있습니다.");
+                    "AI 레포트는 검토 진행 중(최종 처리 완료 전) 상태에서만 생성/재생성할 수 있습니다.");
         }
         AgentEvaluateResponse agentResponse =
                 aiReportAgentClient.evaluateForBatch(patentId, valuationCriteriaService.currentConfigForAgent());
@@ -275,7 +287,11 @@ public class PatentWorkflowService {
                 patent.country(), patent.coApplicants(), patent.applicationDate(),
                 patent.registrationDate(), patent.expectedExpirationDate(),
                 patent.departmentId(), patent.departmentName(), patent.lifecycleStatus(),
-                report.degraded() ? patent.reviewWorkflowStatus() : ReviewWorkflowStatus.MAIL_READY,
+                // 최초 생성(REVIEW_QUARTER_STARTED)만 MAIL_READY로 승급한다. 진행 상태에서의 재생성은
+                // 워크플로우를 되돌리지 않도록 현재 상태를 보존한다(FR-LEGAL-06/18 재생성 지원).
+                report.degraded() || patent.reviewWorkflowStatus() != ReviewWorkflowStatus.REVIEW_QUARTER_STARTED
+                        ? patent.reviewWorkflowStatus()
+                        : ReviewWorkflowStatus.MAIL_READY,
                 patent.feeDueDate(), patent.reviewReason(),
                 report.recommendation(), patent.businessOpinionDecision(), patent.legalActionResult(),
                 withAgentSummary(patent.summary(), agentSummary), report,
@@ -323,7 +339,7 @@ public class PatentWorkflowService {
                 patent.registrationDate(), patent.expectedExpirationDate(),
                 patent.departmentId(), patent.departmentName(),
                 lifecycleStatusByLegalAction(request.legalActionResult()),
-                ReviewWorkflowStatus.NOT_IN_REVIEW, newDueDate, patent.reviewReason(),
+                ReviewWorkflowStatus.LEGAL_ACTION_RECORDED, newDueDate, patent.reviewReason(),
                 patent.currentRecommendation(), patent.businessOpinionDecision(),
                 request.legalActionResult(), patent.summary(), patent.aiEvaluationReport(),
                 new FinalDecisionRecordResponse(
@@ -399,7 +415,7 @@ public class PatentWorkflowService {
                 patent.registrationDate(), patent.expectedExpirationDate(),
                 patent.departmentId(), patent.departmentName(),
                 legalActionResult != null ? lifecycleStatusByLegalAction(legalActionResult) : patent.lifecycleStatus(),
-                ReviewWorkflowStatus.NOT_IN_REVIEW, newDueDate, patent.reviewReason(),
+                ReviewWorkflowStatus.LEGAL_ACTION_RECORDED, newDueDate, patent.reviewReason(),
                 patent.currentRecommendation(), patent.businessOpinionDecision(), legalActionResult,
                 patent.summary(), patent.aiEvaluationReport(),
                 new FinalDecisionRecordResponse(
@@ -429,7 +445,8 @@ public class PatentWorkflowService {
                 patent.currentRecommendation(), patent.businessOpinionDecision(),
                 patent.legalActionResult(), patent.summary(), patent.aiEvaluationReport(),
                 patent.finalDecisionRecord(), patent.businessOpinion(),
-                status != ReviewWorkflowStatus.NOT_IN_REVIEW,
+                status != ReviewWorkflowStatus.NOT_IN_REVIEW
+                        && status != ReviewWorkflowStatus.LEGAL_ACTION_RECORDED,
                 patent.jointApplication(), patent.coApplicantConsent());
     }
 

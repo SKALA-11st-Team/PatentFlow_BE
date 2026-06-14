@@ -129,6 +129,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/business/**").hasRole("BUSINESS")
                         .requestMatchers(HttpMethod.POST, "/api/v1/patents/*/business-submissions").hasRole("BUSINESS")
                         .requestMatchers(HttpMethod.GET, "/api/v1/patents/*/business-submissions").authenticated()
+                        // FR-LEGAL-06/18: AI 레포트 재생성은 법무팀(ADMIN/LEGAL)과 사업부(BUSINESS) 모두 수행 가능.
+                        // 재생성 요청과 진행상태 폴링 두 경로만 BUSINESS에 허용하고, 그 외 patents 쓰기/조회는 종전대로 제한한다.
+                        .requestMatchers(HttpMethod.POST, "/api/v1/patents/*/request-ai-report").hasAnyRole("ADMIN", "LEGAL", "BUSINESS")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/patents/*/ai-report/status").hasAnyRole("ADMIN", "LEGAL", "BUSINESS")
                         .requestMatchers(HttpMethod.GET, "/api/v1/patents/**").hasAnyRole("ADMIN", "LEGAL")
                         .requestMatchers(HttpMethod.POST, "/api/v1/patents/**").hasAnyRole("ADMIN", "LEGAL")
                         .requestMatchers(HttpMethod.PUT, "/api/v1/patents/**").hasAnyRole("ADMIN", "LEGAL")

@@ -197,13 +197,13 @@ class PatentControllerTest {
                         """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.patentId").value("PAT-2026-0005"))
-                .andExpect(jsonPath("$.data.reviewWorkflowStatus").value("NOT_IN_REVIEW"))
+                .andExpect(jsonPath("$.data.reviewWorkflowStatus").value("LEGAL_ACTION_RECORDED"))
                 .andExpect(jsonPath("$.data.legalActionResult").value("MAINTAINED"))
                 .andExpect(jsonPath("$.data.finalDecisionRecord.reason").value("사업부 의견과 AI 평가를 종합해 유지합니다."));
 
         mockMvc.perform(get("/api/v1/patents/PAT-2026-0005"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.reviewWorkflowStatus").value("NOT_IN_REVIEW"))
+                .andExpect(jsonPath("$.data.reviewWorkflowStatus").value("LEGAL_ACTION_RECORDED"))
                 .andExpect(jsonPath("$.data.legalActionResult").value("MAINTAINED"))
                 .andExpect(jsonPath("$.data.lifecycleStatus").value("ACTIVE"))
                 .andExpect(jsonPath("$.data.finalDecisionRecord.reason").value("사업부 의견과 AI 평가를 종합해 유지합니다."));

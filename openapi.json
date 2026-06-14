@@ -2149,7 +2149,8 @@
               "REVIEW_QUARTER_STARTED",
               "MAIL_READY",
               "WAITING_BUSINESS_RESPONSE",
-              "BUSINESS_RESPONSE_RECEIVED"
+              "BUSINESS_RESPONSE_RECEIVED",
+              "LEGAL_ACTION_RECORDED"
             ],
             "type" : "string"
           }
@@ -2705,7 +2706,8 @@
               "REVIEW_QUARTER_STARTED",
               "MAIL_READY",
               "WAITING_BUSINESS_RESPONSE",
-              "BUSINESS_RESPONSE_RECEIVED"
+              "BUSINESS_RESPONSE_RECEIVED",
+              "LEGAL_ACTION_RECORDED"
             ],
             "type" : "string"
           },
@@ -2923,7 +2925,8 @@
               "REVIEW_QUARTER_STARTED",
               "MAIL_READY",
               "WAITING_BUSINESS_RESPONSE",
-              "BUSINESS_RESPONSE_RECEIVED"
+              "BUSINESS_RESPONSE_RECEIVED",
+              "LEGAL_ACTION_RECORDED"
             ],
             "type" : "string"
           },
@@ -4305,7 +4308,8 @@
                 "REVIEW_QUARTER_STARTED",
                 "MAIL_READY",
                 "WAITING_BUSINESS_RESPONSE",
-                "BUSINESS_RESPONSE_RECEIVED"
+                "BUSINESS_RESPONSE_RECEIVED",
+                "LEGAL_ACTION_RECORDED"
               ],
               "type" : "string"
             }
@@ -4637,7 +4641,8 @@
                 "REVIEW_QUARTER_STARTED",
                 "MAIL_READY",
                 "WAITING_BUSINESS_RESPONSE",
-                "BUSINESS_RESPONSE_RECEIVED"
+                "BUSINESS_RESPONSE_RECEIVED",
+                "LEGAL_ACTION_RECORDED"
               ],
               "type" : "string"
             }
@@ -5051,7 +5056,8 @@
                 "REVIEW_QUARTER_STARTED",
                 "MAIL_READY",
                 "WAITING_BUSINESS_RESPONSE",
-                "BUSINESS_RESPONSE_RECEIVED"
+                "BUSINESS_RESPONSE_RECEIVED",
+                "LEGAL_ACTION_RECORDED"
               ],
               "type" : "string"
             }
@@ -5358,7 +5364,8 @@
                 "REVIEW_QUARTER_STARTED",
                 "MAIL_READY",
                 "WAITING_BUSINESS_RESPONSE",
-                "BUSINESS_RESPONSE_RECEIVED"
+                "BUSINESS_RESPONSE_RECEIVED",
+                "LEGAL_ACTION_RECORDED"
               ],
               "type" : "string"
             }
