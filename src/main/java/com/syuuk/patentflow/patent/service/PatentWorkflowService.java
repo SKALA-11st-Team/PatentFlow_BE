@@ -459,7 +459,7 @@ public class PatentWorkflowService {
         return AiReportOverridesSupport.withAppliedCriteria(
                 new AiEvaluationReportResponse(reportId, generatedAt,
                         toRecommendation(agent.recommendation()), summary,
-                        totalScore, averageScore, agent.finalGrade(), agent.finalIndicator(), degraded, failureReason,
+                        totalScore, averageScore, agent.finalGrade(), degraded, failureReason,
                         scores, nullSafeList(agent.missingInformation()), rawMarkdown, markdownFilePath,
                         agent.keyEvidence(), nullSafeList(agent.judgementGrounds()),
                         nullSafeList(agent.businessCheckRequests()), toSourceResponses(agent.externalSources())),
@@ -518,7 +518,8 @@ public class PatentWorkflowService {
             return Math.round((sum / scoreCount) * 10.0) / 10.0;
         }
         if (totalScore != null) {
-            return Math.round((totalScore / 4.0) * 10.0) / 10.0;
+            // 점수 상세가 없는 폴백 경로 — 핵심 평가축(권리성·기술성·사업 연계성 3축) 개수로 나눈 평균.
+            return Math.round((totalScore / 3.0) * 10.0) / 10.0;
         }
         return null;
     }
@@ -569,6 +570,7 @@ public class PatentWorkflowService {
             case "MAINTAIN" -> Recommendation.MAINTAIN;
             case "ABANDON" -> Recommendation.ABANDON;
             case "HOLD" -> Recommendation.HOLD;
+            case "REVIEW_AGAIN" -> Recommendation.REVIEW_AGAIN;
             default -> Recommendation.REVIEW_AGAIN;
         };
     }

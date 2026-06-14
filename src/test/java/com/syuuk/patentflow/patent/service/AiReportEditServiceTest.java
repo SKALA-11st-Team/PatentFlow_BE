@@ -193,7 +193,7 @@ class AiReportEditServiceTest {
     private AiEvaluationReportResponse originalReport() {
         return new AiEvaluationReportResponse(
                 "REPORT-PAT-001-1", OffsetDateTime.now(), Recommendation.HOLD, "AI 사유",
-                280, 70.0, "B", "유지 권고", false, null,
+                280, 70.0, "B", false, null,
                 List.of(new EvaluationScoreResponse(EvaluationCategory.RIGHTS, 60, "B", "AI 근거",
                                 List.of(new EvidenceDetailResponse("출처 텍스트", null))),
                         new EvaluationScoreResponse(EvaluationCategory.MARKET, 75, "B", "시장 근거", List.of())),

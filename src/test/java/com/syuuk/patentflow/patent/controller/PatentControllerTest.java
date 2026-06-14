@@ -156,7 +156,6 @@ class PatentControllerTest {
                 82,
                 82.0,
                 "A",
-                "유지 권고",
                 null,
                 false,
                 null,

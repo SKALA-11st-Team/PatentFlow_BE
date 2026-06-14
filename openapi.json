@@ -53,9 +53,6 @@
           "finalGrade" : {
             "type" : "string"
           },
-          "finalIndicator" : {
-            "type" : "string"
-          },
           "judgementGrounds" : {
             "items" : {
               "type" : "string"

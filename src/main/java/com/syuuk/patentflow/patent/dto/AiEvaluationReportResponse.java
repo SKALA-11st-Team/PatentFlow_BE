@@ -12,7 +12,6 @@ public record AiEvaluationReportResponse(
         Integer totalScore,
         Double averageScore,
         String finalGrade,
-        String finalIndicator,
         boolean degraded,
         String failureReason,
         List<EvaluationScoreResponse> scores,
@@ -45,7 +44,6 @@ public record AiEvaluationReportResponse(
             Integer totalScore,
             Double averageScore,
             String finalGrade,
-            String finalIndicator,
             boolean degraded,
             String failureReason,
             List<EvaluationScoreResponse> scores,
@@ -58,7 +56,7 @@ public record AiEvaluationReportResponse(
             List<SourceResponse> externalSources
     ) {
         this(reportId, createdAt, recommendation, recommendationReason, totalScore, averageScore,
-                finalGrade, finalIndicator, degraded, failureReason, scores, missingInformation,
+                finalGrade, degraded, failureReason, scores, missingInformation,
                 rawMarkdown, markdownFilePath, keyEvidence, judgementGrounds, businessCheckRequests,
                 externalSources, false, null, null, 0, false, null);
     }

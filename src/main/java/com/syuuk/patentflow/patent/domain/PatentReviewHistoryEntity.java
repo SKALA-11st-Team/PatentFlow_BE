@@ -66,9 +66,6 @@ public class PatentReviewHistoryEntity extends BaseEntity {
     @Column(name = "ai_final_grade", length = 16)
     private String aiFinalGrade;
 
-    @Column(name = "ai_final_indicator", length = 128)
-    private String aiFinalIndicator;
-
     @Column(name = "ai_degraded")
     private Boolean aiDegraded;
 
@@ -305,14 +302,6 @@ public class PatentReviewHistoryEntity extends BaseEntity {
 
     public void setAiFinalGrade(String aiFinalGrade) {
         this.aiFinalGrade = aiFinalGrade;
-    }
-
-    public String getAiFinalIndicator() {
-        return aiFinalIndicator;
-    }
-
-    public void setAiFinalIndicator(String aiFinalIndicator) {
-        this.aiFinalIndicator = aiFinalIndicator;
     }
 
     public Boolean getAiDegraded() {

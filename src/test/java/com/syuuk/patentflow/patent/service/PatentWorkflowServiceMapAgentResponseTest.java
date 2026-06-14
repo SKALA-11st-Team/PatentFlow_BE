@@ -26,7 +26,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * VAL-09: 4축 모두 0점인 실제 매각 후보(totalScore=0)와 점수 미산출(totalScore=null)을 구분하는지 검증한다.
+ * VAL-09: 4축 모두 0점인 실제 저평가 특허(totalScore=0)와 점수 미산출(totalScore=null)을 구분하는지 검증한다.
  * 과거 회귀(totalScore == 0 ? null)로 0점이 '미산출'과 섞이지 않도록 락한다. degraded가 명시 구분 플래그다.
  */
 class PatentWorkflowServiceMapAgentResponseTest {
@@ -70,7 +70,7 @@ class PatentWorkflowServiceMapAgentResponseTest {
     ) {
         return new AgentEvaluateResponse(
                 "PAT-VAL09", scores, "포기 검토", summaryMarkdown, rawMarkdown,
-                totalScore, null, "D", "포기 검토", null, degraded, failureReason, OffsetDateTime.now(),
+                totalScore, null, "D", null, degraded, failureReason, OffsetDateTime.now(),
                 List.of(), null, List.of(), List.of(), List.of(), null);
     }
 
@@ -82,7 +82,7 @@ class PatentWorkflowServiceMapAgentResponseTest {
 
         AiEvaluationReportResponse report = service.mapAgentResponse(agent, "PAT-VAL09");
 
-        // 실제 매각 후보(4축 0점)는 합계 0으로 보존되어 '미산출'(null)과 구분된다.
+        // 실제 저평가 특허(4축 0점)는 합계 0으로 보존되어 '미산출'(null)과 구분된다.
         assertThat(report.totalScore()).isZero();
         assertThat(report.degraded()).isFalse();
     }
@@ -93,7 +93,7 @@ class PatentWorkflowServiceMapAgentResponseTest {
 
         AiEvaluationReportResponse report = service.mapAgentResponse(agent, "PAT-VAL09");
 
-        // 점수 미산출은 합계 null + degraded=true로 명시 구분된다(0점 매각후보와 혼동 안 됨).
+        // 점수 미산출은 합계 null + degraded=true로 명시 구분된다(0점 저평가 특허와 혼동 안 됨).
         assertThat(report.totalScore()).isNull();
         assertThat(report.degraded()).isTrue();
     }

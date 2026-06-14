@@ -55,9 +55,12 @@ public class MailingService {
 
     private static final Logger log = LoggerFactory.getLogger(MailingService.class);
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
-    private static final String STATUS_SENT = "SENT";
-    private static final String STATUS_FAILED = "FAILED";
-    private static final String STATUS_RECORDED = "RECORDED";
+    private static final com.syuuk.patentflow.mailing.domain.MailingStatus STATUS_SENT =
+            com.syuuk.patentflow.mailing.domain.MailingStatus.SENT;
+    private static final com.syuuk.patentflow.mailing.domain.MailingStatus STATUS_FAILED =
+            com.syuuk.patentflow.mailing.domain.MailingStatus.FAILED;
+    private static final com.syuuk.patentflow.mailing.domain.MailingStatus STATUS_RECORDED =
+            com.syuuk.patentflow.mailing.domain.MailingStatus.RECORDED;
     private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\{\\{?[^}]*url[^}]*}?}", Pattern.CASE_INSENSITIVE);
 
     private final MailingHistoryRepository mailingHistoryRepository;
@@ -294,7 +297,7 @@ public class MailingService {
     private void saveHistory(
             String mailingBatchId,
             BusinessReviewMailSendDraft draft,
-            String status,
+            com.syuuk.patentflow.mailing.domain.MailingStatus status,
             Map<String, String> departmentIdsByEmail,
             String sentBy
     ) {
@@ -413,7 +416,7 @@ public class MailingService {
                 entity.getRecipientName(),
                 entity.getSentAt(),
                 entity.getSentBy(),
-                entity.getStatus(),
+                entity.getStatus() == null ? null : entity.getStatus().name(),
                 entity.getSubject());
     }
 

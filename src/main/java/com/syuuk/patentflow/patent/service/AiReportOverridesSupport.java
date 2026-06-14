@@ -52,7 +52,6 @@ final class AiReportOverridesSupport {
                 original.totalScore(),
                 original.averageScore(),
                 original.finalGrade(),
-                original.finalIndicator(),
                 original.degraded(),
                 original.failureReason(),
                 mergeScores(original.scores(), overrides.scores()),
@@ -73,7 +72,7 @@ final class AiReportOverridesSupport {
     ) {
         return new AiEvaluationReportResponse(
                 report.reportId(), report.createdAt(), report.recommendation(), report.recommendationReason(),
-                report.totalScore(), report.averageScore(), report.finalGrade(), report.finalIndicator(),
+                report.totalScore(), report.averageScore(), report.finalGrade(),
                 report.degraded(), report.failureReason(), report.scores(), report.missingInformation(),
                 report.rawMarkdown(), report.markdownFilePath(), report.keyEvidence(), report.judgementGrounds(),
                 report.businessCheckRequests(), report.externalSources(),
@@ -89,7 +88,7 @@ final class AiReportOverridesSupport {
         }
         return new AiEvaluationReportResponse(
                 report.reportId(), report.createdAt(), report.recommendation(), report.recommendationReason(),
-                report.totalScore(), report.averageScore(), report.finalGrade(), report.finalIndicator(),
+                report.totalScore(), report.averageScore(), report.finalGrade(),
                 report.degraded(), report.failureReason(), report.scores(), report.missingInformation(),
                 report.rawMarkdown(), report.markdownFilePath(), report.keyEvidence(), report.judgementGrounds(),
                 report.businessCheckRequests(), report.externalSources(),

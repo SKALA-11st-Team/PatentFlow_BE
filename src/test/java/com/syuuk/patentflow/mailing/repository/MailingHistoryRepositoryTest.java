@@ -24,7 +24,8 @@ class MailingHistoryRepositoryTest {
         String patentsJson = "[{\"patentId\":\"" + patentId + "\",\"managementNumber\":\"" + managementNumber
                 + "\",\"originalPatentUrl\":\"https://patents.google.com/patent/" + patentId + "/ko\",\"title\":\"t\"}]";
         return new MailingHistoryEntity(mailingId, "body", "[]", 1, patentsJson, recipient, "name", "DEPT-1",
-                OffsetDateTime.now(), "admin@x.test", "SENT", "subject");
+                OffsetDateTime.now(), "admin@x.test",
+                com.syuuk.patentflow.mailing.domain.MailingStatus.SENT, "subject");
     }
 
     @BeforeEach

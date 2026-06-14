@@ -40,7 +40,6 @@ class AiReportAgentContractTest {
               "totalScore": 300,
               "averageScore": 75.0,
               "finalGrade": "B",
-              "finalIndicator": "유지 권고",
               "degraded": false,
               "failureReason": null,
               "warnings": ["w1"],

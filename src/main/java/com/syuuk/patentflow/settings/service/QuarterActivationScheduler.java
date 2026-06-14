@@ -62,6 +62,7 @@ public class QuarterActivationScheduler implements ApplicationRunner {
     }
 
     @Scheduled(cron = "0 0 0 * * *", zone = "Asia/Seoul")
+    @org.springframework.transaction.annotation.Transactional
     public void run() {
         LocalDate today = LocalDate.now(KST);
         autoActivateQuarters(today);
@@ -75,10 +76,14 @@ public class QuarterActivationScheduler implements ApplicationRunner {
                 .filter(q -> q.isActivated() && !q.isEnded())
                 .filter(q -> q.getEndDate() != null && today.isAfter(q.getEndDate()))
                 .forEach(q -> {
-                    q.setEnded(true);
-                    q.setEndedAt(OffsetDateTime.now(KST));
-                    quarterSettingRepository.save(q);
-                    log.info("Auto-ended quarter: {}", q.getQuarterKey());
+                    try {
+                        q.setEnded(true);
+                        q.setEndedAt(OffsetDateTime.now(KST));
+                        quarterSettingRepository.save(q);
+                        log.info("Auto-ended quarter: {}", q.getQuarterKey());
+                    } catch (Exception e) {
+                        log.warn("Failed to auto-end quarter {}: {}", q.getQuarterKey(), e.getMessage());
+                    }
                 });
     }
 

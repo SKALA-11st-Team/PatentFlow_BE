@@ -99,7 +99,8 @@ class MailingServiceTest {
         assertThat(response.updatedCount()).isZero();
         assertThat(captor.getAllValues())
                 .extracting(MailingHistoryEntity::getStatus)
-                .containsExactly("RECORDED", "RECORDED");
+                .containsExactly(com.syuuk.patentflow.mailing.domain.MailingStatus.RECORDED,
+                        com.syuuk.patentflow.mailing.domain.MailingStatus.RECORDED);
         assertThat(captor.getAllValues())
                 .extracting(MailingHistoryEntity::getMailingId)
                 .doesNotHaveDuplicates();
@@ -128,7 +129,8 @@ class MailingServiceTest {
         verify(mailingHistoryRepository, times(2)).save(captor.capture());
         assertThat(captor.getAllValues())
                 .extracting(MailingHistoryEntity::getStatus)
-                .containsExactly("SENT", "FAILED");
+                .containsExactly(com.syuuk.patentflow.mailing.domain.MailingStatus.SENT,
+                        com.syuuk.patentflow.mailing.domain.MailingStatus.FAILED);
         // 성공 건만 워크플로우 전이 대상이다.
         verify(patentReviewService).markMailingSent(List.of("PAT-SUCCESS"));
     }
@@ -200,7 +202,7 @@ class MailingServiceTest {
                 "DEPT-1",
                 OffsetDateTime.now(),
                 "admin@syuuk.test",
-                "SENT",
+                com.syuuk.patentflow.mailing.domain.MailingStatus.SENT,
                 "subject");
         when(mailingHistoryRepository.findByRecipientEmailAndPatentIdToken(
                 org.mockito.ArgumentMatchers.eq("recipient@example.com"),

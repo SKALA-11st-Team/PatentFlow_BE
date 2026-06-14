@@ -184,7 +184,14 @@ public class SystemSettingsService {
     public int getCountryExtensionMonths(String country) {
         String value = get(KEY_COUNTRY_EXT_PREFIX + country.toUpperCase());
         if (value != null) {
-            try { return Integer.parseInt(value); } catch (NumberFormatException ignored) {}
+            try {
+                int months = Integer.parseInt(value);
+                // 0 이하 설정값은 납부 주기를 전진시키지 못해(advanceAfterMaintenance 무한루프/제자리) 의미가
+                // 없으므로 기본 주기로 폴백한다. 정상 설정은 updateCountryExtension에서 양수만 저장된다.
+                if (months > 0) {
+                    return months;
+                }
+            } catch (NumberFormatException ignored) {}
         }
         return DEFAULT_EXTENSION_MONTHS;
     }
@@ -224,6 +231,15 @@ public class SystemSettingsService {
     public CountryExtensionResponse updateCountryExtension(String country, CountryExtensionRequest request) {
         String upperCountry = country.toUpperCase();
         List<Integer> rounds = request.extensionMonthsByRound();
+        if (rounds != null && !rounds.isEmpty()) {
+            if (rounds.stream().anyMatch(m -> m == null || m <= 0)) {
+                throw new PatentFlowException(ErrorCode.INVALID_REQUEST,
+                        "회차별 연장 개월 수는 모두 1개월 이상이어야 합니다.");
+            }
+        } else if (request.extensionMonths() <= 0) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST,
+                    "연장 개월 수는 1개월 이상이어야 합니다.");
+        }
         if (rounds != null && !rounds.isEmpty()) {
             // 회차 목록 저장 시 단일 키는 1회차 값과 동기화한다(기존 주기 폴백 호환).
             set(KEY_COUNTRY_EXT_PREFIX + upperCountry + ".rounds",

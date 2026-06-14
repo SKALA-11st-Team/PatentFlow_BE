@@ -2,6 +2,8 @@ package com.syuuk.patentflow.mailing.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.OffsetDateTime;
@@ -39,8 +41,9 @@ public class MailingHistoryEntity {
     @Column(length = 128)
     private String sentBy;
 
+    @Enumerated(EnumType.STRING)
     @Column(length = 32)
-    private String status;
+    private MailingStatus status;
 
     @Column(length = 500)
     private String subject;
@@ -59,7 +62,7 @@ public class MailingHistoryEntity {
             String departmentId,
             OffsetDateTime sentAt,
             String sentBy,
-            String status,
+            MailingStatus status,
             String subject
     ) {
         this.mailingId = mailingId;
@@ -116,7 +119,7 @@ public class MailingHistoryEntity {
         return sentBy;
     }
 
-    public String getStatus() {
+    public MailingStatus getStatus() {
         return status;
     }
 

@@ -64,11 +64,18 @@ public class LocalDemoSeedRunner implements ApplicationRunner {
                 || count("quarter_settings") == 0;
     }
 
+    // 시드 게이트 카운트가 조회하는 테이블 화이트리스트 — 식별자는 바인딩 불가하므로 알려진 값만 허용한다.
+    private static final java.util.Set<String> COUNTABLE_TABLES = java.util.Set.of(
+            "patents", "departments", "users", "system_settings", "quarter_settings");
+
     private int count(String tableName) {
         return count(tableName, null);
     }
 
     private int count(String tableName, String whereClause) {
+        if (!COUNTABLE_TABLES.contains(tableName)) {
+            throw new IllegalArgumentException("허용되지 않은 카운트 대상 테이블: " + tableName);
+        }
         String sql = "SELECT COUNT(*) FROM " + tableName;
         if (whereClause != null && !whereClause.isBlank()) {
             sql += " WHERE " + whereClause;

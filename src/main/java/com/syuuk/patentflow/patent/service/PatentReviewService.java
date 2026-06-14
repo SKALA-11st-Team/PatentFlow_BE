@@ -1273,7 +1273,6 @@ public class PatentReviewService {
                 72,
                 72.0,
                 null,
-                null,
                 false,
                 null,
                 List.of(
@@ -1480,7 +1479,6 @@ public class PatentReviewService {
                         state.getAiTotalScore(),
                         state.getAiAverageScore(),
                         state.getAiFinalGrade(),
-                        state.getAiFinalIndicator(),
                         Boolean.TRUE.equals(state.getAiDegraded()),
                         state.getAiFailureReason(),
                         readEvaluationScores(state.getAiScoresJson()),
@@ -1537,7 +1535,6 @@ public class PatentReviewService {
                 report.totalScore(),
                 report.averageScore(),
                 report.finalGrade(),
-                report.finalIndicator(),
                 report.degraded(),
                 report.failureReason(),
                 report.scores(),
@@ -1565,7 +1562,6 @@ public class PatentReviewService {
         state.setAiTotalScore(report.totalScore());
         state.setAiAverageScore(report.averageScore());
         state.setAiFinalGrade(report.finalGrade());
-        state.setAiFinalIndicator(report.finalIndicator());
         state.setAiDegraded(report.degraded());
         state.setAiFailureReason(report.failureReason());
         state.setAiScoresJson(writeJson(report.scores()));
