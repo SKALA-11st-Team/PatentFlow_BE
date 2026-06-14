@@ -121,6 +121,8 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers("/actuator/**", "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/settings/review-quarters/active").hasAnyRole("ADMIN", "LEGAL", "BUSINESS")
+                        // FR-LEGAL-18: AI 레포트 재생성 허용 설정 조회 — FE 버튼 표시 판단용(BUSINESS 포함 전 역할 읽기 허용).
+                        .requestMatchers(HttpMethod.GET, "/api/v1/settings/ai-report-regen").hasAnyRole("ADMIN", "LEGAL", "BUSINESS")
                         .requestMatchers(HttpMethod.GET, "/api/v1/business/checklist-items").authenticated()
                         // I3: 역할 분리 — 검토 업무(특허·연차료·메일·legal 대시보드)는 ADMIN+LEGAL,
                         // 운영(admin 설정·계정/부서 관리·시스템 설정)은 ADMIN 전용으로 유지한다.

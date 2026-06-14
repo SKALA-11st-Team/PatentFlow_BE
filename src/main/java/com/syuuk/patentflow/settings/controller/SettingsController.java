@@ -1,5 +1,6 @@
 package com.syuuk.patentflow.settings.controller;
 
+import com.syuuk.patentflow.common.dto.AiReportRegenSettingResponse;
 import com.syuuk.patentflow.common.dto.ClassificationRequest;
 import com.syuuk.patentflow.common.dto.ClassificationResponse;
 import com.syuuk.patentflow.common.dto.CountryExtensionRequest;
@@ -182,6 +183,24 @@ public class SettingsController {
         return ApiResponse.ok(new ResponseDeadlineResponse(
                 systemSettingsService.getResponseDeadlineMonths(),
                 systemSettingsService.getResponseDeadlineDays()));
+    }
+
+    // ── AI 레포트 재생성 권한 설정 ─────────────────────────────
+    // GET은 SecurityConfig에서 ADMIN/LEGAL/BUSINESS 모두 허용(FE 버튼 노출 판단용).
+    // PATCH는 /api/v1/settings/** 기본 규칙에 의해 ADMIN 전용.
+
+    @GetMapping("/ai-report-regen")
+    public ApiResponse<AiReportRegenSettingResponse> getAiReportRegenSetting() {
+        return ApiResponse.ok(new AiReportRegenSettingResponse(
+                systemSettingsService.getAiReportRegenBusinessAllowed()));
+    }
+
+    @PatchMapping("/ai-report-regen")
+    public ApiResponse<AiReportRegenSettingResponse> updateAiReportRegenSetting(
+            @RequestBody AiReportRegenSettingResponse request) {
+        systemSettingsService.setAiReportRegenBusinessAllowed(request.businessAllowed());
+        return ApiResponse.ok(new AiReportRegenSettingResponse(
+                systemSettingsService.getAiReportRegenBusinessAllowed()));
     }
 
     // ── 분기 조회 / 활성화 ────────────────────────────────────

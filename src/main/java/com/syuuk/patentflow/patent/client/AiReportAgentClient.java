@@ -182,7 +182,7 @@ public class AiReportAgentClient {
         return new AgentEvaluateResponse(
                 patentId,
                 List.of(),
-                "HOLD",
+                "추가 정보 필요",
                 "AI 평가 서비스 연결 실패 - 기본 응답",
                 null,
                 null,
