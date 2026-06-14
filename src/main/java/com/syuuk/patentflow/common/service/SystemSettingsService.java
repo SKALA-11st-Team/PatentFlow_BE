@@ -32,6 +32,8 @@ public class SystemSettingsService {
     static final String KEY_RESPONSE_DEADLINE_DAYS = "review.response.deadline.days";
     // 사업부 초대 토큰 유효기간(일). 미설정 시 기본 7일.
     static final String KEY_INVITATION_TTL_DAYS = "invitation.ttl.days";
+    // AI 레포트 재생성 — 사업부 역할도 허용할지 여부(기본 false = ADMIN/LEGAL만)
+    static final String KEY_AI_REPORT_REGEN_BUSINESS_ALLOWED = "ai.report.regenerate.business_allowed";
     private static final String KEY_COUNTRY_EXT_PREFIX = "country.extension.";
     private static final String KEY_FEE_RULE_PREFIX = "fee.rule.";
     private static final String KEY_CLASSIFICATION_PREFIX = "classification.";
@@ -201,6 +203,18 @@ public class SystemSettingsService {
         }
         set(KEY_INVITATION_TTL_DAYS, String.valueOf(ttlDays));
         return ttlDays;
+    }
+
+    // ── AI 레포트 재생성 권한 설정 ────────────────────────────
+    // 기본 false — ADMIN/LEGAL만 재생성 가능. true로 설정 시 BUSINESS도 허용.
+
+    public boolean getAiReportRegenBusinessAllowed() {
+        return "true".equalsIgnoreCase(get(KEY_AI_REPORT_REGEN_BUSINESS_ALLOWED));
+    }
+
+    @Transactional
+    public void setAiReportRegenBusinessAllowed(boolean allowed) {
+        set(KEY_AI_REPORT_REGEN_BUSINESS_ALLOWED, String.valueOf(allowed));
     }
 
     @Transactional(readOnly = true)
