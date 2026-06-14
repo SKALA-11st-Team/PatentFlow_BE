@@ -79,7 +79,7 @@
               "MAINTAIN",
               "REVIEW_AGAIN",
               "ABANDON",
-              "HOLD"
+              "CONDITIONAL_MAINTAIN"
             ],
             "type" : "string"
           },
@@ -196,7 +196,7 @@
               "MAINTAIN",
               "REVIEW_AGAIN",
               "ABANDON",
-              "HOLD"
+              "CONDITIONAL_MAINTAIN"
             ],
             "type" : "string"
           },
@@ -208,6 +208,14 @@
               "$ref" : "#/components/schemas/ScoreOverride"
             },
             "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "AiReportRegenSettingResponse" : {
+        "properties" : {
+          "businessAllowed" : {
+            "type" : "boolean"
           }
         },
         "type" : "object"
@@ -360,6 +368,21 @@
         "properties" : {
           "data" : {
             "$ref" : "#/components/schemas/AiReportJobResponse"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "timestamp" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ApiResponseAiReportRegenSettingResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/AiReportRegenSettingResponse"
           },
           "message" : {
             "type" : "string"
@@ -1750,7 +1773,7 @@
               "MAINTAIN",
               "REVIEW_AGAIN",
               "ABANDON",
-              "HOLD"
+              "CONDITIONAL_MAINTAIN"
             ],
             "type" : "string"
           },
@@ -2766,7 +2789,7 @@
               "MAINTAIN",
               "REVIEW_AGAIN",
               "ABANDON",
-              "HOLD"
+              "CONDITIONAL_MAINTAIN"
             ],
             "type" : "string"
           },
@@ -2988,7 +3011,7 @@
               "MAINTAIN",
               "REVIEW_AGAIN",
               "ABANDON",
-              "HOLD"
+              "CONDITIONAL_MAINTAIN"
             ],
             "type" : "string"
           },
@@ -6304,6 +6327,54 @@
         },
         "tags" : [
           "patent-controller"
+        ]
+      }
+    },
+    "/api/v1/settings/ai-report-regen" : {
+      "get" : {
+        "operationId" : "getAiReportRegenSetting",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseAiReportRegenSettingResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [
+          "settings-controller"
+        ]
+      },
+      "patch" : {
+        "operationId" : "updateAiReportRegenSetting",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AiReportRegenSettingResponse"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseAiReportRegenSettingResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [
+          "settings-controller"
         ]
       }
     },

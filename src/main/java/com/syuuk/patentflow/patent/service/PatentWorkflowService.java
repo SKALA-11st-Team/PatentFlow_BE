@@ -266,7 +266,7 @@ public class PatentWorkflowService {
                     .orElseGet(() -> new PatentReviewHistoryEntity(entity.getPatentId(), quarterKey));
             history.setReviewWorkflowStatus(ReviewWorkflowStatus.REVIEW_QUARTER_STARTED);
             if (history.getAiRecommendation() == null) {
-                // 아직 AI 평가 전인 초기 상태. HOLD는 '조건부 유지' 전용이므로
+                // 아직 AI 평가 전인 초기 상태. CONDITIONAL_MAINTAIN은 '조건부 유지' 전용이므로
                 // 미평가 placeholder는 REVIEW_AGAIN('추가 정보 필요')으로 둔다.
                 history.setAiRecommendation(Recommendation.REVIEW_AGAIN);
             }
@@ -582,15 +582,16 @@ public class PatentWorkflowService {
     private Recommendation toRecommendation(String value) {
         if (value == null) return Recommendation.REVIEW_AGAIN;
         String normalized = value.trim().toUpperCase();
-        // HOLD enum은 AI 권고 '조건부 유지' 전용이다. '조건부 유지'는 '유지'를 포함하므로
-        // '유지'(MAINTAIN) 판정보다 먼저 처리한다.
-        if (value.contains("조건부")) return Recommendation.HOLD;
+        // CONDITIONAL_MAINTAIN enum은 AI 권고 '조건부 유지' 전용이다. '조건부 유지'는 '유지'를
+        // 포함하므로 '유지'(MAINTAIN) 판정보다 먼저 처리한다.
+        if (value.contains("조건부")) return Recommendation.CONDITIONAL_MAINTAIN;
         if (value.contains("유지")) return Recommendation.MAINTAIN;
         if (value.contains("포기")) return Recommendation.ABANDON;
         if (value.contains("추가") || value.contains("재검토") || value.contains("정보")) return Recommendation.REVIEW_AGAIN;
         return switch (normalized) {
             case "MAINTAIN" -> Recommendation.MAINTAIN;
             case "ABANDON" -> Recommendation.ABANDON;
+            case "CONDITIONAL_MAINTAIN" -> Recommendation.CONDITIONAL_MAINTAIN;
             // 레거시 중립 마커 "HOLD" 문자열은 '추가 정보 필요'(REVIEW_AGAIN)로 취급한다.
             case "HOLD" -> Recommendation.REVIEW_AGAIN;
             case "REVIEW_AGAIN" -> Recommendation.REVIEW_AGAIN;

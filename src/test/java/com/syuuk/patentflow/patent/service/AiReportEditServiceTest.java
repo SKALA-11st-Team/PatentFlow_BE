@@ -52,12 +52,12 @@ class AiReportEditServiceTest {
 
         history = new PatentReviewHistoryEntity("PAT-001", "2026-Q2");
         history.setAiReportId("REPORT-PAT-001-1");
-        history.setAiRecommendation(Recommendation.HOLD);
+        history.setAiRecommendation(Recommendation.CONDITIONAL_MAINTAIN);
         when(historyRepository.findByPatentIdOrderByCreatedAtDesc("PAT-001")).thenReturn(List.of(history));
         // record(final)는 mock이 불가하므로 최소 필드만 채운 실제 응답을 돌려준다.
         PatentDetailResponse detail = new PatentDetailResponse(
                 "PAT-001", null, null, null, null, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, Recommendation.HOLD, null, null, null,
+                null, null, null, null, null, null, Recommendation.CONDITIONAL_MAINTAIN, null, null, null,
                 originalReport(), null, null, true, false, null);
         when(patentReviewService.getPatentDetail("PAT-001")).thenReturn(detail);
     }
@@ -75,7 +75,7 @@ class AiReportEditServiceTest {
         service.editAiReport("PAT-001", request(0, recommendationOverride(Recommendation.MAINTAIN, "법무 검토 결과")), "legal01");
 
         // AI 원본 컬럼은 변형되지 않고 오버라이드만 분리 저장된다.
-        assertThat(history.getAiRecommendation()).isEqualTo(Recommendation.HOLD);
+        assertThat(history.getAiRecommendation()).isEqualTo(Recommendation.CONDITIONAL_MAINTAIN);
         assertThat(history.getAiEditOverridesJson()).contains("MAINTAIN").contains("법무 검토 결과");
         assertThat(history.getAiEditVersion()).isEqualTo(1);
         assertThat(history.getAiEditedBy()).isEqualTo("legal01");
@@ -192,7 +192,7 @@ class AiReportEditServiceTest {
 
     private AiEvaluationReportResponse originalReport() {
         return new AiEvaluationReportResponse(
-                "REPORT-PAT-001-1", OffsetDateTime.now(), Recommendation.HOLD, "AI 사유",
+                "REPORT-PAT-001-1", OffsetDateTime.now(), Recommendation.CONDITIONAL_MAINTAIN, "AI 사유",
                 280, 70.0, "B", false, null,
                 List.of(new EvaluationScoreResponse(EvaluationCategory.RIGHTS, 60, "B", "AI 근거",
                                 List.of(new EvidenceDetailResponse("출처 텍스트", null))),

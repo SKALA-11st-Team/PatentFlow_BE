@@ -127,7 +127,7 @@ WITH demo_reviews (
          TIMESTAMP WITH TIME ZONE '2026-05-14 15:40:00+09',
          'ABANDONED', '사업부 포기 의견과 AI 평가 근거를 반영해 포기 처리합니다.',
          TIMESTAMP WITH TIME ZONE '2026-05-18 15:20:00+09'),
-        ('PAT-2026-0127', 'WAITING_BUSINESS_RESPONSE', 'HOLD',
+        ('PAT-2026-0127', 'WAITING_BUSINESS_RESPONSE', 'CONDITIONAL_MAINTAIN',
          '인증 분야 활용 가능성 확인을 위해 사업부 검토가 필요합니다.', 61,
          '여러 통신채널과 디바이스, 난수를 조합해 사용자를 인증하는 특허입니다.',
          '단일 인증 수단의 취약성을 보완하고 다중 인증 흐름을 제공합니다.',

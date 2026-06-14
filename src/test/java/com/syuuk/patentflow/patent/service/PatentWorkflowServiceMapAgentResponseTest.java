@@ -179,7 +179,7 @@ class PatentWorkflowServiceMapAgentResponseTest {
                 ReviewWorkflowStatus.REVIEW_QUARTER_STARTED,
                 LocalDate.parse("2026-06-30"),
                 "연차료 납부 검토 시점 도래",
-                Recommendation.HOLD,
+                Recommendation.CONDITIONAL_MAINTAIN,
                 null,
                 null,
                 new PatentSummaryResponse("작성 필요", "작성 필요", List.of(), "작성 필요", List.of()),
