@@ -33,11 +33,19 @@ public class AiReportJobConstraintInitializer implements ApplicationRunner {
         if (!isPostgresDatabase()) {
             return;
         }
-        jdbcTemplate.execute(
-                "CREATE UNIQUE INDEX IF NOT EXISTS uq_ai_report_job_active_patent"
-                        + " ON patent_ai_report_jobs (patent_id)"
-                        + " WHERE status IN ('PENDING', 'RUNNING')");
-        log.info("Ensured active AI report job partial unique index (uq_ai_report_job_active_patent).");
+        try {
+            jdbcTemplate.execute(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS uq_ai_report_job_active_patent"
+                            + " ON patent_ai_report_jobs (patent_id)"
+                            + " WHERE status IN ('PENDING', 'RUNNING')");
+            log.info("Ensured active AI report job partial unique index (uq_ai_report_job_active_patent).");
+        } catch (RuntimeException exception) {
+            // 기존에 같은 특허로 PENDING/RUNNING 잡이 2건 이상 남아 있으면 유니크 인덱스 생성이 실패한다.
+            // 이 경우 기동을 막지 않고 경고만 남긴다(orphan cleaner가 중복 활성 잡을 FAILED로 정리하면
+            // 다음 기동에서 인덱스가 정상 생성된다). 인덱스가 없는 동안에도 앱레벨 재조회가 폴백으로 작동한다.
+            log.warn("Skipped active AI report job unique index — likely pre-existing duplicate active jobs: {}",
+                    exception.getMessage());
+        }
     }
 
     private boolean isPostgresDatabase() {
