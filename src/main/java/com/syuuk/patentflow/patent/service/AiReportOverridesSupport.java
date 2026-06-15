@@ -131,7 +131,8 @@ final class AiReportOverridesSupport {
                             override.score() != null ? override.score() : score.score(),
                             override.grade() != null ? override.grade() : score.grade(),
                             override.evidenceSummary() != null ? override.evidenceSummary() : score.evidence(),
-                            score.evidenceDetails());
+                            score.evidenceDetails(),
+                            score.riskFactors(), score.missingInformation(), score.confidence());
                 })
                 .toList();
     }

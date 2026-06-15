@@ -459,7 +459,8 @@ public class PatentWorkflowService {
         List<EvaluationScoreResponse> scores = agent.scores() == null ? List.of() :
                 agent.scores().stream()
                         .map(s -> new EvaluationScoreResponse(toCategory(s.category()), s.score(), s.grade(), s.evidence(),
-                                toEvidenceDetails(s.evidenceDetails())))
+                                toEvidenceDetails(s.evidenceDetails()),
+                                nullSafeList(s.riskFactors()), nullSafeList(s.missingInformation()), s.confidence()))
                         .toList();
         Integer totalScore = totalScore(agent, scores);
         Double averageScore = averageScore(agent, totalScore, scores);
