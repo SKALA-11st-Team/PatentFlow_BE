@@ -101,22 +101,8 @@ public class PatentWorkflowService {
 
     // ── AI 레포트 생성 ────────────────────────────────────────
 
-    public PatentDetailResponse generateAiReport(String patentId) {
-        PatentDetailResponse patent = patentReviewService.findPatent(patentId);
-        if (!AI_REPORT_GENERATABLE_STATUSES.contains(patent.reviewWorkflowStatus())) {
-            throw new PatentFlowException(ErrorCode.INVALID_WORKFLOW_STATUS,
-                    "AI 레포트는 검토 진행 중(최종 처리 완료 전) 상태에서만 생성/재생성할 수 있습니다.");
-        }
-        // UI-008: 현재 활성 가치평가 기준을 agent에 전달한다(미설정 시 null → agent 기본값).
-        AgentEvaluateResponse agentResponse =
-                aiReportAgentClient.evaluate(patentId, valuationCriteriaService.currentConfigForAgent());
-        AiEvaluationReportResponse report = mapAgentResponse(agentResponse, patentId);
-        // 기존 법무 편집 위에서 재생성되면 편집은 보존(stale 처리)하고 감사 로그만 남긴다.
-        aiReportEditService.logRegeneratedOverEdit(patentId, "SYSTEM");
-        return patentReviewService.updatePatentInternal(patentId, p -> withAiReport(p, report, agentResponse.summaryText()));
-    }
-
-    // 배치 자동 생성 전용 — evaluateForBatch(20분 타임아웃)로 장시간 실행 허용
+    // 온디맨드/배치 모두 비동기 잡(evaluateForBatch, 20분 타임아웃)으로 생성한다.
+    // 인터랙티브 30초 동기 경로는 LLM 장시간 실행과 맞지 않아 제거했다(항상 타임아웃 강등 위험).
     public PatentDetailResponse generateAiReportForBatch(String patentId) {
         PatentDetailResponse patent = patentReviewService.findPatent(patentId);
         if (!AI_REPORT_GENERATABLE_STATUSES.contains(patent.reviewWorkflowStatus())) {
@@ -173,6 +159,13 @@ public class PatentWorkflowService {
     public FinalDecisionResponse patchFinalDecision(String patentId, PatchFinalDecisionRequest request, String actor) {
         OffsetDateTime decidedAt = OffsetDateTime.now(KST);
         PatentDetailResponse updated = patentReviewService.updatePatentInternal(patentId, patent -> {
+            // FR-LEGAL-20: PATCH는 '이미 기록된 최종 판단'(LEGAL_ACTION_RECORDED)의 수정/취소 전용이다.
+            // 형제 메서드(recordFinalDecision 등)와 동일하게 진입부에서 워크플로우 상태를 가드해
+            // 최종 판단이 존재한 적 없는 단계에서 결정 레코드가 새로 만들어지거나 상태가 점프하는 것을 막는다.
+            if (patent.reviewWorkflowStatus() != ReviewWorkflowStatus.LEGAL_ACTION_RECORDED) {
+                throw new PatentFlowException(ErrorCode.INVALID_WORKFLOW_STATUS,
+                        "최종 판단 수정/취소는 법무 처리 결과가 기록된 상태에서만 가능합니다.");
+            }
             if (request.legalActionResult() == null && request.reason() == null) {
                 return withClearedFinalDecision(patent);
             }
@@ -382,18 +375,22 @@ public class PatentWorkflowService {
     }
 
     private PatentDetailResponse withClearedFinalDecision(PatentDetailResponse patent) {
-        return new PatentDetailResponse(
+        // 결정 레코드·법무 처리 결과를 비우고, 상태 복귀(LEGAL_ACTION_RECORDED→BUSINESS_RESPONSE_RECEIVED)는
+        // 상수 직접 세팅 대신 중앙 전이표(withReviewWorkflowStatus)를 경유해 검증한다.
+        PatentDetailResponse cleared = new PatentDetailResponse(
                 patent.patentId(), patent.managementNumber(), patent.applicationNumber(),
                 patent.registrationNumber(), patent.title(), patent.draftTitle(),
                 patent.businessArea(), patent.technologyArea(), patent.productName(),
                 patent.country(), patent.coApplicants(), patent.applicationDate(),
                 patent.registrationDate(), patent.expectedExpirationDate(),
                 patent.departmentId(), patent.departmentName(), patent.lifecycleStatus(),
-                ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED, patent.feeDueDate(),
+                patent.reviewWorkflowStatus(), patent.feeDueDate(),
                 patent.reviewReason(), patent.currentRecommendation(), patent.businessOpinionDecision(),
                 null, patent.summary(), patent.aiEvaluationReport(),
-                new FinalDecisionRecordResponse(null, null, null, null), patent.businessOpinion(), true,
+                new FinalDecisionRecordResponse(null, null, null, null), patent.businessOpinion(),
+                patent.inReview(),
                 patent.jointApplication(), patent.coApplicantConsent());
+        return withReviewWorkflowStatus(cleared, ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED);
     }
 
     private PatentDetailResponse withPatchedFinalDecision(
@@ -409,7 +406,9 @@ public class PatentWorkflowService {
                 : patent.feeDueDate();
         String reason = request.reason() != null && !request.reason().isBlank()
                 ? request.reason() : patent.finalDecisionRecord().reason();
-        return new PatentDetailResponse(
+        // 상태는 LEGAL_ACTION_RECORDED 동일상태 멱등 수정이므로, 상수 직접 세팅 대신
+        // 중앙 전이표(withReviewWorkflowStatus, this==target 허용)를 경유해 검증한다.
+        PatentDetailResponse patched = new PatentDetailResponse(
                 patent.patentId(), patent.managementNumber(), patent.applicationNumber(),
                 patent.registrationNumber(), patent.title(), patent.draftTitle(),
                 patent.businessArea(), patent.technologyArea(), patent.productName(),
@@ -417,7 +416,7 @@ public class PatentWorkflowService {
                 patent.registrationDate(), patent.expectedExpirationDate(),
                 patent.departmentId(), patent.departmentName(),
                 legalActionResult != null ? lifecycleStatusByLegalAction(legalActionResult) : patent.lifecycleStatus(),
-                ReviewWorkflowStatus.LEGAL_ACTION_RECORDED, newDueDate, patent.reviewReason(),
+                patent.reviewWorkflowStatus(), newDueDate, patent.reviewReason(),
                 patent.currentRecommendation(), patent.businessOpinionDecision(), legalActionResult,
                 patent.summary(), patent.aiEvaluationReport(),
                 new FinalDecisionRecordResponse(
@@ -425,8 +424,9 @@ public class PatentWorkflowService {
                                 ? patent.patentId() + "-DEC-01"
                                 : patent.finalDecisionRecord().decisionId(),
                         reason, decidedAt, actor),
-                patent.businessOpinion(), false,
+                patent.businessOpinion(), patent.inReview(),
                 patent.jointApplication(), patent.coApplicantConsent());
+        return withReviewWorkflowStatus(patched, ReviewWorkflowStatus.LEGAL_ACTION_RECORDED);
     }
 
     PatentDetailResponse withReviewWorkflowStatus(PatentDetailResponse patent, ReviewWorkflowStatus status) {
@@ -482,7 +482,7 @@ public class PatentWorkflowService {
                         scores, nullSafeList(agent.missingInformation()), rawMarkdown, markdownFilePath,
                         agent.keyEvidence(), nullSafeList(agent.judgementGrounds()),
                         nullSafeList(agent.businessCheckRequests()), toSourceResponses(agent.externalSources())),
-                agent.appliedValuationConfig());
+                agent.appliedValuationConfig(), nullSafeList(agent.warnings()), agent.evidenceConfidence());
     }
 
     private static <T> List<T> nullSafeList(List<T> value) {
@@ -509,11 +509,17 @@ public class PatentWorkflowService {
         return sources.stream().map(PatentWorkflowService::toSourceResponse).toList();
     }
 
+    // 종합 점수(total/average)는 agent와 동일하게 핵심 3축(권리성·기술성·시장성)만 합산한다.
+    // 사업 연계성(BUSINESS_ALIGNMENT)은 합산 대신 AI 권고 라벨 오버라이드로만 작용하므로 제외한다.
+    private static final java.util.Set<EvaluationCategory> CORE_VALUATION_CATEGORIES = java.util.EnumSet.of(
+            EvaluationCategory.RIGHTS, EvaluationCategory.TECHNOLOGY, EvaluationCategory.MARKET);
+
     private Integer totalScore(AgentEvaluateResponse agent, List<EvaluationScoreResponse> scores) {
         if (agent.totalScore() != null) {
             return agent.totalScore();
         }
         List<Integer> scoreValues = scores.stream()
+                .filter(s -> CORE_VALUATION_CATEGORIES.contains(s.category()))
                 .map(EvaluationScoreResponse::score)
                 .filter(score -> score != null)
                 .toList();
@@ -527,9 +533,13 @@ public class PatentWorkflowService {
         if (agent.averageScore() != null) {
             return agent.averageScore();
         }
-        long scoreCount = scores.stream().filter(score -> score.score() != null).count();
+        long scoreCount = scores.stream()
+                .filter(s -> CORE_VALUATION_CATEGORIES.contains(s.category()))
+                .filter(score -> score.score() != null)
+                .count();
         if (scoreCount > 0) {
             double sum = scores.stream()
+                    .filter(s -> CORE_VALUATION_CATEGORIES.contains(s.category()))
                     .map(EvaluationScoreResponse::score)
                     .filter(score -> score != null)
                     .mapToInt(Integer::intValue)
@@ -537,7 +547,7 @@ public class PatentWorkflowService {
             return Math.round((sum / scoreCount) * 10.0) / 10.0;
         }
         if (totalScore != null) {
-            // 점수 상세가 없는 폴백 경로 — 핵심 평가축(권리성·기술성·사업 연계성 3축) 개수로 나눈 평균.
+            // 점수 상세가 없는 폴백 경로 — 핵심 평가축(권리성·기술성·시장성 3축) 개수로 나눈 평균.
             return Math.round((totalScore / 3.0) * 10.0) / 10.0;
         }
         return null;
@@ -592,8 +602,9 @@ public class PatentWorkflowService {
             case "MAINTAIN" -> Recommendation.MAINTAIN;
             case "ABANDON" -> Recommendation.ABANDON;
             case "CONDITIONAL_MAINTAIN" -> Recommendation.CONDITIONAL_MAINTAIN;
-            // 레거시 중립 마커 "HOLD" 문자열은 '추가 정보 필요'(REVIEW_AGAIN)로 취급한다.
-            case "HOLD" -> Recommendation.REVIEW_AGAIN;
+            // 레거시 식별자 "HOLD"는 CONDITIONAL_MAINTAIN('조건부 유지')으로 리네임되었다.
+            // 과거 데이터/외부 호출이 "HOLD"를 보내면 리네임 의미대로 CONDITIONAL_MAINTAIN으로 정규화한다.
+            case "HOLD" -> Recommendation.CONDITIONAL_MAINTAIN;
             case "REVIEW_AGAIN" -> Recommendation.REVIEW_AGAIN;
             default -> Recommendation.REVIEW_AGAIN;
         };

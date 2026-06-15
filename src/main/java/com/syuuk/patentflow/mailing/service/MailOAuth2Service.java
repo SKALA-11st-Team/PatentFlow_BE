@@ -10,6 +10,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,9 +45,12 @@ public class MailOAuth2Service {
     private final RestTemplate restTemplate;
     private final OAuthStateStore stateStore;
 
-    // access_token은 1시간 만료 — 55분 캐시해서 매 발송마다 토큰 교환 API 호출을 방지
-    private String cachedAccessToken;
-    private Instant cachedTokenExpiry;
+    // access_token은 1시간 만료 — 55분 캐시해서 매 발송마다 토큰 교환 API 호출을 방지.
+    // 토큰과 만료시각을 한 객체로 묶어 AtomicReference로 원자 교체 → 동시 발송/연동해제 간
+    // 메모리 가시성과 두 값의 정합성(부분 갱신으로 인한 stale/NPE)을 보장한다.
+    private final AtomicReference<CachedToken> cachedToken = new AtomicReference<>();
+
+    private record CachedToken(String accessToken, Instant expiry) {}
 
     public MailOAuth2Service(MailOAuth2Properties properties,
             SystemSettingsService systemSettingsService,
@@ -118,8 +122,9 @@ public class MailOAuth2Service {
     // ── access_token 조회 (캐시 우선) ────────────────────────
 
     public String getValidAccessToken() {
-        if (cachedAccessToken != null && Instant.now().isBefore(cachedTokenExpiry)) {
-            return cachedAccessToken;
+        CachedToken cached = cachedToken.get();
+        if (cached != null && Instant.now().isBefore(cached.expiry())) {
+            return cached.accessToken();
         }
         return refreshAccessToken();
     }
@@ -137,8 +142,7 @@ public class MailOAuth2Service {
     }
 
     public void disconnect() {
-        cachedAccessToken = null;
-        cachedTokenExpiry = null;
+        cachedToken.set(null);
         systemSettingsService.clearGmailOAuth2();
         log.info("Gmail OAuth2 disconnected.");
     }
@@ -216,8 +220,8 @@ public class MailOAuth2Service {
     private void cacheAccessToken(String accessToken, Map<String, Object> tokenResponse) {
         Object expiresIn = tokenResponse.get("expires_in");
         int secondsUntilExpiry = expiresIn instanceof Number ? ((Number) expiresIn).intValue() : 3600;
-        this.cachedAccessToken = accessToken;
-        // 만료 5분 전에 갱신하도록 여유 시간을 둔다
-        this.cachedTokenExpiry = Instant.now().plusSeconds(secondsUntilExpiry - 300);
+        // 만료 5분 전에 갱신하도록 여유 시간을 두고, 토큰+만료를 한 번에 원자 교체한다.
+        Instant expiry = Instant.now().plusSeconds(secondsUntilExpiry - 300);
+        this.cachedToken.set(new CachedToken(accessToken, expiry));
     }
 }

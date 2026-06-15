@@ -1,7 +1,9 @@
 package com.syuuk.patentflow.common.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -9,7 +11,9 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.syuuk.patentflow.common.domain.SystemSettingsEntity;
 import com.syuuk.patentflow.common.dto.ClassificationResponse;
+import com.syuuk.patentflow.common.error.PatentFlowException;
 import com.syuuk.patentflow.common.repository.SystemSettingsRepository;
+import com.syuuk.patentflow.patent.repository.PatentMetadataRepository;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,12 +31,16 @@ class SystemSettingsServiceTest {
     @Mock
     private SystemSettingsRepository repository;
 
+    @Mock
+    private PatentMetadataRepository patentMetadataRepository;
+
     private SystemSettingsService service;
 
     @BeforeEach
     void setUp() {
         // 키 미설정 SecretCipher = 평문 통과(기존 동작 유지). 암호화 경로는 SecretCipherTest에서 검증.
-        service = new SystemSettingsService(repository, new com.syuuk.patentflow.common.security.SecretCipher(""));
+        service = new SystemSettingsService(
+                repository, patentMetadataRepository, new com.syuuk.patentflow.common.security.SecretCipher(""));
     }
 
     @Test
@@ -92,5 +100,45 @@ class SystemSettingsServiceTest {
                 return false;
             }
         }));
+    }
+
+    // be-settings-4: 사용 중인 분류 삭제는 거부 — 고아(business_area 참조) 방지.
+    @Test
+    void deleteClassificationRejectedWhenInUseByPatent() {
+        when(patentMetadataRepository.findDistinctBusinessAreas()).thenReturn(List.of("AI", "Cloud"));
+
+        assertThatThrownBy(() -> service.deleteClassification("BUSINESS", "AI"))
+                .isInstanceOf(PatentFlowException.class);
+
+        verify(repository, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    // be-settings-4: 사용 중이 아니면 정상 삭제(기준 목록만 갱신).
+    @Test
+    void deleteClassificationAllowedWhenNotInUse() {
+        when(patentMetadataRepository.findDistinctBusinessAreas()).thenReturn(List.of("Cloud"));
+        SystemSettingsEntity saved = new SystemSettingsEntity("classification.business");
+        saved.setValue("[\"AI\",\"Cloud\"]");
+        when(repository.findByIdForUpdate("classification.business")).thenReturn(Optional.of(saved));
+
+        ClassificationResponse response = service.deleteClassification("BUSINESS", "AI");
+
+        assertThat(response.values()).containsExactly("Cloud");
+        verify(repository).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    // be-settings-5: 회신 기한 일수(days) 상한(31)을 서비스 계층에서도 검증.
+    @Test
+    void updateResponseDeadlineRejectsDaysAbove31() {
+        assertThatThrownBy(() -> service.updateResponseDeadline(0, 32))
+                .isInstanceOf(PatentFlowException.class);
+    }
+
+    @Test
+    void updateResponseDeadlineAcceptsDaysAtUpperBound() {
+        service.updateResponseDeadline(0, 31);
+
+        verify(repository).save(argThat(entity ->
+                "review.response.deadline.days".equals(entity.getKey()) && "31".equals(entity.getValue())));
     }
 }

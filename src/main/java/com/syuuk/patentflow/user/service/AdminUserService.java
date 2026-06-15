@@ -1,5 +1,6 @@
 package com.syuuk.patentflow.user.service;
 
+import com.syuuk.patentflow.auth.service.AuthSessionService;
 import com.syuuk.patentflow.common.error.ErrorCode;
 import com.syuuk.patentflow.common.error.PatentFlowException;
 import com.syuuk.patentflow.common.service.SystemSettingsService;
@@ -12,7 +13,8 @@ import com.syuuk.patentflow.settings.dto.QuarterSettingResponse;
 import com.syuuk.patentflow.settings.service.SettingsService;
 import com.syuuk.patentflow.user.domain.UserEntity;
 import com.syuuk.patentflow.user.dto.CreateUserRequest;
-import com.syuuk.patentflow.user.dto.PageResponse;
+import com.syuuk.patentflow.common.response.PageInfo;
+import com.syuuk.patentflow.common.response.PageResponse;
 import com.syuuk.patentflow.user.dto.ResetPasswordResponse;
 import com.syuuk.patentflow.user.dto.UserResponse;
 import com.syuuk.patentflow.user.repository.UserRepository;
@@ -57,6 +59,7 @@ public class AdminUserService {
     private final MailOAuth2Service mailOAuth2Service;
     private final InvitationService invitationService;
     private final SettingsService settingsService;
+    private final AuthSessionService authSessionService;
     // 초대 수락 링크 베이스 URL(FE 도메인). 미설정 시 상대경로 폴백.
     @Value("${patentflow.invite.base-url:}")
     private String inviteBaseUrl;
@@ -64,7 +67,8 @@ public class AdminUserService {
     public AdminUserService(UserRepository userRepository, DepartmentRepository departmentRepository,
             PasswordEncoder passwordEncoder,
             SystemSettingsService systemSettingsService, MailOAuth2Service mailOAuth2Service,
-            InvitationService invitationService, SettingsService settingsService) {
+            InvitationService invitationService, SettingsService settingsService,
+            AuthSessionService authSessionService) {
         this.userRepository = userRepository;
         this.departmentRepository = departmentRepository;
         this.passwordEncoder = passwordEncoder;
@@ -72,6 +76,7 @@ public class AdminUserService {
         this.mailOAuth2Service = mailOAuth2Service;
         this.invitationService = invitationService;
         this.settingsService = settingsService;
+        this.authSessionService = authSessionService;
     }
 
     @Transactional(readOnly = true)
@@ -89,7 +94,8 @@ public class AdminUserService {
                 ? userRepository.findAll(pageable)
                 : userRepository.findByEmailContainingIgnoreCaseOrUsernameContainingIgnoreCaseOrDepartmentIdContainingIgnoreCase(
                         search.trim(), search.trim(), search.trim(), pageable);
-        return PageResponse.from(users.map(UserResponse::from));
+        return PageResponse.ok(users.map(UserResponse::from).getContent(),
+                new PageInfo(users.getNumber(), users.getSize(), users.getTotalElements(), users.getTotalPages()));
     }
 
     @Transactional
@@ -116,7 +122,9 @@ public class AdminUserService {
         } catch (RuntimeException mailError) {
             log.warn("계정·초대는 생성됐으나 초대 메일 발송 실패: recipient={} — {}", user.getEmail(), mailError.getMessage());
         }
-        return UserResponse.from(user);
+        // department 연관은 insertable=false라 신규 엔티티에서 null → 응답의 사업부명이 공란이 되는 문제를
+        // 막기 위해 검증된 departmentId로 사업부명을 직접 조회해 응답에 주입한다.
+        return userResponseWithDepartmentName(user, departmentId);
     }
 
     /**
@@ -133,8 +141,11 @@ public class AdminUserService {
             throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "사업부 계정에만 초대를 발송할 수 있습니다.");
         }
         // 이미 수락한 계정은 다시 PENDING으로 되돌려 재초대한다(접근 회수 후 재온보딩 시나리오).
+        // 재초대 = 접근 회수이므로 발급된 refresh 세션을 즉시 무효화한다(changePassword와 동일 처리).
+        // status를 PENDING으로만 바꾸면 보안 계층은 status를 보지 않아 접근이 그대로 유지된다 — revokeAll로 회수.
         user.setStatus("PENDING");
         userRepository.save(user);
+        authSessionService.revokeAll(userId);
         LocalDate responseDeadline = activeResponseDeadline();
         InvitationService.CreatedInvitation created = invitationService.createInvitation(user, responseDeadline);
         try {
@@ -200,7 +211,25 @@ public class AdminUserService {
         user.setRole(request.role());
         user.setDepartmentId(departmentId);
         user.setUsername(request.username());
-        return UserResponse.from(userRepository.save(user));
+        userRepository.save(user);
+        // department 연관은 updatable=false라 departmentId를 바꿔도 갱신되지 않아 응답이 stale 사업부명을
+        // 반환한다 → 검증된 departmentId로 사업부명을 직접 조회해 응답에 주입한다.
+        return userResponseWithDepartmentName(user, departmentId);
+    }
+
+    /**
+     * 검증된 departmentId로 사업부명을 조회해 응답을 만든다. department 연관(insertable/updatable=false)에
+     * 의존하지 않으므로 createUser/updateUser 직후에도 정확한 사업부명을 반환한다. departmentId가 없으면
+     * (ADMIN/LEGAL) 사업부명은 null.
+     */
+    private UserResponse userResponseWithDepartmentName(UserEntity user, String departmentId) {
+        String departmentName = isBlank(departmentId)
+                ? null
+                : departmentRepository.findById(departmentId)
+                        .map(department -> department.getDepartmentName())
+                        .orElse(null);
+        return new UserResponse(user.getId(), user.getEmail(), user.getUsername(), user.getRole(),
+                user.getDepartmentId(), departmentName, user.getCreatedAt());
     }
 
     @Transactional

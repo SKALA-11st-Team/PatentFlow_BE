@@ -65,6 +65,12 @@ public class BootstrapAdminInitializer implements ApplicationRunner {
                             null,
                             normalizedDisplayName(normalizedEmail)));
 
+            // 승격 추적: 기존 계정을 인계하는 경우 이전 role/departmentId를 남긴다.
+            // 시크릿 오설정으로 사업부/법무 계정 이메일이 admin 이메일로 잘못 들어오면
+            // 부서 소속이 무경고로 사라지므로, ADMIN이 아니던 계정의 승격은 WARN으로 경고한다.
+            String priorRole = user.getRole();
+            String priorDepartmentId = user.getDepartmentId();
+
             user.setEmail(normalizedEmail);
             user.setPassword(passwordEncoder.encode(password));
             user.setRole(ROLE_ADMIN);
@@ -72,7 +78,13 @@ public class BootstrapAdminInitializer implements ApplicationRunner {
             user.setUsername(normalizedDisplayName(normalizedEmail));
             userRepository.save(user);
             demoteBootstrapAdminDuplicates(user.getId());
-            log.info("Bootstrap admin upserted: {}", normalizedEmail);
+            if (priorRole != null && !ROLE_ADMIN.equals(priorRole)) {
+                log.warn("Bootstrap admin promoted existing non-admin account: {} (prior role={}, prior departmentId={}). "
+                        + "Department association cleared. Verify PATENTFLOW_BOOTSTRAP_ADMIN_EMAIL is not a business/legal account email.",
+                        normalizedEmail, priorRole, priorDepartmentId);
+            } else {
+                log.info("Bootstrap admin upserted: {}", normalizedEmail);
+            }
         } catch (Exception exception) {
             // 부트스트랩 실패가 애플리케이션 기동을 막지 않도록 한다(예: 스키마 마이그레이션 미적용 상황).
             log.error("Bootstrap admin upsert failed; continuing startup. Check the users table schema (email column).", exception);

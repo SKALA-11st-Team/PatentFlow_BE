@@ -10,6 +10,7 @@ import com.syuuk.patentflow.common.dto.CountryExtensionResponse;
 import com.syuuk.patentflow.common.error.ErrorCode;
 import com.syuuk.patentflow.common.error.PatentFlowException;
 import com.syuuk.patentflow.common.repository.SystemSettingsRepository;
+import com.syuuk.patentflow.patent.repository.PatentMetadataRepository;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -60,6 +61,8 @@ public class SystemSettingsService {
             "인증", "보안", "Network", "NFC", "AR", "VR (Avatar)", "사내시스템");
 
     private final SystemSettingsRepository repository;
+    // 분류 삭제가 특허(business_area/technology_area)를 고아로 만들지 않도록 사용 중 여부 검사용.
+    private final PatentMetadataRepository patentMetadataRepository;
     // MAIL-08: 민감 시크릿(refresh_token·client_secret) 저장/조회 시 AES-GCM 적용.
     private final com.syuuk.patentflow.common.security.SecretCipher secretCipher;
     // env 폴백 — DB에 값이 없을 때 환경변수 값을 사용 (Docker 배포 시 편의)
@@ -70,8 +73,10 @@ public class SystemSettingsService {
 
     public SystemSettingsService(
             SystemSettingsRepository repository,
+            PatentMetadataRepository patentMetadataRepository,
             com.syuuk.patentflow.common.security.SecretCipher secretCipher) {
         this.repository = repository;
+        this.patentMetadataRepository = patentMetadataRepository;
         this.secretCipher = secretCipher;
     }
 
@@ -174,6 +179,10 @@ public class SystemSettingsService {
         }
         if (months > 12) {
             throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "회신 기한은 12개월 이하로 설정해야 합니다.");
+        }
+        // days 상한(0~31)을 서비스 계층에서도 검증 — DTO @Max(31)와 이중 방어(다른 호출 경로 무방비 방지).
+        if (days > 31) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "회신 기한 일수는 31일 이하로 설정해야 합니다.");
         }
         set(KEY_RESPONSE_DEADLINE_MONTHS, String.valueOf(months));
         set(KEY_RESPONSE_DEADLINE_DAYS, String.valueOf(days));
@@ -406,6 +415,15 @@ public class SystemSettingsService {
         }
         values = normalizedClassificationValues(values);
         setForUpdate(classificationKey(normalizedType), writeClassificationValues(values));
+        // 재명명 캐스케이드: 기존 값을 가진 특허의 분야 참조(business_area/technology_area)를 일괄 갱신해
+        // 기준 목록에서 사라진 고아 값을 막는다. (be-settings-4)
+        if (index >= 0 && !normalizedCurrent.equals(normalizedNext)) {
+            if ("BUSINESS".equals(normalizedType)) {
+                patentMetadataRepository.renameBusinessArea(normalizedCurrent, normalizedNext);
+            } else {
+                patentMetadataRepository.renameTechnologyArea(normalizedCurrent, normalizedNext);
+            }
+        }
         return new ClassificationResponse(normalizedType, values);
     }
 
@@ -413,12 +431,26 @@ public class SystemSettingsService {
     public ClassificationResponse deleteClassification(String type, String value) {
         String normalizedType = normalizeClassificationType(type);
         String normalizedValue = normalizeClassificationValue(value);
+        // 사용 중인 분류를 삭제하면 해당 값을 가진 특허(business_area/technology_area)가 기준 목록에서
+        // 사라진 고아 상태가 되므로 거부한다(데이터 정합 보호). 재명명(rename)으로만 변경하도록 유도.
+        if (isClassificationInUse(normalizedType, normalizedValue)) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST,
+                    "사용 중인 분류는 삭제할 수 없습니다. 해당 분류를 사용하는 특허가 있어 먼저 재명명하거나 다른 분류로 변경해야 합니다.");
+        }
         List<String> values = getClassificationValuesForUpdate(normalizedType).stream()
                 .filter(item -> !item.equals(normalizedValue))
                 .toList();
         values = normalizedClassificationValues(values);
         setForUpdate(classificationKey(normalizedType), writeClassificationValues(values));
         return new ClassificationResponse(normalizedType, values);
+    }
+
+    /** 분류 값이 특허(business_area/technology_area)에서 실제 사용 중인지 검사 — 삭제 시 고아 방지. */
+    private boolean isClassificationInUse(String normalizedType, String normalizedValue) {
+        List<String> usedValues = "TECHNOLOGY".equals(normalizedType)
+                ? patentMetadataRepository.findDistinctTechnologyAreas()
+                : patentMetadataRepository.findDistinctBusinessAreas();
+        return usedValues.stream().anyMatch(used -> used != null && used.trim().equals(normalizedValue));
     }
 
     private List<String> getClassificationValues(String type) {

@@ -70,8 +70,9 @@ class PatentWorkflowServiceMapAgentResponseTest {
     ) {
         return new AgentEvaluateResponse(
                 "PAT-VAL09", scores, "포기 검토", summaryMarkdown, rawMarkdown,
-                totalScore, null, "D", null, degraded, failureReason, OffsetDateTime.now(),
-                List.of(), null, List.of(), List.of(), List.of(), null);
+                totalScore, null, "D", null, degraded, failureReason,
+                List.of(), null, OffsetDateTime.now(),
+                List.of(), null, List.of(), List.of(), List.of(), null, null, null);
     }
 
     @Test

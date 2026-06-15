@@ -51,8 +51,9 @@ public class ValuationCriteriaService {
         config.put("axisWeights", Map.of("legal", 25.0, "technology", 25.0, "market", 25.0, "business_fit", 25.0));
         config.put("gradeCutoffs", Map.of("A", 80.0, "B", 60.0, "C", 40.0));
         config.put("maintainThreshold", 60.0);
+        config.put("businessFitOverrideThreshold", 60.0);
         Map<String, Object> subscores = new LinkedHashMap<>();
-        subscores.put("legal", Map.of("right_stability", 35, "claim_protection", 40, "portfolio_defensive_value", 25));
+        subscores.put("legal", Map.of("right_stability", 40, "claim_protection", 40, "portfolio_defensive_value", 20));
         subscores.put("business_fit",
                 Map.of("official_business_evidence", 30, "product_function_direct_match", 45, "business_context_fit", 25));
         config.put("subscoreWeights", subscores);
@@ -87,6 +88,8 @@ public class ValuationCriteriaService {
         config.put("axisWeights", request.axisWeights());
         config.put("gradeCutoffs", request.gradeCutoffs());
         config.put("maintainThreshold", request.maintainThreshold());
+        config.put("businessFitOverrideThreshold",
+                request.businessFitOverrideThreshold() != null ? request.businessFitOverrideThreshold() : 60.0);
         config.put("subscoreWeights", request.subscoreWeights());
         OffsetDateTime now = OffsetDateTime.now(KST);
         try {
@@ -154,6 +157,11 @@ public class ValuationCriteriaService {
 
         if (request.maintainThreshold() < 0 || request.maintainThreshold() > 100) {
             throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "유지 권고 임계값은 0~100 사이여야 합니다.");
+        }
+
+        if (request.businessFitOverrideThreshold() != null
+                && (request.businessFitOverrideThreshold() < 0 || request.businessFitOverrideThreshold() > 100)) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "사업 연계성 오버라이드 기준값은 0~100 사이여야 합니다.");
         }
 
         for (Map.Entry<String, Set<String>> group : SUBSCORE_KEYS.entrySet()) {

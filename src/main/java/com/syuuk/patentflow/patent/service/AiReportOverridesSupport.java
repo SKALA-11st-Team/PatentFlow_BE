@@ -62,7 +62,10 @@ final class AiReportOverridesSupport {
                 overrides.judgementGrounds() != null ? overrides.judgementGrounds() : original.judgementGrounds(),
                 overrides.businessCheckRequests() != null
                         ? overrides.businessCheckRequests() : original.businessCheckRequests(),
-                original.externalSources());
+                original.externalSources(),
+                original.edited(), original.editedBy(), original.editedAt(),
+                original.editVersion(), original.editStale(), original.appliedCriteria(),
+                original.warnings(), original.evidenceConfidence());
         return withEditMeta(merged, true, state.getAiEditedBy(), state, editVersion, stale);
     }
 
@@ -77,15 +80,14 @@ final class AiReportOverridesSupport {
                 report.rawMarkdown(), report.markdownFilePath(), report.keyEvidence(), report.judgementGrounds(),
                 report.businessCheckRequests(), report.externalSources(),
                 edited, editedBy, state == null ? null : state.getAiEditedAt(), editVersion, stale,
-                report.appliedCriteria());
+                report.appliedCriteria(),
+                report.warnings(), report.evidenceConfidence());
     }
 
     static AiEvaluationReportResponse withAppliedCriteria(
-            AiEvaluationReportResponse report, Map<String, Object> appliedCriteria
+            AiEvaluationReportResponse report, Map<String, Object> appliedCriteria,
+            List<String> warnings, String evidenceConfidence
     ) {
-        if (appliedCriteria == null) {
-            return report;
-        }
         return new AiEvaluationReportResponse(
                 report.reportId(), report.createdAt(), report.recommendation(), report.recommendationReason(),
                 report.totalScore(), report.averageScore(), report.finalGrade(),
@@ -93,7 +95,9 @@ final class AiReportOverridesSupport {
                 report.rawMarkdown(), report.markdownFilePath(), report.keyEvidence(), report.judgementGrounds(),
                 report.businessCheckRequests(), report.externalSources(),
                 report.edited(), report.editedBy(), report.editedAt(), report.editVersion(), report.editStale(),
-                appliedCriteria);
+                appliedCriteria != null ? appliedCriteria : report.appliedCriteria(),
+                warnings != null ? warnings : report.warnings(),
+                evidenceConfidence != null ? evidenceConfidence : report.evidenceConfidence());
     }
 
     private static List<EvaluationScoreResponse> mergeScores(

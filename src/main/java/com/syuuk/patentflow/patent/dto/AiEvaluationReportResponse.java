@@ -32,7 +32,10 @@ public record AiEvaluationReportResponse(
         // 편집 이후 레포트가 재생성되어 편집 기준이 낡았는지 여부(경고 표시용).
         boolean editStale,
         // 이 레포트 생성에 적용된 가치평가 기준(valuationConfig) 스냅샷. 미지원 agent 응답은 null.
-        Map<String, Object> appliedCriteria
+        Map<String, Object> appliedCriteria,
+        // xcomp-be-agent-2: Agent 계약 신호(품질 경고·근거 신뢰도). 그동안 BE record 미정의로 FE까지 유실됐다.
+        List<String> warnings,
+        String evidenceConfidence
 ) {
 
     /** 편집 메타가 없는(원본 그대로) 레포트용 호환 생성자 — 기존 호출부·시드 경로가 사용한다. */
@@ -58,6 +61,6 @@ public record AiEvaluationReportResponse(
         this(reportId, createdAt, recommendation, recommendationReason, totalScore, averageScore,
                 finalGrade, degraded, failureReason, scores, missingInformation,
                 rawMarkdown, markdownFilePath, keyEvidence, judgementGrounds, businessCheckRequests,
-                externalSources, false, null, null, 0, false, null);
+                externalSources, false, null, null, 0, false, null, List.of(), null);
     }
 }

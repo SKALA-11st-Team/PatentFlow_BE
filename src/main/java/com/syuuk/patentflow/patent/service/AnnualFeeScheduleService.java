@@ -108,7 +108,9 @@ public class AnnualFeeScheduleService {
     ) {
         CountryAnnualFeeRule rule = ruleFor(country);
         LocalDate base = annualFeeBaseDate(rule, applicationDate, registrationDate);
-        if (base == null) {
+        // FEE-06: 유지료가 등록일 기준 고정 윈도우(US 등)인 국가는 등록 전엔 유지료가 발생하지 않는다.
+        // 등록일이 없으면 출원일 기준 매년 도래로 폴백하지 않고, 기산일 미확정 신호(연말)로 둔다.
+        if (base == null || (rule.hasMaintenanceWindows() && registrationDate == null)) {
             return LocalDate.of(baseDate.getYear(), 12, 31);
         }
 
@@ -269,7 +271,9 @@ public class AnnualFeeScheduleService {
     ) {
         CountryAnnualFeeRule rule = ruleFor(country);
         LocalDate basisDate = annualFeeBaseDate(rule, applicationDate, registrationDate);
-        if (basisDate == null) {
+        // FEE-06: 기산일이 없거나, 등록일 기준 유지료 윈도우(US 등)인데 미등록이면 일정을 확정할 수 없다.
+        // 미등록 유지료 국가에 출원일 기준 매년(주기 개월) 일정을 만들지 않고, 저장값이 있으면 NEXT 1줄만 노출한다.
+        if (basisDate == null || (rule.hasMaintenanceWindows() && registrationDate == null)) {
             if (effectiveNextDueDate == null) {
                 return List.of();
             }

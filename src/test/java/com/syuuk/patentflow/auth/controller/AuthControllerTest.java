@@ -173,6 +173,22 @@ class AuthControllerTest {
     }
 
     @Test
+    void logoutRequiresCsrfTokenToPreventForcedLogout() throws Exception {
+        // be-auth-3: logout은 CSRF 면제에서 제거됨 — 토큰 없는 cross-site POST는 강제 로그아웃을 일으키지 못한다.
+        String token = loginAsAdmin();
+
+        mockMvc.perform(post("/api/v1/auth/logout")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("CSRF_TOKEN_INVALID"));
+
+        // CSRF 토큰 없이 거부됐으므로 세션은 여전히 유효해야 한다.
+        mockMvc.perform(get("/api/v1/auth/me")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void businessUserCannotAccessAdminApi() throws Exception {
         ensureBusinessUser();
         String token = login("business@test.com", "business1234");

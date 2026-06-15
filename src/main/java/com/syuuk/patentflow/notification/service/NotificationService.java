@@ -127,7 +127,7 @@ public class NotificationService {
                 notification("NOTIF-002", "사업부 메일 발송 완료", "R&D본부 외 3개 사업부에 검토 요청 메일이 발송되었습니다.", "ADMIN", -2, "/admin/mailing"),
                 notification("NOTIF-003", "사업부 의견 수신", "R&D본부에서 PAT-2026-0004 특허에 대한 의견을 제출했습니다.", "ADMIN", -3, "/admin/patents/PAT-2026-0004"),
                 notification("NOTIF-005", "검토 요청 도착", "연차료 검토 요청이 도착했습니다. R&D본부 배정 특허 3건을 확인해주세요.", "BUSINESS", -1, "/business/review-requests"),
-                notification("NOTIF-006", "검토 마감일 임박", "PAT-2026-0004 특허 검토 회신 기한이 7일 후입니다.", "BUSINESS", -2, "/business/patents/PAT-2026-0004"),
+                notification("NOTIF-006", "검토 회신 기한 임박", "PAT-2026-0004 특허 검토 회신 기한이 7일 후입니다.", "BUSINESS", -2, "/business/patents/PAT-2026-0004"),
                 notification("NOTIF-007", "시스템 점검 안내", "2026-05-20 03:00~05:00 시스템 점검이 예정되어 있습니다.", COMMON, -7, null)));
     }
 
