@@ -7,6 +7,7 @@ import com.syuuk.patentflow.patent.dto.LegalActionResult;
 import com.syuuk.patentflow.patent.dto.Recommendation;
 import com.syuuk.patentflow.patent.dto.ReviewWorkflowStatus;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -43,7 +44,7 @@ public class PatentReviewHistoryEntity extends BaseEntity {
     @Column(name = "review_workflow_status", length = 64)
     private ReviewWorkflowStatus reviewWorkflowStatus;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = RecommendationConverter.class)
     @Column(name = "ai_recommendation", length = 64)
     private Recommendation aiRecommendation;
 
@@ -205,7 +206,7 @@ public class PatentReviewHistoryEntity extends BaseEntity {
     @Column(name = "business_ai_report_snapshot_json", columnDefinition = "TEXT")
     private String businessAiReportSnapshotJson;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = RecommendationConverter.class)
     @Column(name = "business_ai_recommendation", length = 64)
     private Recommendation businessAiRecommendation;
 
