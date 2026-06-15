@@ -1511,7 +1511,8 @@ public class PatentReviewService {
                         readStringList(state.getAiJudgementGroundsJson()),
                         readStringList(state.getAiBusinessCheckRequestsJson()),
                         readSourceList(state.getAiExternalSourcesJson())),
-                readCriteriaMap(state.getAiAppliedCriteriaJson()));
+                readCriteriaMap(state.getAiAppliedCriteriaJson()),
+                readStringList(state.getAiWarningsJson()), state.getAiEvidenceConfidence());
     }
 
     /**
@@ -1596,6 +1597,9 @@ public class PatentReviewService {
         state.setAiExternalSourcesJson(writeJson(report.externalSources()));
         // UI-008: 이 레포트에 적용된 가치평가 기준 스냅샷(없으면 null — 구 agent/시드 레포트).
         state.setAiAppliedCriteriaJson(report.appliedCriteria() == null ? null : writeJson(report.appliedCriteria()));
+        // xcomp-be-agent-2: Agent 계약 신호(품질 경고·근거 신뢰도) 영속.
+        state.setAiWarningsJson(writeJson(report.warnings()));
+        state.setAiEvidenceConfidence(report.evidenceConfidence());
     }
 
     private PatentSummaryResponse summaryFromHistory(PatentReviewHistoryEntity state, PatentSummaryResponse fallback) {

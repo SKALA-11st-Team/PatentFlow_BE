@@ -41,6 +41,9 @@
           "editedBy" : {
             "type" : "string"
           },
+          "evidenceConfidence" : {
+            "type" : "string"
+          },
           "externalSources" : {
             "items" : {
               "$ref" : "#/components/schemas/SourceResponse"
@@ -98,6 +101,12 @@
           "totalScore" : {
             "format" : "int32",
             "type" : "integer"
+          },
+          "warnings" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
           }
         },
         "type" : "object"

@@ -72,6 +72,13 @@ public class PatentReviewHistoryEntity extends BaseEntity {
     @Column(name = "ai_failure_reason", columnDefinition = "TEXT")
     private String aiFailureReason;
 
+    // xcomp-be-agent-2: Agent 계약 신호(품질 경고 목록 JSON / 근거 신뢰도)를 영속해 재조회 시에도 노출한다.
+    @Column(name = "ai_warnings_json", columnDefinition = "TEXT")
+    private String aiWarningsJson;
+
+    @Column(name = "ai_evidence_confidence", length = 32)
+    private String aiEvidenceConfidence;
+
     @Column(name = "ai_scores_json", columnDefinition = "TEXT")
     private String aiScoresJson;
 
@@ -330,6 +337,22 @@ public class PatentReviewHistoryEntity extends BaseEntity {
 
     public void setAiFailureReason(String aiFailureReason) {
         this.aiFailureReason = aiFailureReason;
+    }
+
+    public String getAiWarningsJson() {
+        return aiWarningsJson;
+    }
+
+    public void setAiWarningsJson(String aiWarningsJson) {
+        this.aiWarningsJson = aiWarningsJson;
+    }
+
+    public String getAiEvidenceConfidence() {
+        return aiEvidenceConfidence;
+    }
+
+    public void setAiEvidenceConfidence(String aiEvidenceConfidence) {
+        this.aiEvidenceConfidence = aiEvidenceConfidence;
     }
 
     public String getAiScoresJson() {
