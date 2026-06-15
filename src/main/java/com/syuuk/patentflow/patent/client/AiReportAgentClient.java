@@ -53,11 +53,18 @@ public class AiReportAgentClient {
     // 온디맨드/배치 모두 비동기 잡에서 호출 — 에이전트 응답에 10분 이상 소요될 수 있으므로 타임아웃을 20분으로 설정.
     // 인터랙티브 30초 evaluate 경로는 LLM 장시간 실행과 맞지 않아 제거했다.
     public AgentEvaluateResponse evaluateForBatch(String patentId) {
-        return doEvaluate(patentId, BATCH_TIMEOUT, null);
+        return doEvaluate(patentId, BATCH_TIMEOUT, null, null, null, null);
     }
 
     public AgentEvaluateResponse evaluateForBatch(String patentId, Object valuationConfig) {
-        return doEvaluate(patentId, BATCH_TIMEOUT, valuationConfig);
+        return doEvaluate(patentId, BATCH_TIMEOUT, valuationConfig, null, null, null);
+    }
+
+    // BE가 보유한 실제 관리/출원/등록번호를 함께 전달해 에이전트의 특허 식별·KIPRIS 근거수집을 가능하게 한다.
+    public AgentEvaluateResponse evaluateForBatch(String patentId, Object valuationConfig,
+            String managementNumber, String applicationNumber, String registrationNumber) {
+        return doEvaluate(patentId, BATCH_TIMEOUT, valuationConfig,
+                managementNumber, applicationNumber, registrationNumber);
     }
 
     /**
@@ -88,13 +95,27 @@ public class AiReportAgentClient {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record AgentProgress(String stage, String stageLabel, String updatedAt) {}
 
-    private AgentEvaluateResponse doEvaluate(String patentId, Duration timeout, Object valuationConfig) {
+    private AgentEvaluateResponse doEvaluate(String patentId, Duration timeout, Object valuationConfig,
+            String managementNumber, String applicationNumber, String registrationNumber) {
         try {
             String url = agentUrl + "/api/v1/ai/patents/" + patentId + "/evaluate";
-            // 구 agent는 valuationConfig를 모르는 필드로 무시한다(pydantic extra ignore) — 양방향 호환.
-            String body = valuationConfig == null
-                    ? "{}"
-                    : objectMapper.writeValueAsString(java.util.Map.of("valuationConfig", valuationConfig));
+            // 에이전트는 patentId만으로는 특허를 식별하지 못하고 자기 데이터스토어를 관리/출원/등록번호로 조회한다.
+            // BE가 보유한 실제 번호를 함께 넘겨야 KIPRIS 근거수집이 동작한다.
+            // 구 agent는 모르는 필드를 무시한다(pydantic extra ignore) — 양방향 호환. 값이 있을 때만 포함.
+            java.util.Map<String, Object> payload = new java.util.LinkedHashMap<>();
+            if (managementNumber != null && !managementNumber.isBlank()) {
+                payload.put("managementNumber", managementNumber);
+            }
+            if (applicationNumber != null && !applicationNumber.isBlank()) {
+                payload.put("applicationNumber", applicationNumber);
+            }
+            if (registrationNumber != null && !registrationNumber.isBlank()) {
+                payload.put("registrationNumber", registrationNumber);
+            }
+            if (valuationConfig != null) {
+                payload.put("valuationConfig", valuationConfig);
+            }
+            String body = objectMapper.writeValueAsString(payload);
             HttpRequest.Builder builder = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .timeout(timeout)

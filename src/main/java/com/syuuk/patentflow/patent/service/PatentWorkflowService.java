@@ -110,7 +110,8 @@ public class PatentWorkflowService {
                     "AI 레포트는 검토 진행 중(최종 처리 완료 전) 상태에서만 생성/재생성할 수 있습니다.");
         }
         AgentEvaluateResponse agentResponse =
-                aiReportAgentClient.evaluateForBatch(patentId, valuationCriteriaService.currentConfigForAgent());
+                aiReportAgentClient.evaluateForBatch(patentId, valuationCriteriaService.currentConfigForAgent(),
+                        patent.managementNumber(), patent.applicationNumber(), patent.registrationNumber());
         AiEvaluationReportResponse report = mapAgentResponse(agentResponse, patentId);
         aiReportEditService.logRegeneratedOverEdit(patentId, "SYSTEM");
         return patentReviewService.updatePatentInternal(patentId, p -> withAiReport(p, report, agentResponse.summaryText()));
