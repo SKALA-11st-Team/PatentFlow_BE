@@ -18,6 +18,9 @@ data:
   PATENTFLOW_AI_REPORT_STORAGE_DIR: "/app/storage/ai-reports"
   PATENTFLOW_COOKIE_SECURE: "true"
   PATENTFLOW_COOKIE_SAME_SITE: "None"
+  # be-common-infra-1: ALB 단일 프록시(1홉) 뒤이므로 X-Forwarded-For의 '뒤에서 1번째'를 실제
+  # 클라이언트 IP로 채택한다(위조 불가 hop). 레이트리밋 키가 ALB IP로 뭉뚱그려지지 않게 한다.
+  PATENTFLOW_RATELIMIT_TRUSTED_PROXY_COUNT: "1"
   # SEC-12(BE-07): 운영에서 swagger/api-docs 전면 비활성화 — ADMIN 게이트에 더한 심층 방어.
   SPRINGDOC_ENABLED: "false"
   # 인증/세션 공유·영속 스토어(토큰 폐기·로그인 락아웃). Redis는 BE와 별도 StatefulSet 파드
