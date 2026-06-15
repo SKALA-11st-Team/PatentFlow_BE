@@ -260,7 +260,8 @@ public class SettingsController {
                             rule.basis(),
                             rule.initialLumpYears(),
                             rule.cycleMonths(),
-                            rule.label());
+                            rule.label(),
+                            rule.hasMaintenanceWindows());
                 })
                 .toList());
     }
@@ -282,7 +283,8 @@ public class SettingsController {
                 rule.basis(),
                 rule.initialLumpYears(),
                 rule.cycleMonths(),
-                rule.label()));
+                rule.label(),
+                rule.hasMaintenanceWindows()));
     }
 
     // ── 분류 ─────────────────────────────────────────────────

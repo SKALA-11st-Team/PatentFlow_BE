@@ -1846,6 +1846,12 @@
             },
             "type" : "array"
           },
+          "snapshotScores" : {
+            "items" : {
+              "$ref" : "#/components/schemas/EvaluationScoreResponse"
+            },
+            "type" : "array"
+          },
           "submissionId" : {
             "type" : "string"
           },
@@ -2140,6 +2146,9 @@
           "cycleMonths" : {
             "format" : "int32",
             "type" : "integer"
+          },
+          "fixedSchedule" : {
+            "type" : "boolean"
           },
           "initialLumpYears" : {
             "format" : "int32",

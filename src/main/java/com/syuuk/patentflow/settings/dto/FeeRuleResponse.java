@@ -10,6 +10,8 @@ public record FeeRuleResponse(
         String basis,
         int initialLumpYears,
         int cycleMonths,
-        String ruleLabel
+        String ruleLabel,
+        // fe-admin-settings-3: 고정 유지료 일정(US 등)이라 기산일·일괄 연차 편집이 무시되는지 여부.
+        boolean fixedSchedule
 ) {
 }

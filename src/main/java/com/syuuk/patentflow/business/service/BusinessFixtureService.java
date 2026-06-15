@@ -10,7 +10,9 @@ import com.syuuk.patentflow.business.dto.BusinessSubmissionVersionResponse;
 import com.syuuk.patentflow.common.error.ErrorCode;
 import com.syuuk.patentflow.common.error.PatentFlowException;
 import com.syuuk.patentflow.patent.domain.PatentReviewHistoryEntity;
+import com.syuuk.patentflow.patent.dto.AiEvaluationReportResponse;
 import com.syuuk.patentflow.patent.dto.BusinessOpinionDecision;
+import com.syuuk.patentflow.patent.dto.EvaluationScoreResponse;
 import com.syuuk.patentflow.patent.dto.PatentDetailResponse;
 import com.syuuk.patentflow.patent.dto.Recommendation;
 import com.syuuk.patentflow.notification.service.NotificationService;
@@ -142,7 +144,8 @@ public class BusinessFixtureService {
                 valueOrZero(entity.getBusinessQualitativeScore()),
                 entity.getBusinessQualitativeMemo(),
                 entity.getBusinessAdditionalNeeds(),
-                entity.getBusinessEvaluatedAt());
+                entity.getBusinessEvaluatedAt(),
+                readSnapshotScores(entity.getBusinessAiReportSnapshotJson()));
     }
 
     private void applySubmission(PatentReviewHistoryEntity history, BusinessSubmissionVersionResponse submission) {
@@ -202,6 +205,19 @@ public class BusinessFixtureService {
         }
     }
 
+    // fe-components-2: 제출 시점 AI 레포트 스냅샷에서 축별 점수를 복원한다(손상 JSON은 빈 목록으로 폴백).
+    private List<EvaluationScoreResponse> readSnapshotScores(String json) {
+        if (json == null || json.isBlank()) {
+            return List.of();
+        }
+        try {
+            AiEvaluationReportResponse snapshot = objectMapper.readValue(json, AiEvaluationReportResponse.class);
+            return snapshot.scores() == null ? List.of() : snapshot.scores();
+        } catch (Exception exception) {
+            return List.of();
+        }
+    }
+
     private BusinessSubmissionVersionResponse toVersion(
             String patentId,
             BusinessChecklistSubmissionRequest request,
@@ -238,7 +254,8 @@ public class BusinessFixtureService {
                 request.qualitativeScore(),
                 request.qualitativeMemo(),
                 request.additionalNeeds(),
-                request.evaluatedAt());
+                request.evaluatedAt(),
+                List.of());
     }
 
     private BusinessSubmissionVersionResponse toSeedVersion(PatentDetailResponse patent) {
@@ -263,7 +280,8 @@ public class BusinessFixtureService {
                 qualitativeScore,
                 null,
                 null,
-                null);
+                null,
+                List.of());
     }
 
     private String submissionId(String patentId) {
