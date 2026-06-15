@@ -415,6 +415,15 @@ public class SystemSettingsService {
         }
         values = normalizedClassificationValues(values);
         setForUpdate(classificationKey(normalizedType), writeClassificationValues(values));
+        // 재명명 캐스케이드: 기존 값을 가진 특허의 분야 참조(business_area/technology_area)를 일괄 갱신해
+        // 기준 목록에서 사라진 고아 값을 막는다. (be-settings-4)
+        if (index >= 0 && !normalizedCurrent.equals(normalizedNext)) {
+            if ("BUSINESS".equals(normalizedType)) {
+                patentMetadataRepository.renameBusinessArea(normalizedCurrent, normalizedNext);
+            } else {
+                patentMetadataRepository.renameTechnologyArea(normalizedCurrent, normalizedNext);
+            }
+        }
         return new ClassificationResponse(normalizedType, values);
     }
 

@@ -78,7 +78,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 response.setCharacterEncoding("UTF-8");
                 objectMapper.writeValue(
                         response.getWriter(),
-                        ErrorResponse.of(ErrorCode.LOGIN_LOCKED, "요청이 너무 많습니다. 잠시 후 다시 시도해주세요."));
+                        ErrorResponse.of(ErrorCode.RATE_LIMITED, "요청이 너무 많습니다. 잠시 후 다시 시도해주세요."));
                 return;
             }
         }

@@ -38,5 +38,6 @@ public class UserDetailsImpl implements UserDetails {
     @Override public boolean isAccountNonExpired() { return true; }
     @Override public boolean isAccountNonLocked() { return true; }
     @Override public boolean isCredentialsNonExpired() { return true; }
-    @Override public boolean isEnabled() { return true; }
+    // ACTIVE만 로그인 허용 — 초대 재발송(PENDING)·회수(INACTIVE) 계정은 비밀번호 로그인이 차단된다.
+    @Override public boolean isEnabled() { return "ACTIVE".equals(user.getStatus()); }
 }

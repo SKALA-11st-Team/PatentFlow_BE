@@ -39,25 +39,33 @@ public class ReviewReminderScheduler {
     private final SystemSettingsService systemSettingsService;
     private final NotificationService notificationService;
     private final NotificationRepository notificationRepository;
+    private final SchedulerLockService schedulerLockService;
 
     public ReviewReminderScheduler(
             PatentMetadataRepository patentMetadataRepository,
             PatentReviewHistoryRepository reviewHistoryRepository,
             SystemSettingsService systemSettingsService,
             NotificationService notificationService,
-            NotificationRepository notificationRepository
+            NotificationRepository notificationRepository,
+            SchedulerLockService schedulerLockService
     ) {
         this.patentMetadataRepository = patentMetadataRepository;
         this.reviewHistoryRepository = reviewHistoryRepository;
         this.systemSettingsService = systemSettingsService;
         this.notificationService = notificationService;
         this.notificationRepository = notificationRepository;
+        this.schedulerLockService = schedulerLockService;
     }
 
     @Scheduled(cron = "0 10 0 * * *", zone = "Asia/Seoul")
     @Transactional
     public void run() {
         LocalDate today = LocalDate.now(KST);
+        // 멀티 replica 중복 발행 방지: 오늘자 실행을 DB 락으로 단일 인스턴스만 수행한다.
+        if (!schedulerLockService.tryClaim("review-reminder", today)) {
+            log.info("[ReviewReminder] another instance already claimed today's run ({}); skipping.", today);
+            return;
+        }
         remindReviewStart(today);
         escalateResponseDeadline(today);
     }

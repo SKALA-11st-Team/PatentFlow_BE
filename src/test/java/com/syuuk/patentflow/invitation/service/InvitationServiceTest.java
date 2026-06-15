@@ -86,7 +86,7 @@ class InvitationServiceTest {
     void accept_expiredPending_rejectsWithInvalidState() {
         OffsetDateTime expiredAt = OffsetDateTime.now(KST).minusDays(1);
         InvitationEntity invitation = pendingInvitation("USR-3", expiredAt);
-        when(invitationRepository.findByTokenHash(any())).thenReturn(Optional.of(invitation));
+        when(invitationRepository.findByTokenHashForUpdate(any())).thenReturn(Optional.of(invitation));
 
         org.assertj.core.api.Assertions
                 .assertThatThrownBy(() -> service.accept("raw-token", "newPassword1!"))
@@ -101,7 +101,7 @@ class InvitationServiceTest {
         OffsetDateTime futureExpiry = OffsetDateTime.now(KST).plusDays(3);
         InvitationEntity invitation = pendingInvitation("USR-4", futureExpiry);
         UserEntity user = new UserEntity("USR-4", "biz@patentflow.live", "old", "BUSINESS", "DEPT-1", "biz");
-        when(invitationRepository.findByTokenHash(any())).thenReturn(Optional.of(invitation));
+        when(invitationRepository.findByTokenHashForUpdate(any())).thenReturn(Optional.of(invitation));
         when(userRepository.findById("USR-4")).thenReturn(Optional.of(user));
         when(passwordEncoder.encode("newPassword1!")).thenReturn("encoded");
 

@@ -15,6 +15,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -38,6 +39,7 @@ public class AiReportJobService {
     private final PatentReviewService patentReviewService;
     private final PatentWorkflowService workflowService;
     private final Executor aiReportBatchExecutor;
+    private final Executor aiReportOnDemandExecutor;
     private final ApplicationEventPublisher eventPublisher;
     private final AiReportAgentClient agentClient;
     private final SystemSettingsService systemSettingsService;
@@ -47,6 +49,7 @@ public class AiReportJobService {
             PatentReviewService patentReviewService,
             PatentWorkflowService workflowService,
             @Qualifier("aiReportBatchExecutor") Executor aiReportBatchExecutor,
+            @Qualifier("aiReportOnDemandExecutor") Executor aiReportOnDemandExecutor,
             ApplicationEventPublisher eventPublisher,
             AiReportAgentClient agentClient,
             SystemSettingsService systemSettingsService
@@ -55,6 +58,7 @@ public class AiReportJobService {
         this.patentReviewService = patentReviewService;
         this.workflowService = workflowService;
         this.aiReportBatchExecutor = aiReportBatchExecutor;
+        this.aiReportOnDemandExecutor = aiReportOnDemandExecutor;
         this.eventPublisher = eventPublisher;
         this.agentClient = agentClient;
         this.systemSettingsService = systemSettingsService;
@@ -99,7 +103,15 @@ public class AiReportJobService {
                     .map(this::toResponse)
                     .orElseThrow(() -> duplicate);
         }
-        aiReportBatchExecutor.execute(() -> runJob(job.getJobId()));
+        // 온디맨드 잡은 배치 풀과 분리된 aiReportOnDemandExecutor에 제출한다(배치가 스레드를 장시간
+        // 점유해도 굶지 않음). 풀+큐 포화로 거부되면 잡을 PENDING으로 남겨 orphan cleaner/재요청이
+        // 처리하게 하고 HTTP 스레드를 블로킹하지 않는다.
+        try {
+            aiReportOnDemandExecutor.execute(() -> runJob(job.getJobId()));
+        } catch (RejectedExecutionException rejected) {
+            log.warn("[AiReportJob] on-demand executor saturated; leaving job {} PENDING: {}",
+                    job.getJobId(), rejected.getMessage());
+        }
         return toResponse(job);
     }
 

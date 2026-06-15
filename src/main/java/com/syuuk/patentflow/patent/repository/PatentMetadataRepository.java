@@ -6,12 +6,23 @@ import java.time.LocalDate;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface PatentMetadataRepository extends JpaRepository<PatentMetadataEntity, String>, JpaSpecificationExecutor<PatentMetadataEntity> {
 
     // F6: 특허 패밀리 — 같은 관리번호 계열(P201103001-KR0 / -US0 등) 조회.
     java.util.List<PatentMetadataEntity> findByManagementNumberStartingWithOrderByManagementNumberAsc(String prefix);
+
+    // FR-LEGAL-25: 분류 재명명 캐스케이드 — 특허의 분야 참조를 일괄 갱신해 고아 참조를 막는다.
+    @Modifying(clearAutomatically = true)
+    @Query("update PatentMetadataEntity p set p.businessArea = :next where p.businessArea = :current")
+    int renameBusinessArea(@Param("current") String current, @Param("next") String next);
+
+    @Modifying(clearAutomatically = true)
+    @Query("update PatentMetadataEntity p set p.technologyArea = :next where p.technologyArea = :current")
+    int renameTechnologyArea(@Param("current") String current, @Param("next") String next);
 
     @Query("""
             select coalesce(max(cast(substring(p.patentId, 10) as integer)), 0)

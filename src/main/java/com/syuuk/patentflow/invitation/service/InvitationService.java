@@ -92,7 +92,7 @@ public class InvitationService {
         if (newPassword == null || newPassword.isBlank()) {
             throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "새 비밀번호를 입력해 주세요.");
         }
-        InvitationEntity invitation = invitationRepository.findByTokenHash(sha256Hex(rawToken))
+        InvitationEntity invitation = invitationRepository.findByTokenHashForUpdate(sha256Hex(rawToken))
                 .orElseThrow(() -> new PatentFlowException(ErrorCode.INVALID_REQUEST, "유효하지 않은 초대 링크입니다."));
         InvitationStatus effective = lazyExpire(invitation);
         if (effective != InvitationStatus.PENDING) {

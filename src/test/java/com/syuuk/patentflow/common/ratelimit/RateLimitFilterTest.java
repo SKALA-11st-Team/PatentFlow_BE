@@ -64,7 +64,7 @@ class RateLimitFilterTest {
         verify(blockedChain, never()).doFilter(any(), any());
         verify(blockedResponse).setStatus(429);
         // 429 바디는 표준 ErrorResponse 스키마(code/message/details/timestamp)이며 code는 ErrorCode enum 값이다.
-        assertThat(body.toString()).contains("LOGIN_LOCKED").contains("timestamp").contains("details");
+        assertThat(body.toString()).contains("RATE_LIMITED").contains("timestamp").contains("details");
     }
 
     @Test

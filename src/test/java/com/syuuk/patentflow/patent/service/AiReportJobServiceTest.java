@@ -34,6 +34,7 @@ class AiReportJobServiceTest {
     private final PatentReviewService patentReviewService = mock(PatentReviewService.class);
     private final PatentWorkflowService workflowService = mock(PatentWorkflowService.class);
     private final Executor aiReportBatchExecutor = mock(Executor.class);
+    private final Executor aiReportOnDemandExecutor = mock(Executor.class);
     private final ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
     private final AiReportAgentClient agentClient = mock(AiReportAgentClient.class);
     private final SystemSettingsService systemSettingsService = mock(SystemSettingsService.class);
@@ -43,6 +44,7 @@ class AiReportJobServiceTest {
             patentReviewService,
             workflowService,
             aiReportBatchExecutor,
+            aiReportOnDemandExecutor,
             eventPublisher,
             agentClient,
             systemSettingsService);

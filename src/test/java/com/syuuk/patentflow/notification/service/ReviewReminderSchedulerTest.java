@@ -36,13 +36,21 @@ class ReviewReminderSchedulerTest {
     private final SystemSettingsService systemSettingsService = mock(SystemSettingsService.class);
     private final NotificationService notificationService = mock(NotificationService.class);
     private final NotificationRepository notificationRepository = mock(NotificationRepository.class);
+    private final SchedulerLockService schedulerLockService = mock(SchedulerLockService.class);
 
     private final ReviewReminderScheduler scheduler = new ReviewReminderScheduler(
             patentMetadataRepository,
             reviewHistoryRepository,
             systemSettingsService,
             notificationService,
-            notificationRepository);
+            notificationRepository,
+            schedulerLockService);
+
+    @org.junit.jupiter.api.BeforeEach
+    void allowSchedulerLock() {
+        when(schedulerLockService.tryClaim(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(true);
+    }
 
     @Test
     void publishesReviewStartReminderWhenPatentIsDueToday() {
