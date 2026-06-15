@@ -3611,6 +3611,10 @@
             },
             "type" : "object"
           },
+          "businessFitOverrideThreshold" : {
+            "format" : "double",
+            "type" : "number"
+          },
           "gradeCutoffs" : {
             "additionalProperties" : {
               "format" : "double",
