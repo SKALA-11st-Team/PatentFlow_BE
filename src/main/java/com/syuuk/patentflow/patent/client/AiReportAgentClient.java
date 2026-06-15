@@ -2,6 +2,7 @@ package com.syuuk.patentflow.patent.client;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.syuuk.patentflow.patent.dto.PatentDetailResponse;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -50,21 +51,27 @@ public class AiReportAgentClient {
         }
     }
 
+    // null/공백 문자열은 본문에서 제외한다(에이전트는 누락 필드를 무시 — 양방향 호환).
+    private static void putIfPresent(java.util.Map<String, Object> target, String key, String value) {
+        if (value != null && !value.isBlank()) {
+            target.put(key, value);
+        }
+    }
+
     // 온디맨드/배치 모두 비동기 잡에서 호출 — 에이전트 응답에 10분 이상 소요될 수 있으므로 타임아웃을 20분으로 설정.
     // 인터랙티브 30초 evaluate 경로는 LLM 장시간 실행과 맞지 않아 제거했다.
     public AgentEvaluateResponse evaluateForBatch(String patentId) {
-        return doEvaluate(patentId, BATCH_TIMEOUT, null, null, null, null);
+        return doEvaluate(patentId, BATCH_TIMEOUT, null, null);
     }
 
     public AgentEvaluateResponse evaluateForBatch(String patentId, Object valuationConfig) {
-        return doEvaluate(patentId, BATCH_TIMEOUT, valuationConfig, null, null, null);
+        return doEvaluate(patentId, BATCH_TIMEOUT, valuationConfig, null);
     }
 
-    // BE가 보유한 실제 관리/출원/등록번호를 함께 전달해 에이전트의 특허 식별·KIPRIS 근거수집을 가능하게 한다.
-    public AgentEvaluateResponse evaluateForBatch(String patentId, Object valuationConfig,
-            String managementNumber, String applicationNumber, String registrationNumber) {
-        return doEvaluate(patentId, BATCH_TIMEOUT, valuationConfig,
-                managementNumber, applicationNumber, registrationNumber);
+    // BE(공유 PG)가 보유한 특허 번호·메타데이터를 함께 전달한다. 에이전트는 patentId만으로는 특허를 식별하지
+    // 못하므로, 이 정보로 식별·patent_structured 구성·KIPRIS 근거수집을 수행한다.
+    public AgentEvaluateResponse evaluateForBatch(String patentId, Object valuationConfig, PatentDetailResponse patent) {
+        return doEvaluate(patentId, BATCH_TIMEOUT, valuationConfig, patent);
     }
 
     /**
@@ -96,21 +103,33 @@ public class AiReportAgentClient {
     public record AgentProgress(String stage, String stageLabel, String updatedAt) {}
 
     private AgentEvaluateResponse doEvaluate(String patentId, Duration timeout, Object valuationConfig,
-            String managementNumber, String applicationNumber, String registrationNumber) {
+            PatentDetailResponse patent) {
         try {
             String url = agentUrl + "/api/v1/ai/patents/" + patentId + "/evaluate";
-            // 에이전트는 patentId만으로는 특허를 식별하지 못하고 자기 데이터스토어를 관리/출원/등록번호로 조회한다.
-            // BE가 보유한 실제 번호를 함께 넘겨야 KIPRIS 근거수집이 동작한다.
+            // 에이전트는 patentId만으로는 특허를 식별하지 못한다. BE(공유 PG)가 보유한 번호와 메타데이터를 함께 보내면
+            // 에이전트는 로컬 SQLite 조회 없이 patent_structured를 구성하고, 번호로 KIPRIS 본문을 수집한다.
             // 구 agent는 모르는 필드를 무시한다(pydantic extra ignore) — 양방향 호환. 값이 있을 때만 포함.
             java.util.Map<String, Object> payload = new java.util.LinkedHashMap<>();
-            if (managementNumber != null && !managementNumber.isBlank()) {
-                payload.put("managementNumber", managementNumber);
-            }
-            if (applicationNumber != null && !applicationNumber.isBlank()) {
-                payload.put("applicationNumber", applicationNumber);
-            }
-            if (registrationNumber != null && !registrationNumber.isBlank()) {
-                payload.put("registrationNumber", registrationNumber);
+            if (patent != null) {
+                putIfPresent(payload, "managementNumber", patent.managementNumber());
+                putIfPresent(payload, "applicationNumber", patent.applicationNumber());
+                putIfPresent(payload, "registrationNumber", patent.registrationNumber());
+                java.util.Map<String, Object> meta = new java.util.LinkedHashMap<>();
+                putIfPresent(meta, "title", patent.title());
+                putIfPresent(meta, "draftTitle", patent.draftTitle());
+                putIfPresent(meta, "businessArea", patent.businessArea());
+                putIfPresent(meta, "technologyArea", patent.technologyArea());
+                putIfPresent(meta, "productName", patent.productName());
+                putIfPresent(meta, "country", patent.country());
+                putIfPresent(meta, "coApplicants", patent.coApplicants());
+                meta.put("jointApplication", patent.jointApplication());
+                putIfPresent(meta, "applicationDate",
+                        patent.applicationDate() == null ? null : patent.applicationDate().toString());
+                putIfPresent(meta, "registrationDate",
+                        patent.registrationDate() == null ? null : patent.registrationDate().toString());
+                putIfPresent(meta, "expectedExpirationDate",
+                        patent.expectedExpirationDate() == null ? null : patent.expectedExpirationDate().toString());
+                payload.put("patent", meta);
             }
             if (valuationConfig != null) {
                 payload.put("valuationConfig", valuationConfig);
