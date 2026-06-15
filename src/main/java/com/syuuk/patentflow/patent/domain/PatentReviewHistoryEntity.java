@@ -80,6 +80,13 @@ public class PatentReviewHistoryEntity extends BaseEntity {
     @Column(name = "ai_evidence_confidence", length = 32)
     private String aiEvidenceConfidence;
 
+    // AIREPORT-RICH: 에이전트가 FE 렌더링용으로 구조화한 필드(요약 카드/섹션별 본문) 영속 — 재조회 시 유실 방지.
+    @Column(name = "ai_summary_brief_json", columnDefinition = "TEXT")
+    private String aiSummaryBriefJson;
+
+    @Column(name = "ai_report_sections_json", columnDefinition = "TEXT")
+    private String aiReportSectionsJson;
+
     @Column(name = "ai_scores_json", columnDefinition = "TEXT")
     private String aiScoresJson;
 
@@ -354,6 +361,22 @@ public class PatentReviewHistoryEntity extends BaseEntity {
 
     public void setAiEvidenceConfidence(String aiEvidenceConfidence) {
         this.aiEvidenceConfidence = aiEvidenceConfidence;
+    }
+
+    public String getAiSummaryBriefJson() {
+        return aiSummaryBriefJson;
+    }
+
+    public void setAiSummaryBriefJson(String aiSummaryBriefJson) {
+        this.aiSummaryBriefJson = aiSummaryBriefJson;
+    }
+
+    public String getAiReportSectionsJson() {
+        return aiReportSectionsJson;
+    }
+
+    public void setAiReportSectionsJson(String aiReportSectionsJson) {
+        this.aiReportSectionsJson = aiReportSectionsJson;
     }
 
     public String getAiScoresJson() {

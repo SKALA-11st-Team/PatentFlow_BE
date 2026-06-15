@@ -482,7 +482,8 @@ public class PatentWorkflowService {
                         scores, nullSafeList(agent.missingInformation()), rawMarkdown, markdownFilePath,
                         agent.keyEvidence(), nullSafeList(agent.judgementGrounds()),
                         nullSafeList(agent.businessCheckRequests()), toSourceResponses(agent.externalSources())),
-                agent.appliedValuationConfig(), nullSafeList(agent.warnings()), agent.evidenceConfidence());
+                agent.appliedValuationConfig(), nullSafeList(agent.warnings()), agent.evidenceConfidence(),
+                agent.summaryBrief(), agent.reportSections());
     }
 
     private static <T> List<T> nullSafeList(List<T> value) {

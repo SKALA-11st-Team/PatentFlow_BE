@@ -22,6 +22,7 @@ import com.syuuk.patentflow.patent.repository.PatentReviewHistoryRepository;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -156,6 +157,23 @@ class PatentWorkflowServiceMapAgentResponseTest {
         assertThat(report.rawMarkdown()).startsWith("# AI 특허 평가 레포트");
         assertThat(report.rawMarkdown()).contains("# 특허 요약 한 줄");
         assertThat(report.rawMarkdown()).contains("## 평가 점수");
+    }
+
+    @Test
+    void richStructuredFieldsArePassedThrough() {
+        // AIREPORT-RICH: 에이전트의 summaryBrief(카드)·reportSections(섹션 본문)이 DTO까지 풀스루되는지 락한다.
+        Map<String, Object> brief = Map.of("one_line_summary", "한 줄 요약");
+        Map<String, String> sections = Map.of("finalOpinion", "최종 검토 의견 본문");
+        AgentEvaluateResponse agent = new AgentEvaluateResponse(
+                "PAT-VAL09", List.of(score("권리성", 70)), "유지 권고", "요약", "# 보고서",
+                70, null, "B", null, false, null,
+                List.of(), null, OffsetDateTime.now(),
+                List.of(), null, List.of(), List.of(), List.of(), brief, sections, null);
+
+        AiEvaluationReportResponse report = service.mapAgentResponse(agent, "PAT-VAL09");
+
+        assertThat(report.summaryBrief()).containsEntry("one_line_summary", "한 줄 요약");
+        assertThat(report.reportSections()).containsEntry("finalOpinion", "최종 검토 의견 본문");
     }
 
     private PatentDetailResponse reviewStartedPatent() {

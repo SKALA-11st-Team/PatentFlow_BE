@@ -35,7 +35,12 @@ public record AiEvaluationReportResponse(
         Map<String, Object> appliedCriteria,
         // xcomp-be-agent-2: Agent 계약 신호(품질 경고·근거 신뢰도). 그동안 BE record 미정의로 FE까지 유실됐다.
         List<String> warnings,
-        String evidenceConfidence
+        String evidenceConfidence,
+        // AIREPORT-RICH: 에이전트가 FE 렌더링용으로 구조화한 필드. 그동안 DTO 미정의로 FE까지 유실됐다.
+        // summaryBrief 키: one_line_summary·problem·core_idea·key_components[]·operation_steps[]·expected_effect.
+        // reportSections 키: evaluationScope·judgmentBasis·axisDetails·roleChecklist·finalOpinion(섹션별 본문).
+        Map<String, Object> summaryBrief,
+        Map<String, String> reportSections
 ) {
 
     /** 편집 메타가 없는(원본 그대로) 레포트용 호환 생성자 — 기존 호출부·시드 경로가 사용한다. */
@@ -61,6 +66,6 @@ public record AiEvaluationReportResponse(
         this(reportId, createdAt, recommendation, recommendationReason, totalScore, averageScore,
                 finalGrade, degraded, failureReason, scores, missingInformation,
                 rawMarkdown, markdownFilePath, keyEvidence, judgementGrounds, businessCheckRequests,
-                externalSources, false, null, null, 0, false, null, List.of(), null);
+                externalSources, false, null, null, 0, false, null, List.of(), null, Map.of(), Map.of());
     }
 }

@@ -1512,7 +1512,8 @@ public class PatentReviewService {
                         readStringList(state.getAiBusinessCheckRequestsJson()),
                         readSourceList(state.getAiExternalSourcesJson())),
                 readCriteriaMap(state.getAiAppliedCriteriaJson()),
-                readStringList(state.getAiWarningsJson()), state.getAiEvidenceConfidence());
+                readStringList(state.getAiWarningsJson()), state.getAiEvidenceConfidence(),
+                readCriteriaMap(state.getAiSummaryBriefJson()), readStringMap(state.getAiReportSectionsJson()));
     }
 
     /**
@@ -1539,6 +1540,19 @@ public class PatentReviewService {
         }
         try {
             return objectMapper.readValue(value, new TypeReference<>() {
+            });
+        } catch (Exception exception) {
+            return null;
+        }
+    }
+
+    // AIREPORT-RICH: reportSections(섹션키→본문) Map<String,String> 역직렬화.
+    private java.util.Map<String, String> readStringMap(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(value, new TypeReference<java.util.Map<String, String>>() {
             });
         } catch (Exception exception) {
             return null;
@@ -1600,6 +1614,9 @@ public class PatentReviewService {
         // xcomp-be-agent-2: Agent 계약 신호(품질 경고·근거 신뢰도) 영속.
         state.setAiWarningsJson(writeJson(report.warnings()));
         state.setAiEvidenceConfidence(report.evidenceConfidence());
+        // AIREPORT-RICH: FE 렌더링용 구조화 요약/섹션 본문 영속.
+        state.setAiSummaryBriefJson(report.summaryBrief() == null ? null : writeJson(report.summaryBrief()));
+        state.setAiReportSectionsJson(report.reportSections() == null ? null : writeJson(report.reportSections()));
     }
 
     private PatentSummaryResponse summaryFromHistory(PatentReviewHistoryEntity state, PatentSummaryResponse fallback) {

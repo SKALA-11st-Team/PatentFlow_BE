@@ -65,7 +65,8 @@ final class AiReportOverridesSupport {
                 original.externalSources(),
                 original.edited(), original.editedBy(), original.editedAt(),
                 original.editVersion(), original.editStale(), original.appliedCriteria(),
-                original.warnings(), original.evidenceConfidence());
+                original.warnings(), original.evidenceConfidence(),
+                original.summaryBrief(), original.reportSections());
         return withEditMeta(merged, true, state.getAiEditedBy(), state, editVersion, stale);
     }
 
@@ -81,12 +82,14 @@ final class AiReportOverridesSupport {
                 report.businessCheckRequests(), report.externalSources(),
                 edited, editedBy, state == null ? null : state.getAiEditedAt(), editVersion, stale,
                 report.appliedCriteria(),
-                report.warnings(), report.evidenceConfidence());
+                report.warnings(), report.evidenceConfidence(),
+                report.summaryBrief(), report.reportSections());
     }
 
     static AiEvaluationReportResponse withAppliedCriteria(
             AiEvaluationReportResponse report, Map<String, Object> appliedCriteria,
-            List<String> warnings, String evidenceConfidence
+            List<String> warnings, String evidenceConfidence,
+            Map<String, Object> summaryBrief, Map<String, String> reportSections
     ) {
         return new AiEvaluationReportResponse(
                 report.reportId(), report.createdAt(), report.recommendation(), report.recommendationReason(),
@@ -97,7 +100,9 @@ final class AiReportOverridesSupport {
                 report.edited(), report.editedBy(), report.editedAt(), report.editVersion(), report.editStale(),
                 appliedCriteria != null ? appliedCriteria : report.appliedCriteria(),
                 warnings != null ? warnings : report.warnings(),
-                evidenceConfidence != null ? evidenceConfidence : report.evidenceConfidence());
+                evidenceConfidence != null ? evidenceConfidence : report.evidenceConfidence(),
+                summaryBrief != null ? summaryBrief : report.summaryBrief(),
+                reportSections != null ? reportSections : report.reportSections());
     }
 
     private static List<EvaluationScoreResponse> mergeScores(
