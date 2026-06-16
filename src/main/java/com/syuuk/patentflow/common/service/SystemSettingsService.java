@@ -48,7 +48,7 @@ public class SystemSettingsService {
             "TW", "대만 (TW)"
     );
     private static final int DEFAULT_EXTENSION_MONTHS = 12;
-    private static final int DEFAULT_MAIL_LEAD_MONTHS = 2;
+    private static final int DEFAULT_MAIL_LEAD_MONTHS = 3;
     private static final int DEFAULT_RESPONSE_DEADLINE_MONTHS = 1;
     private static final int DEFAULT_RESPONSE_DEADLINE_DAYS = 0;
     private static final int DEFAULT_INVITATION_TTL_DAYS = 7;
