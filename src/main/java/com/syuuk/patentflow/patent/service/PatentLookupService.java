@@ -1,5 +1,7 @@
 package com.syuuk.patentflow.patent.service;
 
+import com.syuuk.patentflow.common.error.ErrorCode;
+import com.syuuk.patentflow.common.error.PatentFlowException;
 import com.syuuk.patentflow.patent.client.GooglePatentsLookupClient;
 import com.syuuk.patentflow.patent.client.KiprisPatentLookupClient;
 import com.syuuk.patentflow.patent.client.PatentLookupException;
@@ -59,7 +61,9 @@ public class PatentLookupService {
             List<PatentDetailResponse> allPatents
     ) {
         String lookupValue = firstNonBlank(applicationNumber, firstNonBlank(registrationNumber, managementNumber));
-        if (lookupValue == null) return null;
+        if (lookupValue == null) {
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "관리번호, 출원번호, 등록번호 중 하나를 입력해주세요.");
+        }
 
         String keyword = lookupValue.trim().toLowerCase(Locale.ROOT);
         PatentDetailResponse knownPatent = allPatents.stream()
@@ -73,8 +77,8 @@ public class PatentLookupService {
 
         PatentLookupQuery query = new PatentLookupQuery(
                 knownPatent == null ? lookupValue.trim() : knownPatent.managementNumber(),
-                knownPatent == null ? firstNonBlank(applicationNumber, lookupValue.trim()) : knownPatent.applicationNumber(),
-                knownPatent == null ? registrationNumber : knownPatent.registrationNumber(),
+                knownPatent == null ? firstNonBlank(applicationNumber, lookupValue.trim()) : firstNonBlank(knownPatent.applicationNumber(), applicationNumber),
+                knownPatent == null ? registrationNumber : firstNonBlank(knownPatent.registrationNumber(), registrationNumber),
                 knownPatent == null ? "KR" : knownPatent.country());
 
         PatentLookupException lastLookupException = null;
