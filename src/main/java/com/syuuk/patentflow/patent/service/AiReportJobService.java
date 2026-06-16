@@ -76,11 +76,6 @@ public class AiReportJobService {
         }
 
         PatentDetailResponse patent = patentReviewService.findPatent(patentId);
-        // FR-LEGAL-06/18: 최초 생성뿐 아니라 진행 상태(레포트 존재)에서도 법무팀·사업부가 재생성할 수 있다.
-        if (!PatentWorkflowService.AI_REPORT_GENERATABLE_STATUSES.contains(patent.reviewWorkflowStatus())) {
-            throw new PatentFlowException(ErrorCode.INVALID_WORKFLOW_STATUS,
-                    "AI 레포트는 검토 진행 중(최종 처리 완료 전) 상태에서만 생성/재생성할 수 있습니다.");
-        }
 
         AiReportJobEntity existing = jobRepository
                 .findFirstByPatentIdAndStatusInOrderByRequestedAtDesc(patentId, ACTIVE_STATUSES)

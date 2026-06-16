@@ -53,18 +53,6 @@ public class PatentWorkflowService {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
-    /**
-     * FR-LEGAL-06/18: AI 레포트 (재)생성이 허용되는 검토 워크플로우 상태.
-     * 최초 생성(REVIEW_QUARTER_STARTED)뿐 아니라 레포트가 이미 존재하는 진행 상태(MAIL_READY,
-     * WAITING_BUSINESS_RESPONSE, BUSINESS_RESPONSE_RECEIVED)에서 법무팀·사업부가 재생성할 수 있다.
-     * 최종 처리 완료(LEGAL_ACTION_RECORDED)와 검토 분기 아님(NOT_IN_REVIEW)은 제외해 완료 기록을 보호한다.
-     */
-    public static final java.util.Set<ReviewWorkflowStatus> AI_REPORT_GENERATABLE_STATUSES = java.util.EnumSet.of(
-            ReviewWorkflowStatus.REVIEW_QUARTER_STARTED,
-            ReviewWorkflowStatus.MAIL_READY,
-            ReviewWorkflowStatus.WAITING_BUSINESS_RESPONSE,
-            ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED);
-
     // @Lazy: PatentReviewService ↔ PatentWorkflowService 순환 의존성을 런타임 프록시로 해소
     private final PatentReviewService patentReviewService;
     private final PatentMetadataRepository patentMetadataRepository;
@@ -105,10 +93,6 @@ public class PatentWorkflowService {
     // 인터랙티브 30초 동기 경로는 LLM 장시간 실행과 맞지 않아 제거했다(항상 타임아웃 강등 위험).
     public PatentDetailResponse generateAiReportForBatch(String patentId) {
         PatentDetailResponse patent = patentReviewService.findPatent(patentId);
-        if (!AI_REPORT_GENERATABLE_STATUSES.contains(patent.reviewWorkflowStatus())) {
-            throw new PatentFlowException(ErrorCode.INVALID_WORKFLOW_STATUS,
-                    "AI 레포트는 검토 진행 중(최종 처리 완료 전) 상태에서만 생성/재생성할 수 있습니다.");
-        }
         AgentEvaluateResponse agentResponse =
                 aiReportAgentClient.evaluateForBatch(patentId, valuationCriteriaService.currentConfigForAgent(), patent);
         AiEvaluationReportResponse report = mapAgentResponse(agentResponse, patentId);
