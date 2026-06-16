@@ -19,7 +19,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * UI-008 가치평가 기준 설정 — 검증 규칙(가중치 합 100, 컷오프 순서, subscore 합 100)과
+ * UI-008 가치평가 기준 설정 — 검증 규칙(가중치 합 100, 권고 기준점 순서, subscore 합 100)과
  * 버전 증가, 기본값 미러링(agent DEFAULT_*와 일치)을 검증한다.
  */
 class ValuationCriteriaServiceTest {
@@ -36,9 +36,8 @@ class ValuationCriteriaServiceTest {
 
     private ValuationCriteriaRequest validRequest() {
         return new ValuationCriteriaRequest(
-                Map.of("legal", 30.0, "technology", 20.0, "market", 30.0, "business_fit", 20.0),
-                Map.of("A", 80.0, "B", 60.0, "C", 40.0),
-                60.0,
+                Map.of("legal", 40.0, "technology", 30.0, "market", 30.0),
+                Map.of("A", 70.0, "B", 50.0),
                 60.0,
                 Map.of(
                         "legal", Map.of("right_stability", 35, "claim_protection", 40, "portfolio_defensive_value", 25),
@@ -54,9 +53,9 @@ class ValuationCriteriaServiceTest {
 
         assertThat(current.isDefault()).isTrue();
         assertThat(current.config().get("axisWeights"))
-                .isEqualTo(Map.of("legal", 25.0, "technology", 25.0, "market", 25.0, "business_fit", 25.0));
-        assertThat(current.config().get("gradeCutoffs")).isEqualTo(Map.of("A", 80.0, "B", 60.0, "C", 40.0));
-        assertThat(current.config().get("maintainThreshold")).isEqualTo(60.0);
+                .isEqualTo(Map.of("legal", 34.0, "technology", 33.0, "market", 33.0));
+        assertThat(current.config().get("gradeCutoffs")).isEqualTo(Map.of("A", 70.0, "B", 50.0));
+        assertThat(current.config().containsKey("maintainThreshold")).isFalse();
         assertThat(current.config().get("version")).isEqualTo(0);
         // subscore 배점도 agent DEFAULT_SUBSCORE_WEIGHTS(schemas/valuation.py)와 동일해야 한다 — 드리프트 방지.
         assertThat(current.config().get("subscoreWeights")).isEqualTo(Map.of(
@@ -78,14 +77,14 @@ class ValuationCriteriaServiceTest {
         assertThat(updated.isDefault()).isFalse();
         assertThat(updated.config().get("version")).isEqualTo(3);
         assertThat(updated.updatedBy()).isEqualTo("legal01");
-        assertThat(((Map<?, ?>) updated.config().get("axisWeights")).get("legal")).isEqualTo(30.0);
+        assertThat(((Map<?, ?>) updated.config().get("axisWeights")).get("legal")).isEqualTo(40.0);
     }
 
     @Test
     void axisWeightsMustSumTo100() {
         ValuationCriteriaRequest invalid = new ValuationCriteriaRequest(
-                Map.of("legal", 30.0, "technology", 20.0, "market", 30.0, "business_fit", 30.0),
-                validRequest().gradeCutoffs(), 60.0, 60.0, validRequest().subscoreWeights());
+                Map.of("legal", 30.0, "technology", 20.0, "market", 30.0),  // sum=80
+                validRequest().gradeCutoffs(), 60.0, validRequest().subscoreWeights());
 
         assertThatThrownBy(() -> service.update(invalid, "legal01"))
                 .isInstanceOf(PatentFlowException.class)
@@ -94,10 +93,10 @@ class ValuationCriteriaServiceTest {
     }
 
     @Test
-    void axisWeightsMustCoverAllFourAxes() {
+    void axisWeightsMustCoverAllThreeAxes() {
         ValuationCriteriaRequest invalid = new ValuationCriteriaRequest(
-                Map.of("legal", 50.0, "technology", 50.0),
-                validRequest().gradeCutoffs(), 60.0, 60.0, validRequest().subscoreWeights());
+                Map.of("legal", 50.0, "technology", 50.0),  // market 누락
+                validRequest().gradeCutoffs(), 60.0, validRequest().subscoreWeights());
 
         assertThatThrownBy(() -> service.update(invalid, "legal01"))
                 .isInstanceOf(PatentFlowException.class);
@@ -107,8 +106,8 @@ class ValuationCriteriaServiceTest {
     void gradeCutoffsMustBeStrictlyOrdered() {
         ValuationCriteriaRequest invalid = new ValuationCriteriaRequest(
                 validRequest().axisWeights(),
-                Map.of("A", 50.0, "B", 60.0, "C", 40.0),
-                60.0, 60.0, validRequest().subscoreWeights());
+                Map.of("A", 50.0, "B", 60.0),  // A < B → 순서 역전
+                60.0, validRequest().subscoreWeights());
 
         assertThatThrownBy(() -> service.update(invalid, "legal01"))
                 .isInstanceOf(PatentFlowException.class);
@@ -117,7 +116,7 @@ class ValuationCriteriaServiceTest {
     @Test
     void subscoreGroupMustSumTo100() {
         ValuationCriteriaRequest invalid = new ValuationCriteriaRequest(
-                validRequest().axisWeights(), validRequest().gradeCutoffs(), 60.0, 60.0,
+                validRequest().axisWeights(), validRequest().gradeCutoffs(), 60.0,
                 Map.of(
                         "legal", Map.of("right_stability", 50, "claim_protection", 40, "portfolio_defensive_value", 25),
                         "business_fit", Map.of("official_business_evidence", 30, "product_function_direct_match", 45,
@@ -128,22 +127,13 @@ class ValuationCriteriaServiceTest {
     }
 
     @Test
-    void maintainThresholdMustBeWithinRange() {
-        ValuationCriteriaRequest invalid = new ValuationCriteriaRequest(
-                validRequest().axisWeights(), validRequest().gradeCutoffs(), 150.0, 60.0, validRequest().subscoreWeights());
-
-        assertThatThrownBy(() -> service.update(invalid, "legal01"))
-                .isInstanceOf(PatentFlowException.class);
-    }
-
-    @Test
     void currentConfigForAgentReturnsLatestConfig() {
         when(repository.findTopByOrderByVersionDesc())
                 .thenReturn(Optional.of(new ValuationCriteriaConfigEntity(
-                        1, "{\"version\":1,\"maintainThreshold\":70.0}", "admin", java.time.OffsetDateTime.now())));
+                        1, "{\"version\":1,\"businessFitOverrideThreshold\":70.0}", "admin", java.time.OffsetDateTime.now())));
 
         Map<String, Object> config = service.currentConfigForAgent();
 
-        assertThat(config).containsEntry("version", 1).containsEntry("maintainThreshold", 70.0);
+        assertThat(config).containsEntry("version", 1).containsEntry("businessFitOverrideThreshold", 70.0);
     }
 }

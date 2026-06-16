@@ -30,7 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ValuationCriteriaService {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
-    private static final Set<String> AXES = Set.of("legal", "technology", "market", "business_fit");
+    private static final Set<String> AXES = Set.of("legal", "technology", "market");
     private static final Map<String, Set<String>> SUBSCORE_KEYS = Map.of(
             "legal", Set.of("right_stability", "claim_protection", "portfolio_defensive_value"),
             "business_fit", Set.of("official_business_evidence", "product_function_direct_match", "business_context_fit"));
@@ -48,9 +48,8 @@ public class ValuationCriteriaService {
     static Map<String, Object> defaultConfig() {
         Map<String, Object> config = new LinkedHashMap<>();
         config.put("version", 0);
-        config.put("axisWeights", Map.of("legal", 25.0, "technology", 25.0, "market", 25.0, "business_fit", 25.0));
-        config.put("gradeCutoffs", Map.of("A", 80.0, "B", 60.0, "C", 40.0));
-        config.put("maintainThreshold", 60.0);
+        config.put("axisWeights", Map.of("legal", 34.0, "technology", 33.0, "market", 33.0));
+        config.put("gradeCutoffs", Map.of("A", 70.0, "B", 50.0));
         config.put("businessFitOverrideThreshold", 60.0);
         Map<String, Object> subscores = new LinkedHashMap<>();
         subscores.put("legal", Map.of("right_stability", 40, "claim_protection", 40, "portfolio_defensive_value", 20));
@@ -87,7 +86,6 @@ public class ValuationCriteriaService {
         config.put("version", nextVersion);
         config.put("axisWeights", request.axisWeights());
         config.put("gradeCutoffs", request.gradeCutoffs());
-        config.put("maintainThreshold", request.maintainThreshold());
         config.put("businessFitOverrideThreshold",
                 request.businessFitOverrideThreshold() != null ? request.businessFitOverrideThreshold() : 60.0);
         config.put("subscoreWeights", request.subscoreWeights());
@@ -131,7 +129,7 @@ public class ValuationCriteriaService {
         Map<String, Double> weights = request.axisWeights();
         if (!weights.keySet().equals(AXES)) {
             throw new PatentFlowException(ErrorCode.INVALID_REQUEST,
-                    "축 가중치는 legal/technology/market/business_fit 4개 축을 모두 포함해야 합니다.");
+                    "축 가중치는 legal/technology/market 3개 핵심 축을 모두 포함해야 합니다.");
         }
         double weightSum = 0;
         for (Map.Entry<String, Double> entry : weights.entrySet()) {
@@ -148,20 +146,15 @@ public class ValuationCriteriaService {
 
         Double cutoffA = request.gradeCutoffs().get("A");
         Double cutoffB = request.gradeCutoffs().get("B");
-        Double cutoffC = request.gradeCutoffs().get("C");
-        if (cutoffA == null || cutoffB == null || cutoffC == null
-                || !(100 >= cutoffA && cutoffA > cutoffB && cutoffB > cutoffC && cutoffC >= 0)) {
+        if (cutoffA == null || cutoffB == null
+                || !(100 >= cutoffA && cutoffA > cutoffB && cutoffB >= 0)) {
             throw new PatentFlowException(ErrorCode.INVALID_REQUEST,
-                    "등급 컷오프는 100 ≥ A > B > C ≥ 0 순서를 지켜야 합니다.");
-        }
-
-        if (request.maintainThreshold() < 0 || request.maintainThreshold() > 100) {
-            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "유지 권고 임계값은 0~100 사이여야 합니다.");
+                    "권고 기준점은 100 ≥ 유지 권고 최소 > 조건부 유지 최소 ≥ 0 순서를 지켜야 합니다.");
         }
 
         if (request.businessFitOverrideThreshold() != null
                 && (request.businessFitOverrideThreshold() < 0 || request.businessFitOverrideThreshold() > 100)) {
-            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "사업 연계성 오버라이드 기준값은 0~100 사이여야 합니다.");
+            throw new PatentFlowException(ErrorCode.INVALID_REQUEST, "사업 연계성 유지 권고 기준점은 0~100 사이여야 합니다.");
         }
 
         for (Map.Entry<String, Set<String>> group : SUBSCORE_KEYS.entrySet()) {
