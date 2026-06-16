@@ -1131,7 +1131,8 @@ public class PatentReviewService {
                 "%s 관련 특허의 공식 metadata 기반 mock 요약입니다.".formatted(title),
                 "%s 영역에서 발생하는 업무 또는 기술 문제를 해결하기 위한 특허입니다.".formatted(valueOrDefault(technologyArea, "관련 기술")),
                 List.of(valueOrDefault(technologyArea, "추가 확인 필요"), valueOrDefault(productName, "관련 제품 정보 부족")),
-                "청구항 상세 분석 전 단계의 mock 권리 범위 요약입니다.",
+                // 권리범위 요약은 agent/AI가 산출하지 않는 필드다. 출력에 없으면 비워 둔다(빈 값=미노출).
+                "",
                 List.of("상세 청구항 분석 자료", "시장 규모 자료", "제품 적용 여부"));
     }
 
