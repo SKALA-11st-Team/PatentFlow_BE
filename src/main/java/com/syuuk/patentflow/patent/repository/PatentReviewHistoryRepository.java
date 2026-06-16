@@ -65,10 +65,14 @@ public interface PatentReviewHistoryRepository extends JpaRepository<PatentRevie
             """)
     long countLatestMailReadyWithSuccessfulAiReport(@Param("status") ReviewWorkflowStatus status);
 
+    // DASH-01: '이번 분기' KPI(메일 발송 대기=pendingReview)의 한 축이므로 다른 분기 카운트와 동일하게
+    // NOT_IN_REVIEW(검토 종료/과거 분기)는 제외한다. 이 가드가 없으면 과거 분기의 실패 레포트 행이
+    // 최신 행으로 남아 카운트에 새어 quarterlyTargetCount와 정합이 깨진다. 실패 신호 자체는 행에 보존된다.
     @Query("""
             select count(h)
             from PatentReviewHistoryEntity h
             where (coalesce(h.aiDegraded, false) = true or (h.aiFailureReason is not null and trim(h.aiFailureReason) <> ''))
+              and h.reviewWorkflowStatus <> com.syuuk.patentflow.patent.dto.ReviewWorkflowStatus.NOT_IN_REVIEW
               and h.createdAt = (
                   select max(latest.createdAt)
                   from PatentReviewHistoryEntity latest
