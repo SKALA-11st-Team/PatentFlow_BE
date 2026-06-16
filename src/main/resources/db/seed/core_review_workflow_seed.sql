@@ -44,7 +44,7 @@ ON CONFLICT (setting_key) DO UPDATE SET
 -- Q1은 납부 기간(3월)이 지났으므로 ended=true.
 -- Q2 이후는 미활성 상태로 둔다. 검토 시작일이 지나면 백엔드 스케줄러가 활성화하며 검토 이력을 생성한다.
 -- submission_deadline = 활성화일(검토 시작일) + 회신기한(기본 1개월)
--- mail_lead_months_snapshot = 활성화 시점의 메일 발송 기준 개월 수 스냅샷 (기본 2)
+-- mail_lead_months_snapshot = 활성화 시점의 메일 발송 기준 개월 수 스냅샷 (기본 3)
 INSERT INTO quarter_settings (
     quarter_key,
     setting_year,
@@ -58,7 +58,7 @@ INSERT INTO quarter_settings (
     submission_deadline,
     mail_lead_months_snapshot
 ) VALUES
-    ('2026-Q1', 2026, 1, DATE '2026-01-01', DATE '2026-03-31', true, TIMESTAMP WITH TIME ZONE '2026-01-01 09:00:00+09', true, TIMESTAMP WITH TIME ZONE '2026-03-31 18:00:00+09', DATE '2026-02-01', 2),
+    ('2026-Q1', 2026, 1, DATE '2026-01-01', DATE '2026-03-31', true, TIMESTAMP WITH TIME ZONE '2026-01-01 09:00:00+09', true, TIMESTAMP WITH TIME ZONE '2026-03-31 18:00:00+09', DATE '2026-02-01', 3),
     ('2026-Q2', 2026, 2, DATE '2026-04-01', DATE '2026-06-30', false, NULL, false, NULL, NULL, NULL),
     ('2026-Q3', 2026, 3, DATE '2026-07-01', DATE '2026-09-30', false, NULL, false, NULL, NULL, NULL),
     ('2026-Q4', 2026, 4, DATE '2026-10-01', DATE '2026-12-31', false, NULL, false, NULL, NULL, NULL)

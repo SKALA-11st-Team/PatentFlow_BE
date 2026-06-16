@@ -152,7 +152,7 @@ class AnnualFeeScheduleControllerTest {
     }
 
     // FEE-06: KR 특허 상세 연차료 일정 — 1~3년차 일괄 행 + 4년차(등록일+3년) NEXT 도래일과
-    // 검토 시작일(도래일 - 메일 리드 2개월)을 내려준다.
+    // 검토 시작일(도래일 - 메일 리드 3개월)을 내려준다.
     @Test
     void getPatentFeeScheduleReturnsKrLumpScheduleWithReviewStartDates() throws Exception {
         mockMvc.perform(get("/api/v1/patents/PAT-2026-0001/fee-schedule"))
@@ -161,7 +161,7 @@ class AnnualFeeScheduleControllerTest {
                 .andExpect(jsonPath("$.data.basis").value("REGISTRATION_DATE"))
                 .andExpect(jsonPath("$.data.basisDate").value("2026-02-25"))
                 .andExpect(jsonPath("$.data.initialLumpYears").value(3))
-                .andExpect(jsonPath("$.data.mailLeadMonths").value(2))
+                .andExpect(jsonPath("$.data.mailLeadMonths").value(3))
                 .andExpect(jsonPath("$.data.items[0].status").value("PAID_LUMP"))
                 .andExpect(jsonPath("$.data.items[0].lump").value(true))
                 .andExpect(jsonPath("$.data.items[0].yearLabel").value("1~3년차"))
@@ -170,7 +170,7 @@ class AnnualFeeScheduleControllerTest {
                 .andExpect(jsonPath("$.data.items[1].dueDate").value("2029-02-25"))
                 .andExpect(jsonPath("$.data.items[1].yearNumber").value(4))
                 .andExpect(jsonPath("$.data.items[1].yearLabel").value("4년차"))
-                .andExpect(jsonPath("$.data.items[1].reviewStartDate").value("2028-12-25"))
+                .andExpect(jsonPath("$.data.items[1].reviewStartDate").value("2028-11-25"))
                 .andExpect(jsonPath("$.data.items[2].status").value("FUTURE"));
     }
 
