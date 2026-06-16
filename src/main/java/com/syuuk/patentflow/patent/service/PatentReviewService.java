@@ -1351,13 +1351,17 @@ public class PatentReviewService {
 
     private AiReportReadinessStatus aiReportReadinessStatus(PatentDetailResponse detail) {
         AiEvaluationReportResponse report = detail.aiEvaluationReport();
-        if (report != null && (report.degraded() || hasText(report.failureReason()))) {
-            return AiReportReadinessStatus.FAILED;
-        }
-        if (detail.reviewWorkflowStatus() == ReviewWorkflowStatus.MAIL_READY
-                && report != null
-                && hasText(report.reportId())) {
+        // 레포트 산출물(reportId)이 있으면 degraded(제한 근거)여도 '준비됨'이다.
+        // degraded는 생성 실패가 아니라 제한된 근거로 생성된 정상 산출물이며, 상세 화면의
+        // '제한 생성' 배지/failureReason 문구가 별도로 알린다. degraded를 FAILED로 묶으면
+        // 정상 생성된 레포트가 대시보드 '레포트 실패' 집계에 잘못 잡힌다.
+        boolean hasReport = report != null && hasText(report.reportId());
+        if (detail.reviewWorkflowStatus() == ReviewWorkflowStatus.MAIL_READY && hasReport) {
             return AiReportReadinessStatus.READY;
+        }
+        // 산출물이 없는데 실패 신호만 있으면 진짜 생성 실패로 본다.
+        if (report != null && !hasReport && (report.degraded() || hasText(report.failureReason()))) {
+            return AiReportReadinessStatus.FAILED;
         }
         return AiReportReadinessStatus.PENDING;
     }
