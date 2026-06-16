@@ -65,13 +65,30 @@ public interface PatentReviewHistoryRepository extends JpaRepository<PatentRevie
             """)
     long countLatestMailReadyWithSuccessfulAiReport(@Param("status") ReviewWorkflowStatus status);
 
-    // DASH-01: '이번 분기' KPI(메일 발송 대기=pendingReview)의 한 축이므로 다른 분기 카운트와 동일하게
-    // NOT_IN_REVIEW(검토 종료/과거 분기)는 제외한다. 이 가드가 없으면 과거 분기의 실패 레포트 행이
-    // 최신 행으로 남아 카운트에 새어 quarterlyTargetCount와 정합이 깨진다. 실패 신호 자체는 행에 보존된다.
+    // DASH-01: '메일 발송 대기'(pendingReview) 단일 출처. 메일 발송 가능 = MAIL_READY 상태이고
+    // 레포트 산출물(reportId)이 있는 것. degraded(제한 근거)도 산출물이 있으면 발송 대상이므로 포함한다
+    // (degraded는 생성 실패가 아니다). 이렇게 해야 클릭 시 이동하는 메일 발송 대기 목록(MAIL_READY)과
+    // 카운트가 정합한다.
     @Query("""
             select count(h)
             from PatentReviewHistoryEntity h
-            where (coalesce(h.aiDegraded, false) = true or (h.aiFailureReason is not null and trim(h.aiFailureReason) <> ''))
+            where h.reviewWorkflowStatus = :status
+              and h.aiReportId is not null
+              and h.createdAt = (
+                  select max(latest.createdAt)
+                  from PatentReviewHistoryEntity latest
+                  where latest.patentId = h.patentId
+              )
+            """)
+    long countLatestMailReadyWithReport(@Param("status") ReviewWorkflowStatus status);
+
+    // DASH-01: 진짜 '생성 실패'(산출물 없음)만 센다. degraded(제한 근거)는 reportId가 있는 정상 산출물이므로
+    // 실패로 세지 않는다(aiReportReadinessStatus 정의와 일관). NOT_IN_REVIEW(검토 종료/과거 분기)는 제외한다.
+    @Query("""
+            select count(h)
+            from PatentReviewHistoryEntity h
+            where h.aiReportId is null
+              and (coalesce(h.aiDegraded, false) = true or (h.aiFailureReason is not null and trim(h.aiFailureReason) <> ''))
               and h.reviewWorkflowStatus <> com.syuuk.patentflow.patent.dto.ReviewWorkflowStatus.NOT_IN_REVIEW
               and h.createdAt = (
                   select max(latest.createdAt)

@@ -44,7 +44,10 @@ public class DashboardSummaryService {
         int mailReadySuccessCount = Math.toIntExact(
                 reviewHistoryRepository.countLatestMailReadyWithSuccessfulAiReport(ReviewWorkflowStatus.MAIL_READY));
         int aiReportFailedCount = Math.toIntExact(reviewHistoryRepository.countLatestFailedAiReports());
-        int pendingReview = mailReadySuccessCount + aiReportFailedCount;
+        // 메일 발송 대기 = MAIL_READY 상태이고 산출물(reportId)이 있는 것(degraded 포함).
+        // 클릭 시 이동하는 메일 발송 대기 목록과 같은 기준이라 카운트=목록이 정합한다.
+        int pendingReview = Math.toIntExact(
+                reviewHistoryRepository.countLatestMailReadyWithReport(ReviewWorkflowStatus.MAIL_READY));
         int waitingBusiness = countLatest(ReviewWorkflowStatus.WAITING_BUSINESS_RESPONSE);
         int businessReceived = countLatest(ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED);
         int pendingFinalDecision = Math.toIntExact(reviewHistoryRepository.countLatestPendingLegalAction(

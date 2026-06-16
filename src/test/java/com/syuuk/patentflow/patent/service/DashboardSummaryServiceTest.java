@@ -51,6 +51,9 @@ class DashboardSummaryServiceTest {
         when(reviewHistoryRepository.countLatestMailReadyWithSuccessfulAiReport(ReviewWorkflowStatus.MAIL_READY))
                 .thenReturn(3L);
         when(reviewHistoryRepository.countLatestFailedAiReports()).thenReturn(2L);
+        // 메일 발송 대기(pendingReview)는 MAIL_READY+산출물(degraded 포함) 독립 카운트가 단일 출처다.
+        when(reviewHistoryRepository.countLatestMailReadyWithReport(ReviewWorkflowStatus.MAIL_READY))
+                .thenReturn(7L);
         when(reviewHistoryRepository.countLatestByReviewWorkflowStatus(ReviewWorkflowStatus.WAITING_BUSINESS_RESPONSE))
                 .thenReturn(4L);
         when(reviewHistoryRepository.countLatestByReviewWorkflowStatus(ReviewWorkflowStatus.BUSINESS_RESPONSE_RECEIVED))
@@ -63,7 +66,7 @@ class DashboardSummaryServiceTest {
 
         assertThat(summary.totalPatents()).isEqualTo(40);
         assertThat(summary.quarterlyTargetCount()).isEqualTo(12);
-        assertThat(summary.pendingReview()).isEqualTo(5);
+        assertThat(summary.pendingReview()).isEqualTo(7);
         assertThat(summary.mailReadySuccessCount()).isEqualTo(3);
         assertThat(summary.aiReportFailedCount()).isEqualTo(2);
         assertThat(summary.waitingBusinessResponse()).isEqualTo(4);
