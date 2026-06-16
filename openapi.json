@@ -92,11 +92,21 @@
           "reportId" : {
             "type" : "string"
           },
+          "reportSections" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          },
           "scores" : {
             "items" : {
               "$ref" : "#/components/schemas/EvaluationScoreResponse"
             },
             "type" : "array"
+          },
+          "summaryBrief" : {
+            "additionalProperties" : { },
+            "type" : "object"
           },
           "totalScore" : {
             "format" : "int32",
@@ -2102,6 +2112,10 @@
             ],
             "type" : "string"
           },
+          "confidence" : {
+            "format" : "double",
+            "type" : "number"
+          },
           "evidence" : {
             "type" : "string"
           },
@@ -2113,6 +2127,18 @@
           },
           "grade" : {
             "type" : "string"
+          },
+          "missingInformation" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "riskFactors" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
           },
           "score" : {
             "format" : "int32",
@@ -3622,10 +3648,6 @@
             },
             "type" : "object"
           },
-          "maintainThreshold" : {
-            "format" : "double",
-            "type" : "number"
-          },
           "subscoreWeights" : {
             "additionalProperties" : {
               "additionalProperties" : {
@@ -3640,7 +3662,6 @@
         "required" : [
           "axisWeights",
           "gradeCutoffs",
-          "maintainThreshold",
           "subscoreWeights"
         ],
         "type" : "object"
