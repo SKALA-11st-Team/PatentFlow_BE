@@ -1,3 +1,7 @@
+/**
+ * @author 유건욱
+ * @date 2026-05-22
+ */
 package com.syuuk.patentflow.patent.service;
 
 import com.syuuk.patentflow.common.error.ErrorCode;

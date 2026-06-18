@@ -1,3 +1,7 @@
+/**
+ * @author 이소율
+ * @date 2026-05-29
+ */
 package com.syuuk.patentflow.patent.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -89,6 +93,11 @@ public class PatentWorkflowService {
 
     // ── AI 레포트 생성 ────────────────────────────────────────
 
+    /**
+     * @relatedFR FR-LEGAL-06, FR-LEGAL-07, FR-LEGAL-08, FR-LEGAL-18
+     * @relatedUI UI-LEGAL-04
+     * @description Agent를 호출해 특허의 AI 평가 레포트(평가/근거/권고)를 생성하고 특허에 반영한다.
+     */
     // 온디맨드/배치 모두 비동기 잡(evaluateForBatch, 20분 타임아웃)으로 생성한다.
     // 인터랙티브 30초 동기 경로는 LLM 장시간 실행과 맞지 않아 제거했다(항상 타임아웃 강등 위험).
     public PatentDetailResponse generateAiReportForBatch(String patentId) {
@@ -102,6 +111,11 @@ public class PatentWorkflowService {
 
     // ── 메일 발송 처리 ────────────────────────────────────────
 
+    /**
+     * @relatedFR FR-LEGAL-14
+     * @relatedUI UI-LEGAL-05
+     * @description 메일 발송 완료된 특허를 사업부 회신 대기 상태로 전이한다(MAIL_READY → WAITING_BUSINESS_RESPONSE).
+     */
     @Transactional
     public PatentReviewService.WorkflowBatchUpdateResult markMailingSent(List<String> patentIds) {
         List<String> updatedPatentIds = new ArrayList<>();
@@ -123,6 +137,11 @@ public class PatentWorkflowService {
 
     // ── 사업부 의견 / 최종 결정 ───────────────────────────────
 
+    /**
+     * @relatedFR FR-BUS-01
+     * @relatedUI UI-BUS-02, UI-LEGAL-04
+     * @description 사업부 회신 대기 상태에서만 사업부 의견(유지/포기)과 사유를 기록한다.
+     */
     @Transactional
     public void recordBusinessOpinion(
             String patentId,
@@ -139,6 +158,11 @@ public class PatentWorkflowService {
         });
     }
 
+    /**
+     * @relatedFR FR-LEGAL-20
+     * @relatedUI UI-LEGAL-04
+     * @description 이미 기록된 최종 판단(LEGAL_ACTION_RECORDED)의 수정/취소 전용 경로.
+     */
     @Transactional
     public FinalDecisionResponse patchFinalDecision(String patentId, PatchFinalDecisionRequest request, String actor) {
         OffsetDateTime decidedAt = OffsetDateTime.now(KST);
@@ -159,6 +183,12 @@ public class PatentWorkflowService {
                 updated.legalActionResult(), updated.reviewWorkflowStatus());
     }
 
+    /**
+     * @relatedFR FR-LEGAL-10, FR-LEGAL-19
+     * @relatedUI UI-LEGAL-04
+     * @description 사업부 회신 접수 상태에서 특허별 최종 의사결정과 실제 법무 처리 결과를 기록한다.
+     *     공동출원 특허는 공동출원인 합의(AGREED)가 선행돼야 한다.
+     */
     @Transactional
     public FinalDecisionResponse recordFinalDecision(String patentId, FinalDecisionRequest request, String actor) {
         OffsetDateTime decidedAt = OffsetDateTime.now(KST);
@@ -184,8 +214,10 @@ public class PatentWorkflowService {
     }
 
     /**
-     * 공동출원 특허의 공동출원인 합의를 기록한다(게이트 모델 — 워크플로 상태는 바꾸지 않음).
-     * 공동출원이 아니거나 최종 판단 대기(BUSINESS_RESPONSE_RECEIVED) 상태가 아니면 거부한다.
+     * @relatedFR FR-LEGAL-10
+     * @relatedUI UI-LEGAL-04
+     * @description 공동출원 특허의 공동출원인 합의를 기록한다(게이트 모델 — 워크플로 상태는 바꾸지 않고 최종 판단의 선행 조건만 충족).
+     *     공동출원이 아니거나 최종 판단 대기(BUSINESS_RESPONSE_RECEIVED) 상태가 아니면 거부한다.
      */
     @Transactional
     public PatentDetailResponse recordCoApplicantConsent(String patentId, CoApplicantConsentRequest request, String actor) {
@@ -210,6 +242,11 @@ public class PatentWorkflowService {
 
     // ── 분기 / 배치 관리 ─────────────────────────────────────
 
+    /**
+     * @relatedFR FR-LEGAL-01, FR-LEGAL-22
+     * @relatedUI UI-LEGAL-01
+     * @description 분기 납부 기간에 해당하는 ACTIVE 특허를 검토 대상으로 선정하고 분기 검토 워크플로를 시작한다.
+     */
     @Transactional
     public List<String> createQuarterReviewTargets(
             String quarterKey,

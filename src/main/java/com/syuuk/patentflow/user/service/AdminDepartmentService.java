@@ -1,3 +1,7 @@
+/**
+ * @author 유건욱
+ * @date 2026-05-19
+ */
 package com.syuuk.patentflow.user.service;
 
 import com.syuuk.patentflow.common.error.ErrorCode;
@@ -21,6 +25,11 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * @relatedFR FR-LEGAL-12, FR-LEGAL-25
+ * @relatedUI UI-LEGAL-07
+ * @description 부서(수신자 매핑) 기준값 관리 서비스. 부서 조회·등록·수정·삭제와 삭제 시 참조 무결성 검증을 다룬다.
+ */
 @Service
 public class AdminDepartmentService {
 
@@ -43,6 +52,11 @@ public class AdminDepartmentService {
         this.mailingHistoryRepository = mailingHistoryRepository;
     }
 
+    /**
+     * @relatedFR FR-LEGAL-12, FR-LEGAL-25
+     * @relatedUI UI-LEGAL-07
+     * @description 전체 부서 목록을 부서 ID 순으로 조회한다.
+     */
     @Transactional(readOnly = true)
     public List<DepartmentRecipientMappingResponse> getDepartments() {
         // 부서 목록 조회 — 수신자(email·name) 정보는 MailingService.getRecipientMappings에서 users 테이블과 합산
@@ -51,6 +65,11 @@ public class AdminDepartmentService {
                 .toList();
     }
 
+    /**
+     * @relatedFR FR-LEGAL-12, FR-LEGAL-25
+     * @relatedUI UI-LEGAL-07
+     * @description 부서 ID·부서명 검색어로 부서를 검색·페이징 조회한다.
+     */
     @Transactional(readOnly = true)
     public PageResponse<DepartmentRecipientMappingResponse> getDepartments(int page, int size, String search) {
         PageRequest pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100),
@@ -63,6 +82,11 @@ public class AdminDepartmentService {
                 new PageInfo(departments.getNumber(), departments.getSize(), departments.getTotalElements(), departments.getTotalPages()));
     }
 
+    /**
+     * @relatedFR FR-LEGAL-12, FR-LEGAL-25
+     * @relatedUI UI-LEGAL-07
+     * @description 부서를 신규 등록하고 검토 서비스의 부서 캐시를 갱신한다(중복 ID 검증 포함).
+     */
     @Transactional
     public DepartmentRecipientMappingResponse createDepartment(CreateDepartmentRequest request) {
         if (mailingRecipientMappingRepository.existsById(request.departmentId())) {
@@ -79,6 +103,11 @@ public class AdminDepartmentService {
         return toResponse(entity);
     }
 
+    /**
+     * @relatedFR FR-LEGAL-12, FR-LEGAL-25
+     * @relatedUI UI-LEGAL-07
+     * @description 부서명을 수정하고 검토 서비스의 부서 캐시를 갱신한다.
+     */
     @Transactional
     public DepartmentRecipientMappingResponse updateDepartment(String departmentId, UpdateDepartmentRequest request) {
         DepartmentEntity entity = mailingRecipientMappingRepository.findById(departmentId)
@@ -91,6 +120,11 @@ public class AdminDepartmentService {
         return toResponse(entity);
     }
 
+    /**
+     * @relatedFR FR-LEGAL-12, FR-LEGAL-25
+     * @relatedUI UI-LEGAL-07
+     * @description 부서를 삭제한다. 소속 계정·검토 이력·메일 발송 이력이 있으면 삭제를 거부하고, 삭제 후 부서 캐시를 갱신한다.
+     */
     @Transactional
     public void deleteDepartment(String departmentId) {
         if (!mailingRecipientMappingRepository.existsById(departmentId)) {

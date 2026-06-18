@@ -1,3 +1,7 @@
+/**
+ * @author 이소율
+ * @date 2026-05-29
+ */
 package com.syuuk.patentflow.patent.service;
 
 import com.syuuk.patentflow.patent.domain.AiReportJobEntity;
@@ -13,7 +17,9 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 /**
- * 분기 활성화 시 대상 특허 전체에 대해 AI 레포트를 자동 생성하는 배치 서비스.
+ * @relatedFR FR-LEGAL-06, FR-LEGAL-07
+ * @relatedUI UI-LEGAL-04
+ * @description 분기 활성화 시 대상 특허 전체에 대해 AI 레포트를 자동 생성하는 배치 서비스.
  *
  * - @Async("aiReportBatchExecutor") 덕분에 스케줄러 스레드를 블로킹하지 않는다.
  * - 특허 1건당 에이전트 응답까지 최대 20분이 소요될 수 있으므로 순차 처리한다.
@@ -41,6 +47,11 @@ public class AiReportBatchService {
         this.jobRepository = jobRepository;
     }
 
+    /**
+     * @relatedFR FR-LEGAL-06, FR-LEGAL-07
+     * @relatedUI UI-LEGAL-04
+     * @description 분기 대상 특허 목록을 순차로 돌며 AI 레포트를 생성한다(활성 잡은 건너뛰고, 개별 실패는 격리해 나머지를 계속 처리).
+     */
     @Async("aiReportBatchExecutor")
     public void generateReportsForQuarter(List<String> patentIds, String quarterKey) {
         log.info("[AiReportBatch] 분기 {} 배치 시작 — 대상 특허 {}건", quarterKey, patentIds.size());

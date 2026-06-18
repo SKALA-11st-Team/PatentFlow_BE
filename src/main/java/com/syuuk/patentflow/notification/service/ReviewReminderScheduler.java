@@ -1,3 +1,7 @@
+/**
+ * @author 유건욱
+ * @date 2026-06-12
+ */
 package com.syuuk.patentflow.notification.service;
 
 import com.syuuk.patentflow.common.service.SystemSettingsService;

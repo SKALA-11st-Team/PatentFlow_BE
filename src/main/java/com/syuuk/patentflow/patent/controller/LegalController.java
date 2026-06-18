@@ -1,3 +1,7 @@
+/**
+ * @author 유건욱
+ * @date 2026-05-19
+ */
 package com.syuuk.patentflow.patent.controller;
 
 import com.syuuk.patentflow.common.response.ApiResponse;

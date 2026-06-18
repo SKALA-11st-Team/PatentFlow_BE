@@ -1,3 +1,7 @@
+/**
+ * @author 유건욱
+ * @date 2026-05-20
+ */
 package com.syuuk.patentflow.auth.service;
 
 import com.syuuk.patentflow.auth.config.AuthProperties;
@@ -18,6 +22,11 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * @relatedFR FR-COM-01
+ * @relatedUI UI-COM-01
+ * @description refresh 세션을 생성·소비(1회성)·무효화한다. 토큰은 해시로만 저장한다.
+ */
 @Service
 public class AuthSessionService {
 
@@ -32,6 +41,11 @@ public class AuthSessionService {
         this.authSessionRepository = authSessionRepository;
     }
 
+    /**
+     * @relatedFR FR-COM-01
+     * @relatedUI UI-COM-01
+     * @description 난수 refresh 토큰을 발급하고 해시·만료 시각을 저장하며 만료 세션을 정리한다.
+     */
     @Transactional
     public RefreshSession create(UserDetailsImpl userDetails) {
         byte[] randomBytes = new byte[48];
@@ -53,6 +67,11 @@ public class AuthSessionService {
         return new RefreshSession(refreshToken, expiresAt.toInstant());
     }
 
+    /**
+     * @relatedFR FR-COM-01
+     * @relatedUI UI-COM-01
+     * @description refresh 토큰을 검증하고 1회성으로 즉시 revoke해 재사용을 차단한다. 폐기 토큰 재사용 시 전 세션을 무효화한다.
+     */
     @Transactional(noRollbackFor = PatentFlowException.class)
     public UserSession consume(String refreshToken) {
         if (refreshToken == null || refreshToken.isBlank()) {
@@ -77,6 +96,11 @@ public class AuthSessionService {
         return new UserSession(session.getEmail());
     }
 
+    /**
+     * @relatedFR FR-COM-01
+     * @relatedUI UI-COM-01
+     * @description 주어진 refresh 토큰의 세션을 찾아 무효화한다(로그아웃 시 사용).
+     */
     @Transactional
     public void revoke(String refreshToken) {
         if (refreshToken == null || refreshToken.isBlank()) {
@@ -90,7 +114,11 @@ public class AuthSessionService {
                 });
     }
 
-    // 비밀번호 변경 후 해당 사용자의 모든 세션을 무효화해 재로그인을 강제한다.
+    /**
+     * @relatedFR FR-COM-01
+     * @relatedUI UI-COM-01
+     * @description 해당 사용자의 활성 세션 전체를 무효화한다(비밀번호 변경 후 재로그인 강제).
+     */
     @Transactional
     public void revokeAll(String userId) {
         authSessionRepository.revokeActiveByUserId(userId, OffsetDateTime.now(KST));

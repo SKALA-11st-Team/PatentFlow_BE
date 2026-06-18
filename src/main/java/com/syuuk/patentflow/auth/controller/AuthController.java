@@ -1,3 +1,7 @@
+/**
+ * @author 유건욱
+ * @date 2026-05-19
+ */
 package com.syuuk.patentflow.auth.controller;
 
 import com.syuuk.patentflow.auth.dto.ChangePasswordRequest;
@@ -21,6 +25,11 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * @relatedFR FR-COM-01
+ * @relatedUI UI-COM-01
+ * @description 로그인·토큰 갱신·로그아웃과 본인 프로필/비밀번호 관리를 처리하는 인증 API.
+ */
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
@@ -33,6 +42,11 @@ public class AuthController {
         this.authCookieService = authCookieService;
     }
 
+    /**
+     * @relatedFR FR-COM-01
+     * @relatedUI UI-COM-01
+     * @description 이메일/비밀번호로 로그인하고 access·refresh 토큰을 HttpOnly 쿠키로 발급한다.
+     */
     @PostMapping("/login")
     public ApiResponse<LoginResponse> login(
             @Valid @RequestBody LoginRequest request,
@@ -48,6 +62,11 @@ public class AuthController {
         return ApiResponse.ok(result.response());
     }
 
+    /**
+     * @relatedFR FR-COM-01
+     * @relatedUI UI-COM-01
+     * @description refresh 쿠키로 세션을 검증해 새 access·refresh 토큰을 재발급한다.
+     */
     @PostMapping("/refresh")
     public ApiResponse<LoginResponse> refresh(HttpServletRequest request, HttpServletResponse response) {
         AuthService.AuthResult result = authService.refresh(authCookieService.getRefreshToken(request));
@@ -69,11 +88,21 @@ public class AuthController {
         return ApiResponse.ok(null);
     }
 
+    /**
+     * @relatedFR FR-COM-01
+     * @relatedUI UI-COM-01
+     * @description 현재 로그인한 사용자의 프로필(이메일·이름·역할·부서)을 조회한다.
+     */
     @GetMapping("/me")
     public ApiResponse<UserPrincipalResponse> me(Authentication authentication) {
         return ApiResponse.ok(authService.currentUser(authentication));
     }
 
+    /**
+     * @relatedFR FR-COM-01
+     * @relatedUI UI-COM-01
+     * @description 로그인한 사용자가 본인 프로필(표시 이름)을 수정한다.
+     */
     @PatchMapping("/me")
     public ApiResponse<UserPrincipalResponse> updateProfile(
             Authentication authentication,
@@ -82,6 +111,11 @@ public class AuthController {
         return ApiResponse.ok(authService.updateProfile(authentication, request));
     }
 
+    /**
+     * @relatedFR FR-COM-01
+     * @relatedUI UI-COM-01
+     * @description 본인 비밀번호를 변경하고 기존 세션·인증 쿠키를 무효화해 재로그인을 강제한다.
+     */
     @PatchMapping("/password")
     public ApiResponse<Void> changePassword(
             Authentication authentication,
@@ -95,6 +129,11 @@ public class AuthController {
         return ApiResponse.ok(null);
     }
 
+    /**
+     * @relatedFR FR-COM-01
+     * @relatedUI UI-COM-01
+     * @description access·refresh 토큰을 폐기하고 인증 쿠키를 제거해 로그아웃한다.
+     */
     @PostMapping("/logout")
     public ApiResponse<Void> logout(
             Authentication authentication,

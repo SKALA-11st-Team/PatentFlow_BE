@@ -1,3 +1,7 @@
+/**
+ * @author 이소율
+ * @date 2026-05-29
+ */
 package com.syuuk.patentflow.patent.service;
 
 import com.syuuk.patentflow.common.error.ErrorCode;
@@ -50,8 +54,10 @@ public class PatentLookupService {
     // ── 서지 정보 조회 ────────────────────────────────────────
 
     /**
-     * 관리번호/등록번호로 KIPRIS 또는 Google Patents에서 서지 정보를 조회한다.
-     * allPatents는 PatentReviewService.loadPatentsFromDatabase()에서 전달받는다.
+     * @relatedFR FR-LEGAL-03
+     * @relatedUI UI-LEGAL-02, UI-LEGAL-03
+     * @description 관리번호/등록번호로 KIPRIS 또는 Google Patents에서 서지 정보를 조회한다(외부 정보 기반 입력 추천).
+     *     allPatents는 PatentReviewService.loadPatentsFromDatabase()에서 전달받는다.
      */
     public PatentBibliographicInfoResponse lookupBibliographicInfo(
             String managementNumber,
@@ -121,7 +127,9 @@ public class PatentLookupService {
     // ── 컨텍스트 추천 ─────────────────────────────────────────
 
     /**
-     * 입력값과 내부 특허 metadata를 비교해 가장 유사한 사업 분야/기술 영역을 추천한다.
+     * @relatedFR FR-LEGAL-04
+     * @relatedUI UI-LEGAL-03
+     * @description 입력값과 내부 특허 metadata를 비교해 가장 유사한 사업 분야/기술 영역을 추천한다(회사 컨텍스트 입력 보조).
      */
     public PatentContextSuggestionResponse suggestContext(
             PatentContextSuggestionRequest request,

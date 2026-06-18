@@ -1,3 +1,7 @@
+/**
+ * @author 유건욱
+ * @date 2026-06-08
+ */
 package com.syuuk.patentflow.patent.service;
 
 import com.syuuk.patentflow.common.error.ErrorCode;
@@ -26,6 +30,11 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * @relatedFR FR-LEGAL-06, FR-LEGAL-07, FR-LEGAL-18
+ * @relatedUI UI-LEGAL-04
+ * @description AI 평가 레포트 생성 잡을 요청·실행하고 진행 상태(PENDING/RUNNING/성공/제한/실패)를 추적한다.
+ */
 @Service
 public class AiReportJobService {
 
@@ -64,6 +73,11 @@ public class AiReportJobService {
         this.systemSettingsService = systemSettingsService;
     }
 
+    /**
+     * @relatedFR FR-LEGAL-06, FR-LEGAL-18
+     * @relatedUI UI-LEGAL-04
+     * @description 특허 1건의 AI 레포트 재생성 잡을 온디맨드로 요청한다(활성 잡 있으면 재사용, BUSINESS는 설정 허용 시에만).
+     */
     // NOTE: @Transactional을 붙이지 않는다 — 아래 잡 row가 커밋된 뒤에야 비동기 executor가
     // runJob()의 findById(jobId)로 안전하게 조회할 수 있기 때문이다(트랜잭션 미커밋 상태의 row를
     // 다른 스레드가 못 읽는 race 방지). 동시 중복은 saveAndFlush + DataIntegrityViolation 처리로 막는다.
@@ -119,6 +133,11 @@ public class AiReportJobService {
                 .anyMatch(authority -> ROLE_BUSINESS.equals(authority.getAuthority()));
     }
 
+    /**
+     * @relatedFR FR-LEGAL-18
+     * @relatedUI UI-LEGAL-04
+     * @description 특허의 최신 AI 레포트 잡 진행 상태를 조회한다(RUNNING이면 에이전트 진행 단계도 함께 내려준다).
+     */
     @Transactional(readOnly = true)
     public AiReportJobResponse latestStatus(String patentId) {
         patentReviewService.ensurePatentExists(patentId);

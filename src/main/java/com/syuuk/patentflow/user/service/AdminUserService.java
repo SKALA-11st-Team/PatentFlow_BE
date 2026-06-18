@@ -1,3 +1,7 @@
+/**
+ * @author 유건욱
+ * @date 2026-05-19
+ */
 package com.syuuk.patentflow.user.service;
 
 import com.syuuk.patentflow.auth.service.AuthSessionService;
@@ -41,6 +45,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * @relatedFR FR-COM-01, FR-LEGAL-25
+ * @relatedUI UI-LEGAL-08
+ * @description 사용자 계정 관리 서비스. 계정 조회·생성(초대 메일)·수정·삭제·비밀번호 초기화와 사업부 초대 상태를 다룬다.
+ */
 @Service
 public class AdminUserService {
 
@@ -79,6 +88,11 @@ public class AdminUserService {
         this.authSessionService = authSessionService;
     }
 
+    /**
+     * @relatedFR FR-COM-01
+     * @relatedUI UI-LEGAL-08
+     * @description 전체 사용자 계정을 생성일 순으로 조회한다.
+     */
     @Transactional(readOnly = true)
     public List<UserResponse> getUsers() {
         return userRepository.findAll(Sort.by("createdAt")).stream()
@@ -86,6 +100,11 @@ public class AdminUserService {
                 .toList();
     }
 
+    /**
+     * @relatedFR FR-COM-01
+     * @relatedUI UI-LEGAL-08
+     * @description 이메일·계정명·사업부 ID 검색어로 사용자 계정을 검색·페이징 조회한다.
+     */
     @Transactional(readOnly = true)
     public PageResponse<UserResponse> getUsers(int page, int size, String search) {
         PageRequest pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100),
@@ -98,6 +117,11 @@ public class AdminUserService {
                 new PageInfo(users.getNumber(), users.getSize(), users.getTotalElements(), users.getTotalPages()));
     }
 
+    /**
+     * @relatedFR FR-COM-01, FR-LEGAL-25
+     * @relatedUI UI-LEGAL-08
+     * @description 계정을 생성한다. 사업부 계정은 PENDING + 임시 비밀번호로 만들고 초대 토큰·초대 메일을 발송한다(메일 실패는 롤백하지 않음).
+     */
     @Transactional
     public UserResponse createUser(CreateUserRequest request) {
         validateAdminRoleChange(null, null, request.role());
@@ -128,8 +152,9 @@ public class AdminUserService {
     }
 
     /**
-     * @relatedFR FR-LEGAL-12, FR-LEGAL-23
-     * 초대 재발송: 사용자의 PENDING 초대를 rotate 후 새 초대 생성 + 메일 발송.
+     * @relatedFR FR-COM-01, FR-LEGAL-12, FR-LEGAL-23
+     * @relatedUI UI-LEGAL-08
+     * @description 초대 재발송: 사용자의 PENDING 초대를 rotate 후 새 초대 생성 + 메일 발송.
      * USER-06: 메일 실패가 초대 rotate/생성을 롤백시키지 않는다(커밋된 새 초대는 보존).
      */
     @Transactional
@@ -157,8 +182,9 @@ public class AdminUserService {
     }
 
     /**
-     * @relatedFR FR-LEGAL-12, FR-LEGAL-23
-     * 사업부(BUSINESS) 계정별 초대/접근 상태 목록.
+     * @relatedFR FR-COM-01, FR-LEGAL-12, FR-LEGAL-23
+     * @relatedUI UI-LEGAL-08
+     * @description 사업부(BUSINESS) 계정별 초대/접근 상태 목록을 현재 활성 분기의 회신 기한 기준으로 조회한다.
      */
     @Transactional(readOnly = true)
     public List<BusinessInvitationStatusResponse> getBusinessInvitationStatuses() {
@@ -194,6 +220,11 @@ public class AdminUserService {
         return active != null ? active.submissionDeadline() : null;
     }
 
+    /**
+     * @relatedFR FR-COM-01, FR-LEGAL-25
+     * @relatedUI UI-LEGAL-08
+     * @description 계정의 이메일·역할·사업부·이름을 수정한다(관리자 역할 제약·사업부 검증 포함).
+     */
     @Transactional
     public UserResponse updateUser(String userId, CreateUserRequest request) {
         UserEntity user = userRepository.findById(userId)
@@ -232,6 +263,11 @@ public class AdminUserService {
                 user.getDepartmentId(), departmentName, user.getCreatedAt());
     }
 
+    /**
+     * @relatedFR FR-COM-01
+     * @relatedUI UI-LEGAL-08
+     * @description 계정을 삭제한다. 본인·기본 관리자·마지막 관리자 계정은 삭제할 수 없다.
+     */
     @Transactional
     public void deleteUser(String userId, String currentUserId) {
         UserEntity user = userRepository.findById(userId)
@@ -250,6 +286,9 @@ public class AdminUserService {
     }
 
     /**
+     * @relatedFR FR-COM-01
+     * @relatedUI UI-LEGAL-08
+     * @description 임시 비밀번호를 발급하고 안내 메일을 발송한다(레거시 경로, 신규 흐름은 초대 재발송 사용).
      * @deprecated 임시 비밀번호 평문 발급 방식은 초대 토큰 재발송({@link #resendInvitation})으로 대체됐다.
      *             사업부 계정 자격증명 복구는 초대 재발송이 단일 경로다. 본 메서드는 하위 호환을 위해서만 유지하며
      *             신규 흐름에서 호출하지 않는다(관리자 본인 비밀번호 변경은 별도 changePassword 경로).

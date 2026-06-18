@@ -1,3 +1,7 @@
+/**
+ * @author 유건욱
+ * @date 2026-05-19
+ */
 package com.syuuk.patentflow.auth.service;
 
 import com.syuuk.patentflow.auth.dto.ChangePasswordRequest;
@@ -26,6 +30,11 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * @relatedFR FR-COM-01
+ * @relatedUI UI-COM-01
+ * @description 로그인·토큰 발급/갱신/폐기, 본인 프로필·비밀번호 변경 등 인증 비즈니스 로직을 담당한다.
+ */
 @Service
 public class AuthService {
 
@@ -66,6 +75,11 @@ public class AuthService {
         this.passwordChangeCache = passwordChangeCache;
     }
 
+    /**
+     * @relatedFR FR-COM-01
+     * @relatedUI UI-COM-01
+     * @description 락아웃 검사 후 자격을 인증하고, 실패/성공을 감사 로깅한 뒤 토큰을 발급한다.
+     */
     @Transactional
     public AuthResult login(LoginRequest request) {
         loginAttemptService.assertNotLocked(request.email());
@@ -85,6 +99,11 @@ public class AuthService {
         return issueTokens((UserDetailsImpl) userDetails);
     }
 
+    /**
+     * @relatedFR FR-COM-01
+     * @relatedUI UI-COM-01
+     * @description refresh 토큰으로 세션을 소비(1회성)하고 사용자 정보를 재조회해 토큰을 재발급한다.
+     */
     @Transactional(noRollbackFor = PatentFlowException.class)
     public AuthResult refresh(String refreshToken) {
         AuthSessionService.UserSession session = authSessionService.consume(refreshToken);
@@ -92,6 +111,11 @@ public class AuthService {
         return issueTokens((UserDetailsImpl) userDetails);
     }
 
+    /**
+     * @relatedFR FR-COM-01
+     * @relatedUI UI-COM-01
+     * @description 인증 principal을 기준으로 DB를 재조회해 최신 사용자 프로필을 반환한다.
+     */
     @Transactional(readOnly = true)
     public UserPrincipalResponse currentUser(Authentication authentication) {
         Object principal = authentication.getPrincipal();
@@ -105,6 +129,11 @@ public class AuthService {
         return toPrincipalResponse((UserDetails) principal);
     }
 
+    /**
+     * @relatedFR FR-COM-01
+     * @relatedUI UI-COM-01
+     * @description 로그인한 사용자의 표시 이름(username)을 수정해 저장한다.
+     */
     @Transactional
     public UserPrincipalResponse updateProfile(Authentication authentication, UpdateProfileRequest request) {
         UserPrincipalResponse current = currentUser(authentication);
@@ -115,6 +144,11 @@ public class AuthService {
         return toPrincipalResponse(new UserDetailsImpl(user));
     }
 
+    /**
+     * @relatedFR FR-COM-01
+     * @relatedUI UI-COM-01
+     * @description 현재 비밀번호 확인·정책 검증 후 비밀번호를 변경하고 모든 세션을 무효화한다.
+     */
     @Transactional
     public void changePassword(Authentication authentication, ChangePasswordRequest request) {
         UserPrincipalResponse current = currentUser(authentication);
@@ -135,6 +169,11 @@ public class AuthService {
         auditLogger.record(SecurityAuditLogger.Event.PASSWORD_CHANGED, current.email());
     }
 
+    /**
+     * @relatedFR FR-COM-01
+     * @relatedUI UI-COM-01
+     * @description access 토큰을 폐기하고 refresh 세션을 무효화한 뒤 로그아웃을 감사 로깅한다.
+     */
     @Transactional
     public void logout(String accessToken, String refreshToken) {
         revokeAccessToken(accessToken);
@@ -142,6 +181,11 @@ public class AuthService {
         auditLogger.record(SecurityAuditLogger.Event.LOGOUT, null);
     }
 
+    /**
+     * @relatedFR FR-COM-01
+     * @relatedUI UI-COM-01
+     * @description Bearer 토큰을 추출·검증한 뒤 만료 시각까지 폐기 목록에 등록한다.
+     */
     @Transactional
     public void revokeAccessToken(String accessToken) {
         String token = extractBearerToken(accessToken);

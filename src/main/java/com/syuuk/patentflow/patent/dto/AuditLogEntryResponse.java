@@ -1,3 +1,7 @@
+/**
+ * @author 유건욱
+ * @date 2026-06-12
+ */
 package com.syuuk.patentflow.patent.dto;
 
 import java.time.OffsetDateTime;

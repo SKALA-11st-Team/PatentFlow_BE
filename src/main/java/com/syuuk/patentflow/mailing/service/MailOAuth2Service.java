@@ -1,3 +1,7 @@
+/**
+ * @author 이소율
+ * @date 2026-05-28
+ */
 package com.syuuk.patentflow.mailing.service;
 
 import com.syuuk.patentflow.common.error.ErrorCode;
@@ -26,6 +30,12 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+/**
+ * @relatedFR FR-LEGAL-13
+ * @relatedUI UI-LEGAL-05
+ * @description 메일 발송용 Google 계정 연동을 담당한다. 인증 URL 발급, code 교환·refresh_token 저장,
+ *     access_token 캐시·갱신, 연동 상태 조회/해제를 처리한다.
+ */
 @Service
 public class MailOAuth2Service {
 
@@ -67,6 +77,11 @@ public class MailOAuth2Service {
 
     // ── 인증 URL ──────────────────────────────────────────────
 
+    /**
+     * @relatedFR FR-LEGAL-13
+     * @relatedUI UI-LEGAL-05
+     * @description CSRF 방어용 state를 발급·저장하고 Gmail 발송 권한을 요청하는 Google 인증 URL을 생성한다.
+     */
     public String buildAuthorizationUrl() {
         String clientId = systemSettingsService.getGmailOAuth2ClientId();
         if (clientId.isBlank()) {
@@ -101,6 +116,11 @@ public class MailOAuth2Service {
 
     // ── 코드 교환 및 저장 ─────────────────────────────────────
 
+    /**
+     * @relatedFR FR-LEGAL-13
+     * @relatedUI UI-LEGAL-05
+     * @description 콜백 code를 Google 토큰으로 교환해 refresh_token과 연동 이메일을 저장하고 access_token을 캐시한다.
+     */
     public void exchangeCodeAndSave(String code) {
         Map<String, Object> tokenResponse = requestTokens(code);
 
@@ -121,6 +141,11 @@ public class MailOAuth2Service {
 
     // ── access_token 조회 (캐시 우선) ────────────────────────
 
+    /**
+     * @relatedFR FR-LEGAL-13
+     * @relatedUI UI-LEGAL-05
+     * @description 유효한 access_token을 반환한다. 캐시가 살아 있으면 재사용하고, 만료 시 refresh_token으로 갱신한다.
+     */
     public String getValidAccessToken() {
         CachedToken cached = cachedToken.get();
         if (cached != null && Instant.now().isBefore(cached.expiry())) {
@@ -131,16 +156,31 @@ public class MailOAuth2Service {
 
     // ── 연동 상태 ─────────────────────────────────────────────
 
+    /**
+     * @relatedFR FR-LEGAL-13
+     * @relatedUI UI-LEGAL-05
+     * @description Google 계정 연동 여부와 연동된 발신 이메일 주소를 응답 DTO로 반환한다.
+     */
     public MailOAuth2StatusResponse getStatus() {
         String email = systemSettingsService.getGmailOAuth2ConnectedEmail();
         boolean connected = systemSettingsService.getGmailOAuth2RefreshToken() != null;
         return new MailOAuth2StatusResponse(connected, connected ? email : null);
     }
 
+    /**
+     * @relatedFR FR-LEGAL-13
+     * @relatedUI UI-LEGAL-05
+     * @description refresh_token 보유 여부로 Google 계정 연동 상태를 판정한다(메일 발송 가능 여부 판단에 사용).
+     */
     public boolean isConnected() {
         return systemSettingsService.getGmailOAuth2RefreshToken() != null;
     }
 
+    /**
+     * @relatedFR FR-LEGAL-13
+     * @relatedUI UI-LEGAL-05
+     * @description 캐시 토큰과 저장된 연동 정보를 모두 제거해 Google 계정 연동을 해제한다.
+     */
     public void disconnect() {
         cachedToken.set(null);
         systemSettingsService.clearGmailOAuth2();

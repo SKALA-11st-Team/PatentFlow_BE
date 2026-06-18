@@ -1,3 +1,7 @@
+/**
+ * @author 유건욱
+ * @date 2026-05-19
+ */
 package com.syuuk.patentflow.settings.service;
 
 import com.syuuk.patentflow.common.error.ErrorCode;
@@ -23,6 +27,11 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * @relatedFR FR-LEGAL-16, FR-LEGAL-23
+ * @relatedUI UI-LEGAL-07
+ * @description 분기 템플릿·분기 설정(납부 기간/회신 기한/메일 발송 리드타임)·분기 활성화 등 운영 기준 설정을 관리한다.
+ */
 @Service
 public class SettingsService {
 
@@ -59,6 +68,11 @@ public class SettingsService {
         this.eventPublisher = eventPublisher;
     }
 
+    /**
+     * @relatedFR FR-LEGAL-16
+     * @relatedUI UI-LEGAL-07
+     * @description 분기(Q1~Q4) 경계 날짜 템플릿 목록을 분기 번호 순으로 조회한다.
+     */
     @Transactional(readOnly = true)
     public List<ReviewPeriodTemplateResponse> getPeriodTemplates() {
         return periodTemplateRepository.findAllByOrderByPeriodNumber().stream()
@@ -66,6 +80,11 @@ public class SettingsService {
                 .toList();
     }
 
+    /**
+     * @relatedFR FR-LEGAL-16
+     * @relatedUI UI-LEGAL-07
+     * @description 특정 분기 템플릿의 시작/종료 월·일을 고정 달력 분기 범위 안에서 수정한다.
+     */
     @Transactional
     public ReviewPeriodTemplateResponse updatePeriodTemplate(int periodNumber, ReviewPeriodTemplateRequest request) {
         validatePeriodNumber(periodNumber);
@@ -78,6 +97,11 @@ public class SettingsService {
         return toTemplateResponse(template);
     }
 
+    /**
+     * @relatedFR FR-LEGAL-16, FR-LEGAL-23
+     * @relatedUI UI-LEGAL-07
+     * @description 해당 연도의 분기별 설정(납부 기간·활성화 여부·회신 기한·메일 발송 예정일)을 조회한다.
+     */
     @Transactional(readOnly = true)
     public List<QuarterSettingResponse> getQuarterSettings(int year) {
         return periodTemplateRepository.findAllByOrderByPeriodNumber().stream()
@@ -95,6 +119,11 @@ public class SettingsService {
                 .toList();
     }
 
+    /**
+     * @relatedFR FR-LEGAL-16
+     * @relatedUI UI-LEGAL-07
+     * @description 현재 활성화되어 있고 종료되지 않은 분기 설정을 조회한다(없으면 null).
+     */
     @Transactional(readOnly = true)
     public QuarterSettingResponse getActiveQuarter() {
         return quarterSettingRepository.findByActivatedTrueAndEndedFalseOrderByActivatedAtDesc().stream()
@@ -104,6 +133,11 @@ public class SettingsService {
                 .orElse(null);
     }
 
+    /**
+     * @relatedFR FR-LEGAL-16, FR-LEGAL-23
+     * @relatedUI UI-LEGAL-07
+     * @description 분기의 납부 기간과 회신 기한을 수정한다(활성화된 분기는 납부 기간 수정 불가, 회신 기한은 분기 범위 검증).
+     */
     @Transactional
     public QuarterSettingResponse updateQuarterSetting(String quarterKey, QuarterSettingRequest request) {
         QuarterSettingEntity quarter = findOrCreateQuarter(quarterKey);
@@ -130,6 +164,11 @@ public class SettingsService {
                 quarter.getQuarterNumber(), quarter.getStartDate(), quarter.getEndDate());
     }
 
+    /**
+     * @relatedFR FR-LEGAL-16, FR-LEGAL-23
+     * @relatedUI UI-LEGAL-07
+     * @description 분기를 활성화해 회신 기한·메일 리드타임 스냅샷을 확정하고 검토 대상 생성·AI 레포트 배치를 트리거한다.
+     */
     @Transactional
     public QuarterActivateResponse activateQuarter(String quarterKey) {
         synchronized (quarterActivationMonitor) {
@@ -144,6 +183,11 @@ public class SettingsService {
         }
     }
 
+    /**
+     * @relatedFR FR-LEGAL-16, FR-LEGAL-23
+     * @relatedUI UI-LEGAL-07
+     * @description 스케줄러용 멱등 활성화 — 아직 활성화되지 않은 분기만 활성화하고(이미 활성이면 false) 검토 대상·AI 배치를 트리거한다.
+     */
     @Transactional
     public boolean activateQuarterIfNeeded(String quarterKey) {
         synchronized (quarterActivationMonitor) {
@@ -393,6 +437,11 @@ public class SettingsService {
 
     private record QuarterParts(int year, int quarterNumber) {}
 
+    /**
+     * @relatedFR FR-LEGAL-16
+     * @relatedUI UI-LEGAL-07
+     * @description 분기 템플릿이 비어 있을 때만 기본 달력 분기(Q1~Q4) 템플릿을 시드한다.
+     */
     // SETTINGS-09: 생성자 내 트랜잭션 밖 쓰기 대신 @Transactional public으로 노출하고,
     // 별도 ReviewPeriodTemplateSeeder(@PostConstruct)가 호출한다(프록시 적용 → 트랜잭션 보장).
     @Transactional

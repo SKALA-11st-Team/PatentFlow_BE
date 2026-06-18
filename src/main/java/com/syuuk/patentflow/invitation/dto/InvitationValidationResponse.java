@@ -1,3 +1,7 @@
+/**
+ * @author 유건욱
+ * @date 2026-06-14
+ */
 package com.syuuk.patentflow.invitation.dto;
 
 import java.time.LocalDate;

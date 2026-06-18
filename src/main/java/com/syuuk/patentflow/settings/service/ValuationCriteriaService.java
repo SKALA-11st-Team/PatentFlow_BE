@@ -1,3 +1,7 @@
+/**
+ * @author 유건욱
+ * @date 2026-06-11
+ */
 package com.syuuk.patentflow.settings.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;

@@ -1,3 +1,7 @@
+/**
+ * @author 유건욱
+ * @date 2026-05-19
+ */
 package com.syuuk.patentflow.mailing.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -50,6 +54,12 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * @relatedFR FR-LEGAL-12, FR-LEGAL-13, FR-LEGAL-14
+ * @relatedUI UI-LEGAL-05
+ * @description 사업부 검토 요청 메일링을 담당한다. 부서별 수신자 매핑 조회·수정, Google 계정 연동을 통한 메일 발송과
+ *     워크플로우 전이, 발송 이력 조회를 한곳에서 처리한다.
+ */
 @Service
 public class MailingService {
 
@@ -97,6 +107,11 @@ public class MailingService {
         this.mailOAuth2Service = mailOAuth2Service;
     }
 
+    /**
+     * @relatedFR FR-LEGAL-12
+     * @relatedUI UI-LEGAL-05
+     * @description 부서별 수신자 매핑을 조회한다. users.department_id 기준으로 주 수신자와 CC를 도출한다.
+     */
     @Transactional(readOnly = true)
     public List<DepartmentRecipientMappingResponse> getRecipientMappings(String departmentId) {
         // users.department_id 기준으로 사업부별 수신자를 도출한다.
@@ -122,6 +137,11 @@ public class MailingService {
                 .toList();
     }
 
+    /**
+     * @relatedFR FR-LEGAL-12
+     * @relatedUI UI-LEGAL-05
+     * @description 부서 수신자 매핑을 수정한다(부서명만 변경 가능 — 수신자 이메일은 users 테이블에서 파생).
+     */
     @Transactional
     // 부서명만 변경 가능 — 수신자 이메일은 users 테이블에서 파생되므로 여기서 관리하지 않는다.
     public DepartmentRecipientMappingResponse updateRecipientMapping(
@@ -138,6 +158,12 @@ public class MailingService {
         return getRecipientMappings(departmentId).get(0);
     }
 
+    /**
+     * @relatedFR FR-LEGAL-13, FR-LEGAL-14
+     * @relatedUI UI-LEGAL-05
+     * @description 검토 요청 메일 draft를 Google 계정 연동으로 발송하고, 발송 이력 기록과 사업부 응답 대기 전이를
+     *     한 트랜잭션으로 처리한다. 발송 결과(성공/실패/미발송 기록)와 알림 발행을 함께 수행한다.
+     */
     // 트랜잭션 경계(MAIL-02): 이력 저장과 워크플로우 전이를 한 트랜잭션으로 묶어 DB 상태(이력·워크플로우 전이)를
     // 항상 일관되게 유지한다. 실패 처리 방식은 단계별로 다르다 —
     //   토큰 획득(getValidAccessToken): 실패 시 예외를 전파해 전체 롤백(이력 미기록).
@@ -265,6 +291,11 @@ public class MailingService {
         }
     }
 
+    /**
+     * @relatedFR FR-LEGAL-14
+     * @relatedUI UI-LEGAL-05
+     * @description 메일 발송 이력을 특허/수신자 필터와 페이징으로 조회한다(발송 시각 내림차순).
+     */
     @Transactional(readOnly = true)
     public PageResponse<MailingHistoryItemResponse> getHistory(String patentId, String recipientEmail, int page, int size) {
         int normalizedPage = Math.max(page, 1);

@@ -1,3 +1,7 @@
+/**
+ * @author 유건욱
+ * @date 2026-05-20
+ */
 package com.syuuk.patentflow.auth.service;
 
 import com.syuuk.patentflow.auth.config.AuthProperties;
@@ -24,16 +28,31 @@ public class LoginAttemptService {
         this.auditLogger = auditLogger;
     }
 
+    /**
+     * @relatedFR FR-COM-01
+     * @relatedUI UI-COM-01
+     * @description 해당 이메일 계정이 잠금 상태이면 로그인 차단 예외를 던진다.
+     */
     public void assertNotLocked(String email) {
         if (store.isLocked(key(email))) {
             throw new PatentFlowException(ErrorCode.LOGIN_LOCKED);
         }
     }
 
+    /**
+     * @relatedFR FR-COM-01
+     * @relatedUI UI-COM-01
+     * @description 로그인 성공 시 누적된 실패 횟수를 초기화한다.
+     */
     public void recordSuccess(String email) {
         store.reset(key(email));
     }
 
+    /**
+     * @relatedFR FR-COM-01
+     * @relatedUI UI-COM-01
+     * @description 로그인 실패를 누적하고, 임계치 도달 시 계정을 잠그고 감사 로깅한다.
+     */
     public void recordFailure(String email) {
         String key = key(email);
         Duration window = Duration.ofSeconds(properties.getLoginLockSeconds());

@@ -1,3 +1,7 @@
+/**
+ * @author 유건욱
+ * @date 2026-05-29
+ */
 package com.syuuk.patentflow.patent.service;
 
 import com.syuuk.patentflow.business.dto.BusinessDashboardSummaryResponse;
@@ -19,6 +23,11 @@ import java.util.function.Function;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * @relatedFR FR-LEGAL-01
+ * @relatedUI UI-LEGAL-01, UI-BUS-01
+ * @description 관리자/사업부 대시보드의 KPI와 영역별 분포를 검토 이력 최신 상태 기준으로 집계한다.
+ */
 @Service
 public class DashboardSummaryService {
 
@@ -35,6 +44,11 @@ public class DashboardSummaryService {
         this.patentReviewService = patentReviewService;
     }
 
+    /**
+     * @relatedFR FR-LEGAL-01
+     * @relatedUI UI-LEGAL-01
+     * @description 관리자 대시보드 KPI(전체·이번 분기 검토 대상·메일 발송 대기·AI 실패·사업부 응답·최종 판단 대기·처리 완료)를 집계한다.
+     */
     @Transactional(readOnly = true)
     public LegalDashboardSummaryResponse getLegalSummary() {
         int total = Math.toIntExact(patentMetadataRepository.count());
@@ -65,6 +79,11 @@ public class DashboardSummaryService {
                 legalActionCompleted);
     }
 
+    /**
+     * @relatedFR FR-LEGAL-01
+     * @relatedUI UI-BUS-01
+     * @description 사업부 대시보드 KPI(부서 배정 특허 전체·응답 대기·검토 완료·유지·포기)를 부서별 최신 상태로 집계한다.
+     */
     @Transactional(readOnly = true)
     public BusinessDashboardSummaryResponse getBusinessSummary(String departmentId) {
         int total = Math.toIntExact(reviewHistoryRepository.countLatestByDepartmentId(departmentId));
@@ -84,8 +103,10 @@ public class DashboardSummaryService {
     }
 
     /**
-     * DASH-F3: 검토 대상(동일 필터)을 영역별로 서버 집계한다. review-targets 와 같은 조회 경로를 재사용해
-     * 분포 카드와 목록 테이블이 항상 같은 모집단을 보게 한다. 색상·비율·정렬 등 표시 로직은 FE가 담당한다.
+     * @relatedFR FR-LEGAL-01
+     * @relatedUI UI-LEGAL-01
+     * @description DASH-F3: 검토 대상(동일 필터)을 영역별로 서버 집계한다. review-targets 와 같은 조회 경로를 재사용해
+     *     분포 카드와 목록 테이블이 항상 같은 모집단을 보게 한다. 색상·비율·정렬 등 표시 로직은 FE가 담당한다.
      */
     @Transactional(readOnly = true)
     public AreaDistributionResponse getAreaDistribution(

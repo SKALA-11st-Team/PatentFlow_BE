@@ -1,3 +1,7 @@
+/**
+ * @author 유건욱
+ * @date 2026-05-19
+ */
 package com.syuuk.patentflow.notification.service;
 
 import com.syuuk.patentflow.common.error.ErrorCode;
@@ -18,6 +22,11 @@ import java.util.stream.Collectors;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
 
+/**
+ * @relatedFR FR-COM-02
+ * @relatedUI UI-COM-03
+ * @description 역할별 알림 목록 조회·읽음 상태 변경·미읽음 수 집계를 처리한다(공통/역할 대상 분리).
+ */
 @Service
 public class NotificationService {
 
@@ -35,12 +44,22 @@ public class NotificationService {
         this.readStateRepository = readStateRepository;
     }
 
+    /**
+     * @relatedFR FR-COM-02
+     * @relatedUI UI-COM-03
+     * @description 워크플로우 이벤트로 발생한 알림 1건을 대상 역할·링크와 함께 저장한다.
+     */
     @Transactional
     public void addNotification(String title, String message, String targetRole, String link) {
         String id = "NOTIF-" + UUID.randomUUID();
         notificationRepository.save(new NotificationEntity(id, title, message, targetRole, OffsetDateTime.now(KST), link));
     }
 
+    /**
+     * @relatedFR FR-COM-02
+     * @relatedUI UI-COM-03
+     * @description 현재 역할에 노출되는 알림 목록을 사용자별 읽음 상태와 함께 최신순으로 반환한다.
+     */
     @Transactional
     public List<NotificationResponse> getNotifications(String role, String userId) {
         seedDefaultNotificationsIfNeeded();
@@ -52,6 +71,11 @@ public class NotificationService {
                 .toList();
     }
 
+    /**
+     * @relatedFR FR-COM-02
+     * @relatedUI UI-COM-03
+     * @description 사용자별 알림 1건의 읽음/안읽음 상태를 토글 저장한다(노출 권한 검증 포함).
+     */
     @Transactional
     public NotificationResponse updateReadState(String notificationId, boolean isRead, String currentRole, String userId) {
         seedDefaultNotificationsIfNeeded();
@@ -65,6 +89,11 @@ public class NotificationService {
         return toResponse(notification, readState.isRead());
     }
 
+    /**
+     * @relatedFR FR-COM-02
+     * @relatedUI UI-COM-03
+     * @description 현재 역할/사용자의 미읽음 알림 개수(배지 표시용)를 집계한다.
+     */
     @Transactional
     public long unreadCount(String role, String userId) {
         return getNotifications(role, userId).stream()
@@ -72,6 +101,11 @@ public class NotificationService {
                 .count();
     }
 
+    /**
+     * @relatedFR FR-COM-02
+     * @relatedUI UI-COM-03
+     * @description 현재 역할에 노출되는 모든 알림을 해당 사용자 기준으로 읽음 처리한다.
+     */
     @Transactional
     public void markAllRead(String role, String userId) {
         seedDefaultNotificationsIfNeeded();

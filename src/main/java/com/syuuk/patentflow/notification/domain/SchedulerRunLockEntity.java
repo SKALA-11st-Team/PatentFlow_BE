@@ -1,3 +1,7 @@
+/**
+ * @author 유건욱
+ * @date 2026-06-15
+ */
 package com.syuuk.patentflow.notification.domain;
 
 import jakarta.persistence.Column;
