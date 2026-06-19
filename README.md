@@ -44,21 +44,16 @@ PATENTFLOW_JWT_SECRET=change-this-secret
 PATENTFLOW_JWT_EXPIRATION_SECONDS=3600
 ```
 
-## 필요 API
+## 필요 API (외부 API 키)
 
-엔드포인트 전체와 요청/응답 스키마는 Swagger UI가 단일 출처입니다. 아래는 도메인별 요약입니다.
+아래 외부 서비스는 키/자격증명이 설정돼야 동작합니다. 미설정 시 해당 기능은 폴백되거나 건너뜁니다. 내부 엔드포인트 전체와 스키마는 Swagger UI가 단일 출처입니다.
 
-| 도메인 | 베이스 경로 | 주요 기능 | 관련 FR |
+| 외부 API | 용도 | 환경변수 | 키 필요 |
 |---|---|---|---|
-| 인증 | `/api/v1/auth` | 로그인·토큰 갱신·내 정보·비밀번호 변경·로그아웃 | FR-COM |
-| 특허 | `/api/v1/patents` | 목록·검색·필터·상세·등록/수정·이력·최종 판단·AI 레포트 요청/상태·외부 조회·PDF | FR-LEGAL |
-| 연차료 일정 | `/api/v1/annual-fees/schedule` | 일정 조회·개별 수정·재계산 | FR-LEGAL |
-| 법무 | `/api/v1/legal` | 감사 로그·대시보드 요약·기술분야 분포 | FR-LEGAL |
-| 사업부 | `/api/v1/business` | 대시보드·검토 요청·담당 특허 상세·의견(체크리스트) 제출 | FR-BUS |
-| 메일링 | `/api/v1/mailings` | 수신자 매핑·발송·발송 이력 | FR-LEGAL |
-| 알림 | `/api/v1/notifications` | 목록·미읽음 수·읽음 처리 | FR-COM |
-| 설정 | `/api/v1/settings` | 평가 기준·체크리스트·검토 분기·회신 기한·연차료 규칙·국가 설정 | FR-LEGAL |
-| 관리 | `/api/v1/admin/*` | 사용자·부서·초대 관리, 메일 OAuth2 연동 | FR-LEGAL |
+| KIPRIS Plus | 특허 서지·공개전문 PDF 조회 | `PATENTFLOW_KIPRIS_SERVICE_KEY` (복수는 `PATENTFLOW_KIPRIS_SERVICE_KEYS`) | ✅ |
+| Google OAuth2 | 메일 발송 계정 연동(Google 계정 연동) | `GOOGLE_OAUTH2_CLIENT_ID`, `GOOGLE_OAUTH2_CLIENT_SECRET` | ✅ |
+| AWS S3 | 특허 PDF 캐시·presigned 다운로드 링크 | `PATENTFLOW_PDF_S3_BUCKET` (+ AWS 자격증명) | ✅ |
+| Google Patents | 외부 조회 폴백(공개 페이지) | — | ❌ 키 불필요 |
 
 ## 도메인 결정 (드리프트 금지)
 
