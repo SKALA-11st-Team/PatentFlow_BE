@@ -97,11 +97,11 @@ Review target identification
 - APIs that list review targets should support quarter filters (`Q1` through `Q4`) and explicit date ranges.
 - Business-facing fields, mail templates, and DTO display labels should use `회신 기한`, not `마감 기한`.
 - `회신 기한` is a business-response due date configured in bulk by administrators. It is distinct from the internal/legal `실제 마감 기한`.
-- Review-request mail is sent by default three months before the quarter start date:
-  - Q1 patents: October 1 of the previous year
-  - Q2 patents: January 1
-  - Q3 patents: April 1
-  - Q4 patents: July 1
+- Review-request mail is sent by default two months before the quarter start date:
+  - Q1 patents: November 1 of the previous year
+  - Q2 patents: February 1
+  - Q3 patents: May 1
+  - Q4 patents: August 1
 - The lead time in months must be administrator-configurable. Backend settings/query APIs should return the calculated send date per quarter after the setting is applied.
 - Review-request mail payloads, previews, and history records must include the patent original-document URL.
 - Country-specific patent views must distinguish domestic patents from overseas patents because annual-fee payment rules differ by country.
