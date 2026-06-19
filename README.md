@@ -54,10 +54,3 @@ PATENTFLOW_JWT_EXPIRATION_SECONDS=3600
 | Google OAuth2 | 메일 발송 계정 연동(Google 계정 연동) | `GOOGLE_OAUTH2_CLIENT_ID`, `GOOGLE_OAUTH2_CLIENT_SECRET` | ✅ |
 | AWS S3 | 특허 PDF 캐시·presigned 다운로드 링크 | `PATENTFLOW_PDF_S3_BUCKET` (+ AWS 자격증명) | ✅ |
 | Google Patents | 외부 조회 폴백(공개 페이지) | — | ❌ 키 불필요 |
-
-## 도메인 결정 (드리프트 금지)
-
-- 워크플로우에 **별도 결재 단계가 없습니다.** `BUSINESS_RESPONSE_RECEIVED` 이후 관리자/법무가 최종 결정과 법무 처리 결과를 직접 기록합니다. 별도 결재 상태나 결재용 API/타입을 추가하지 않습니다.
-- `patent_review_history`가 **현재 분기 검토 상태의 단일 출처**입니다(워크플로우 상태, AI 권고/레포트 스냅샷, 특허 요약 스냅샷, 사업부 의견 스냅샷, 최종 법무 결정 포함).
-- `business_submissions`는 사업부가 제출한 체크리스트/의견을 저장하며, AI 권고/레포트 값은 **제출 시점 스냅샷**으로만 보관합니다. 현재 AI 권고의 출처로 읽지 않습니다.
-- AI 평가 축은 **권리성·기술성·시장성·사업 연계성** 4개뿐입니다.
